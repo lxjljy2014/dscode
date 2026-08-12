@@ -32,14 +32,56 @@
   },
   "input": {
     "selectProject": "Select project",
-    "gitBranch": "GIT Branch",
+    "gitBranch": "git branch",
     "planMode": "Plan mode",
     "agentMode": "Agent mode",
     "addContext": "Add context",
     "effort": {
-      "close": "Close",
+      "close": "Off",
       "high": "High",
       "max": "Max"
+    }
+  },
+  "permission": {
+    "confirm": "Confirm each",
+    "hintConfirm": "Confirm before every change",
+    "autoEdit": "Auto-edit",
+    "hintAutoEdit": "Edits run automatically, commands need confirmation",
+    "plan": "Plan mode",
+    "hintPlan": "Read-only analysis, changes need manual approval",
+    "fullAccess": "Full access",
+    "hintFullAccess": "All operations run directly"
+  },
+  "project": {
+    "search": "Search projects",
+    "openFolder": "Open folder",
+    "noProject": "Work outside a project",
+    "empty": "No recent projects",
+    "remote": "Remote connection",
+    "remoteNotReady": "Remote connection is not implemented yet"
+  },
+  "branch": {
+    "search": "Search branches",
+    "create": "Create and checkout new branch",
+    "graph": "git graph",
+    "empty": "No matching branches",
+    "loading": "Loading",
+    "nameLabel": "Branch name",
+    "switched": "Switched to branch {branch}",
+    "created": "Created and switched to branch {name}"
+  },
+  "dialog": {
+    "cancel": "Cancel",
+    "create": "Create",
+    "close": "Close",
+    "graphTitle": "git graph",
+    "graphEmpty": "No commits",
+    "graphColumns": {
+      "graph": "Graph",
+      "description": "Description",
+      "date": "Date",
+      "author": "Author",
+      "hash": "Commit id"
     }
   },
   "diff": {

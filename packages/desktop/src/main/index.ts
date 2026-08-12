@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
+import { registerIpcHandlers } from './ipc';
 
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
@@ -74,6 +75,9 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // 业务 IPC（settings / 最近项目 / 目录选择 / git）
+  registerIpcHandlers();
+
   // 渲染端主题切换后同步悬浮按钮符号色（仅 Windows 生效；背景色固定透明）
   ipcMain.on('win:set-titlebar-overlay', (e, options: unknown) => {
     if (!isWindows) return;

@@ -1,0 +1,32 @@
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+import type { AppSettings, SettingsPatch } from '@dscode/shared';
+import { host } from '../host';
+
+/**
+ * 应用设置（工作目录 / 权限模式），主进程 settings.json 持久化。
+ * 纯浏览器环境（host undefined）下用内存默认值降级。
+ */
+
+const DEFAULTS: AppSettings = { workingDirectory: '', permissionMode: 'confirm' };
+
+export const useSettingsStore = defineStore('settings', () => {
+  const settings = ref<AppSettings>({ ...DEFAULTS });
+  const loaded = ref(false);
+
+  async function load(): Promise<void> {
+    if (!host) return;
+    settings.value = await host.getSettings();
+    loaded.value = true;
+  }
+
+  async function save(patch: SettingsPatch): Promise<void> {
+    if (!host) {
+      settings.value = { ...settings.value, ...patch };
+      return;
+    }
+    settings.value = await host.setSettings(patch);
+  }
+
+  return { settings, loaded, load, save };
+});

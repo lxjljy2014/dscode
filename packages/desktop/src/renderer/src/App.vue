@@ -2,13 +2,17 @@
 import { watch, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useLocale, useTheme } from 'vuetify';
-import { host, useUiStore, vuetifyLocaleMap } from '@dscode/ui';
+import { host, useSettingsStore, useUiStore, vuetifyLocaleMap } from '@dscode/ui';
 import { darkTheme, lightTheme } from '@dscode/ui/tokens';
 
 const ui = useUiStore();
+const settingsStore = useSettingsStore();
 const theme = useTheme();
 const { locale } = useI18n();
 const { current } = useLocale();
+
+// 启动时加载应用设置（工作目录 / 权限模式）
+void settingsStore.load();
 
 // 主题：store → Vuetify + color-scheme + Windows 标题栏悬浮按钮符号色
 watchEffect(() => {

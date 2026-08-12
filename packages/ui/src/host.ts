@@ -1,3 +1,5 @@
+import type { AppSettings, GitGraphResult, GitListResult, GitOpResult, ProjectsListResult, SettingsPatch } from '@dscode/shared';
+
 /**
  * 宿主（Electron preload）注入到 window.dscode 的桥接 API。
  * 纯浏览器环境下为 undefined，组件需做降级处理。
@@ -12,6 +14,20 @@ export interface HostApi {
   platform: string;
   versions: Record<string, string | undefined>;
   setTitleBarOverlay: (options: TitleBarOverlayOptions) => void;
+
+  // ---- settings ----
+  getSettings: () => Promise<AppSettings>;
+  setSettings: (patch: SettingsPatch) => Promise<AppSettings>;
+
+  // ---- 最近项目 / 目录选择 ----
+  listRecentProjects: () => Promise<ProjectsListResult>;
+  pickDirectory: () => Promise<string | null>;
+
+  // ---- git ----
+  gitListBranches: (cwd: string) => Promise<GitListResult>;
+  gitCheckout: (cwd: string, branch: string) => Promise<GitOpResult>;
+  gitCreateBranch: (cwd: string, name: string) => Promise<GitOpResult>;
+  gitGraph: (cwd: string) => Promise<GitGraphResult>;
 }
 
 declare global {

@@ -19,7 +19,7 @@ packages/
 │   ├── electron.vite.config.ts
 │   ├── uno.config.ts
 │   └── src/
-│       ├── main/     # Electron 主进程（窗口创建、Windows 标题栏悬浮按钮 IPC）
+│       ├── main/     # Electron 主进程（index.ts 窗口/IPC；git.ts git CLI 封装；projects.ts 最近项目 SQLite；config.ts settings 持久化；ipc.ts 业务 handler）
 │       ├── preload/  # contextBridge 暴露 window.dscode
 │       └── renderer/ # Vue 应用入口（App.vue / router.ts / main.ts）
 ├── shared/           # @dscode/shared —— 纯 TS：类型定义、mock 数据、i18n 语言包
@@ -29,8 +29,8 @@ packages/
 │       └── locales/  # zh-CN.json / en-US.json
 └── ui/               # @dscode/ui —— 全部 UI：组件、Pinia stores、插件、主题
     └── src/
-        ├── components/  # 17 个 Vue SFC（WorkspaceView、ChatView、DiffPanel 等）
-        ├── stores/      # ui.ts（主题/语言/侧栏显隐）、session.ts（会话/流式回复模拟）
+        ├── components/  # 18 个 Vue SFC（WorkspaceView、ChatView、DiffPanel、GitGraphDialog 等）
+        ├── stores/      # ui.ts（主题/语言/侧栏显隐）、session.ts（会话/流式回复模拟）、settings.ts（工作目录/权限模式，主进程持久化）
         ├── plugins/     # vuetify.ts、i18n.ts（createXxxPlugin 工厂函数）
         ├── theme/       # tokens.ts（主题色唯一事实源）、global.css（滚动条/选区/拖拽区）
         └── host.ts      # window.dscode 桥接 API 的类型封装
@@ -96,7 +96,13 @@ Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror �
 - 无边框窗口（`titleBarStyle: 'hidden'`）：macOS 用 `trafficLightPosition` 悬浮红绿灯，Windows 用 `titleBarOverlay` 原生悬浮按钮（背景色固定透明，渲染端主题切换时经 IPC `win:set-titlebar-overlay` 只同步 `symbolColor` 符号色）。渲染端需为系统控件预留位置，相关常量在 `@dscode/ui` 的 `host.ts`（`TITLEBAR_OVERLAY_WIDTH = 150`，macOS 左侧让位 84px）。
 - 渲染端通过 `.ds-drag` / `.ds-no-drag` CSS 类处理标题栏拖拽区（见 `global.css`）。
 - 安全设置：`contextIsolation: true`、`nodeIntegration: false`、`sandbox: false`；外部链接一律 `shell.openExternal`，`window.open` 被 deny。
-- preload 只暴露 `window.dscode`（platform、versions、setTitleBarOverlay）；纯浏览器环境下为 `undefined`，组件须降级处理。
+- preload 只暴露 `window.dscode`（platform、versions、setTitleBarOverlay + 业务 IPC 封装）；纯浏览器环境下为 `undefined`，组件须降级处理。
+- **业务 IPC 通道**（全部 `ipcMain.handle` / `ipcRenderer.invoke`，定义在 `desktop/src/main/ipc.ts`，渲染端类型见 `@dscode/ui` 的 `host.ts`）：
+  - `settings:get` / `settings:set` —— 工作目录 + 权限模式（`userData/settings.json` 持久化；set 时工作目录变化自动记入最近项目）
+  - `projects:list` —— 最近项目（`node:sqlite`，`userData/projects.db`，无原生依赖）
+  - `dialog:pick-directory` —— 选择工作目录（取消返回 null）
+  - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` —— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合
+  - 每个 handler 校验 sender 属于主窗口 + 参数类型；新增业务 IPC 沿用此模式
 
 ## 测试与质量
 

@@ -32,7 +32,7 @@
   },
   "input": {
     "selectProject": "选择项目",
-    "gitBranch": "GIT分支",
+    "gitBranch": "git分支",
     "planMode": "计划模式",
     "agentMode": "代理模式",
     "addContext": "添加上下文",
@@ -40,6 +40,48 @@
       "close": "关闭",
       "high": "高",
       "max": "最高"
+    }
+  },
+  "permission": {
+    "confirm": "每次确认",
+    "hintConfirm": "变更前逐项确认",
+    "autoEdit": "自动编辑",
+    "hintAutoEdit": "编辑自动执行，执行命令需确认",
+    "plan": "计划模式",
+    "hintPlan": "只读分析，变更需手动批准",
+    "fullAccess": "完全访问",
+    "hintFullAccess": "全部操作直接执行"
+  },
+  "project": {
+    "search": "搜索项目",
+    "openFolder": "打开文件夹",
+    "noProject": "不在项目中工作",
+    "empty": "暂无最近项目",
+    "remote": "远程连接",
+    "remoteNotReady": "远程连接功能尚未实现"
+  },
+  "branch": {
+    "search": "搜索分支",
+    "create": "创建并检出新分支",
+    "graph": "git 图谱",
+    "empty": "无匹配分支",
+    "loading": "加载中",
+    "nameLabel": "分支名称",
+    "switched": "已切换到分支 {branch}",
+    "created": "已创建并切换到分支 {name}"
+  },
+  "dialog": {
+    "cancel": "取消",
+    "create": "创建",
+    "close": "关闭",
+    "graphTitle": "git 图谱",
+    "graphEmpty": "暂无提交",
+    "graphColumns": {
+      "graph": "图",
+      "description": "描述",
+      "date": "日期",
+      "author": "作者",
+      "hash": "提交id"
     }
   },
   "diff": {

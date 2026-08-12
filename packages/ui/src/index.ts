@@ -8,6 +8,7 @@ export type { HostApi, TitleBarOverlayOptions } from './host';
 export { useUiStore } from './stores/ui';
 export type { LocaleSetting, ThemeMode } from './stores/ui';
 export { useSessionStore } from './stores/session';
+export { useSettingsStore } from './stores/settings';
 
 export { default as AppHeader } from './components/AppHeader.vue';
 export { default as SessionSidebar } from './components/SessionSidebar.vue';
