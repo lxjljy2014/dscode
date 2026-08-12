@@ -1,15 +1,20 @@
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { defineConfig } from 'electron-vite'
 import UnoCSS from 'unocss/vite'
 import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()]
+    build: {
+      // electron-vite 5：externalizeDepsPlugin 已弃用，改用 build.externalizeDeps 配置
+      externalizeDeps: true
+    }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()]
+    build: {
+      externalizeDeps: true
+    }
   },
   renderer: {
     resolve: {
