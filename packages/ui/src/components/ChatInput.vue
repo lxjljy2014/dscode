@@ -40,61 +40,61 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <v-sheet class="flex flex-col" rounded="2xl">
+  <VSheet class="flex flex-col" rounded="2xl">
     <div v-if="!sessionStore.hasMessage" class="flex gap-2 px-2 py-1">
       <!-- 项目选择条 -->
-      <v-menu location="top start" :offset="4">
+      <VMenu location="top start" :offset="4">
         <template #activator="{ props: menuProps }">
-          <v-btn
-              v-bind="menuProps"
-              variant="text"
-              rounded="pill"
-              size="small"
-              class="text-muted"
-              prepend-icon="i-lucide:folder"
-              append-icon="i-lucide:chevron-down"
+          <VBtn
+            v-bind="menuProps"
+            variant="text"
+            rounded="pill"
+            size="small"
+            class="text-muted"
+            prepend-icon="i-lucide:folder"
+            append-icon="i-lucide:chevron-down"
           >
             {{ t('input.selectProject') }}
-          </v-btn>
+          </VBtn>
         </template>
-        <v-list min-width="200" nav>
-          <v-list-item active prepend-icon="i-lucide:folder">
-            <v-list-item-title class="text-sm">dscode</v-list-item-title>
+        <VList min-width="200" nav>
+          <VListItem active prepend-icon="i-lucide:folder">
+            <VListItemTitle class="text-sm">dscode</VListItemTitle>
             <template #append>
-              <v-icon icon="i-lucide:check" size="16" />
+              <VIcon icon="i-lucide:check" size="16" />
             </template>
-          </v-list-item>
-        </v-list>
-      </v-menu>
-<!--      git 分支-->
-      <v-menu location="top start" :offset="4">
+          </VListItem>
+        </VList>
+      </VMenu>
+      <!--      git 分支-->
+      <VMenu location="top start" :offset="4">
         <template #activator="{ props: menuProps }">
-          <v-btn
-              v-bind="menuProps"
-              variant="text"
-              rounded="pill"
-              size="small"
-              class="text-muted"
-              prepend-icon="i-lucide:git-branch"
-              append-icon="i-lucide:chevron-down"
+          <VBtn
+            v-bind="menuProps"
+            variant="text"
+            rounded="pill"
+            size="small"
+            class="text-muted"
+            prepend-icon="i-lucide:git-branch"
+            append-icon="i-lucide:chevron-down"
           >
             {{ t('input.gitBranch') }}
-          </v-btn>
+          </VBtn>
         </template>
-        <v-list min-width="200" nav>
-          <v-list-item active prepend-icon="i-lucide:folder">
-            <v-list-item-title class="text-sm">dscode</v-list-item-title>
+        <VList min-width="200" nav>
+          <VListItem active prepend-icon="i-lucide:folder">
+            <VListItemTitle class="text-sm">dscode</VListItemTitle>
             <template #append>
-              <v-icon icon="i-lucide:check" size="16" />
+              <VIcon icon="i-lucide:check" size="16" />
             </template>
-          </v-list-item>
-        </v-list>
-      </v-menu>
+          </VListItem>
+        </VList>
+      </VMenu>
     </div>
 
     <!-- 输入卡片 -->
     <div class="rounded-2xl border bg-elevated">
-      <v-textarea
+      <VTextarea
         v-model="input"
         :placeholder="t('chat.placeholder')"
         variant="solo"
@@ -109,16 +109,16 @@ function onKeydown(e: KeyboardEvent) {
       />
 
       <div class="flex items-center gap-1 px-2 pb-2">
-        <v-tooltip :text="t('input.addContext')" location="top">
-          <template #activator="{ props }">
-            <v-btn v-bind="props" icon="i-lucide:plus" variant="text" size="small" class="text-muted" />
+        <VTooltip :text="t('input.addContext')" location="top">
+          <template #activator="{ props: tipProps }">
+            <VBtn v-bind="tipProps" icon="i-lucide:plus" variant="text" size="small" class="text-muted" />
           </template>
-        </v-tooltip>
+        </VTooltip>
 
         <!-- 模式选择 -->
-        <v-menu location="top start" :offset="4">
+        <VMenu location="top start" :offset="4">
           <template #activator="{ props: menuProps }">
-            <v-btn
+            <VBtn
               v-bind="menuProps"
               variant="text"
               size="small"
@@ -127,31 +127,31 @@ function onKeydown(e: KeyboardEvent) {
               append-icon="i-lucide:chevron-down"
             >
               {{ mode === 'plan' ? t('input.planMode') : t('input.agentMode') }}
-            </v-btn>
+            </VBtn>
           </template>
-            <v-list min-width="140" nav>
-              <v-list-item
-                  v-for="m in modes"
-                  :key="m"
-                  :active="mode === m"
-                  @click="mode = m"
-              >
-                <v-list-item-title class="text-sm">
-                  {{ m === 'plan' ? t('input.planMode') : t('input.agentMode') }}
-                </v-list-item-title>
-                <template #append>
-                  <v-icon v-if="mode === m" icon="i-lucide:check" size="16" />
-                </template>
-              </v-list-item>
-            </v-list>
-        </v-menu>
+          <VList min-width="140" nav>
+            <VListItem
+              v-for="m in modes"
+              :key="m"
+              :active="mode === m"
+              @click="mode = m"
+            >
+              <VListItemTitle class="text-sm">
+                {{ m === 'plan' ? t('input.planMode') : t('input.agentMode') }}
+              </VListItemTitle>
+              <template #append>
+                <VIcon v-if="mode === m" icon="i-lucide:check" size="16" />
+              </template>
+            </VListItem>
+          </VList>
+        </VMenu>
 
-        <v-spacer />
+        <VSpacer />
 
         <!-- 模型选择 -->
-        <v-menu location="top end" :offset="4">
+        <VMenu location="top end" :offset="4">
           <template #activator="{ props: menuProps }">
-            <v-btn
+            <VBtn
               v-bind="menuProps"
               variant="text"
               size="small"
@@ -159,27 +159,27 @@ function onKeydown(e: KeyboardEvent) {
               append-icon="i-lucide:chevron-down"
             >
               {{ model }}
-            </v-btn>
+            </VBtn>
           </template>
-            <v-list min-width="220" nav>
-              <v-list-item
-                  v-for="m in models"
-                  :key="m"
-                  :active="model === m"
-                  @click="model = m"
-              >
-                <v-list-item-title>{{ m }}</v-list-item-title>
-                <template #append>
-                  <v-icon v-if="model === m" icon="i-lucide:check" size="16" />
-                </template>
-              </v-list-item>
-            </v-list>
-        </v-menu>
+          <VList min-width="220" nav>
+            <VListItem
+              v-for="m in models"
+              :key="m"
+              :active="model === m"
+              @click="model = m"
+            >
+              <VListItemTitle>{{ m }}</VListItemTitle>
+              <template #append>
+                <VIcon v-if="model === m" icon="i-lucide:check" size="16" />
+              </template>
+            </VListItem>
+          </VList>
+        </VMenu>
 
         <!-- 推理强度 -->
-        <v-menu location="top end" :offset="4">
+        <VMenu location="top end" :offset="4">
           <template #activator="{ props: menuProps }">
-            <v-btn
+            <VBtn
               v-bind="menuProps"
               variant="text"
               size="small"
@@ -188,27 +188,26 @@ function onKeydown(e: KeyboardEvent) {
               append-icon="i-lucide:chevron-down"
             >
               {{ t(`input.effort.${effort}`) }}
-            </v-btn>
+            </VBtn>
           </template>
-            <v-list min-width="120" nav>
-              <v-list-item
-                  v-for="e in efforts"
-                  :key="e"
-                  :active="effort === e"
-                  @click="effort = e"
-              >
-                <v-list-item-title class="text-sm">{{ t(`input.effort.${e}`) }}</v-list-item-title>
-                <template #append>
-                  <v-icon v-if="effort === e" icon="i-lucide:check" size="16" />
-                </template>
-              </v-list-item>
-            </v-list>
+          <VList min-width="120" nav>
+            <VListItem
+              v-for="e in efforts"
+              :key="e"
+              :active="effort === e"
+              @click="effort = e"
+            >
+              <VListItemTitle class="text-sm">{{ t(`input.effort.${e}`) }}</VListItemTitle>
+              <template #append>
+                <VIcon v-if="effort === e" icon="i-lucide:check" size="16" />
+              </template>
+            </VListItem>
+          </VList>
+        </VMenu>
 
-        </v-menu>
-
-        <v-tooltip :text="generating ? t('chat.stop') : t('chat.send')" location="top">
+        <VTooltip :text="generating ? t('chat.stop') : t('chat.send')" location="top">
           <template #activator="{ props: tipProps }">
-            <v-btn
+            <VBtn
               v-bind="tipProps"
               :icon="generating ? 'i-lucide:square' : 'i-lucide:arrow-up'"
               color="primary"
@@ -217,8 +216,8 @@ function onKeydown(e: KeyboardEvent) {
               @click="generating ? emit('stop') : submit()"
             />
           </template>
-        </v-tooltip>
+        </VTooltip>
       </div>
     </div>
-  </v-sheet>
+  </VSheet>
 </template>

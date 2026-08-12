@@ -41,7 +41,7 @@ const proxyExceptions = ref('')
 
   <div class="flex flex-col gap-4">
     <!-- 界面语言 -->
-    <v-card class="px-4 py-3.5">
+    <VCard class="px-4 py-3.5">
       <div class="flex items-center justify-between gap-6">
         <div class="min-w-0">
           <div class="text-sm font-medium">{{ t('settingsPage.general.language') }}</div>
@@ -49,9 +49,9 @@ const proxyExceptions = ref('')
             {{ t('settingsPage.general.languageDesc') }}
           </div>
         </div>
-        <v-menu location="bottom end" :offset="4">
+        <VMenu location="bottom end" :offset="4">
           <template #activator="{ props: menuProps }">
-            <v-btn
+            <VBtn
               v-bind="menuProps"
               variant="outlined"
               size="small"
@@ -59,27 +59,27 @@ const proxyExceptions = ref('')
               append-icon="i-lucide:chevron-down"
             >
               {{ languageLabel }}
-            </v-btn>
+            </VBtn>
           </template>
-          <v-list min-width="160" class="p-1">
-            <v-list-item
+          <VList min-width="160" class="p-1">
+            <VListItem
               v-for="item in languageItems"
               :key="item.value"
               :active="language === item.value"
               @click="language = item.value"
             >
-              <v-list-item-title class="text-sm">{{ item.title }}</v-list-item-title>
+              <VListItemTitle class="text-sm">{{ item.title }}</VListItemTitle>
               <template #append>
-                <v-icon v-if="language === item.value" icon="i-lucide:check" size="16" />
+                <VIcon v-if="language === item.value" icon="i-lucide:check" size="16" />
               </template>
-            </v-list-item>
-          </v-list>
-        </v-menu>
+            </VListItem>
+          </VList>
+        </VMenu>
       </div>
-    </v-card>
+    </VCard>
 
     <!-- 终端 -->
-    <v-card class="px-4 py-3.5">
+    <VCard class="px-4 py-3.5">
       <div class="flex items-center justify-between gap-6">
         <div class="min-w-0">
           <div class="text-sm font-medium">{{ t('settingsPage.general.inheritProfile') }}</div>
@@ -87,7 +87,7 @@ const proxyExceptions = ref('')
             {{ t('settingsPage.general.inheritProfileDesc') }}
           </div>
         </div>
-        <v-switch v-model="inheritProfile" inset color="primary" density="compact" hide-details />
+        <VSwitch v-model="inheritProfile" inset color="primary" density="compact" hide-details />
       </div>
 
       <div class="mt-3.5 border-t border-line pt-3.5">
@@ -98,9 +98,9 @@ const proxyExceptions = ref('')
               {{ t('settingsPage.general.terminalFontDesc') }}
             </div>
           </div>
-          <v-btn size="small" class="shrink-0">{{ t('settingsPage.save') }}</v-btn>
+          <VBtn size="small" class="shrink-0">{{ t('settingsPage.save') }}</VBtn>
         </div>
-        <v-text-field
+        <VTextField
           v-model="terminalFont"
           density="compact"
           :placeholder="t('settingsPage.general.terminalFontPlaceholder')"
@@ -115,12 +115,12 @@ const proxyExceptions = ref('')
             {{ t('settingsPage.general.findGrepDesc') }}
           </div>
         </div>
-        <v-switch v-model="enhancedFindGrep" inset color="primary" density="compact" hide-details />
+        <VSwitch v-model="enhancedFindGrep" inset color="primary" density="compact" hide-details />
       </div>
-    </v-card>
+    </VCard>
 
     <!-- 代理 -->
-    <v-card class="px-4 py-3.5">
+    <VCard class="px-4 py-3.5">
       <div class="flex items-start justify-between gap-6">
         <div class="min-w-0">
           <div class="text-sm font-medium">{{ t('settingsPage.general.httpProxy') }}</div>
@@ -128,9 +128,9 @@ const proxyExceptions = ref('')
             {{ t('settingsPage.general.httpProxyDesc') }}
           </div>
         </div>
-        <v-btn size="small" class="shrink-0">{{ t('settingsPage.save') }}</v-btn>
+        <VBtn size="small" class="shrink-0">{{ t('settingsPage.save') }}</VBtn>
       </div>
-      <v-text-field
+      <VTextField
         v-model="httpProxy"
         density="compact"
         :placeholder="t('settingsPage.general.httpProxyPlaceholder')"
@@ -144,14 +144,14 @@ const proxyExceptions = ref('')
             {{ t('settingsPage.general.proxyExceptionsDesc') }}
           </div>
         </div>
-        <v-btn size="small" class="shrink-0">{{ t('settingsPage.save') }}</v-btn>
+        <VBtn size="small" class="shrink-0">{{ t('settingsPage.save') }}</VBtn>
       </div>
-      <v-text-field
+      <VTextField
         v-model="proxyExceptions"
         density="compact"
         :placeholder="t('settingsPage.general.proxyExceptionsPlaceholder')"
         class="mt-2"
       />
-    </v-card>
+    </VCard>
   </div>
 </template>

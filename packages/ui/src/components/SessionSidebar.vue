@@ -20,7 +20,7 @@ const opened = ref(['project'])
   <div class="flex h-full flex-col">
     <!-- 项目栏：折叠开关 + 更多/新建 -->
     <div class="flex shrink-0 items-center justify-between px-3 py-1">
-      <v-btn
+      <VBtn
         variant="text"
         size="small"
         class="-ml-1 px-2 text-faint"
@@ -28,16 +28,16 @@ const opened = ref(['project'])
         @click="projectOpen = !projectOpen"
       >
         {{ t('sidebar.project') }}
-      </v-btn>
+      </VBtn>
       <div class="flex items-center">
-        <v-tooltip :text="t('sidebar.more')" location="bottom">
+        <VTooltip :text="t('sidebar.more')" location="bottom">
           <template #activator="{ props }">
-            <v-btn v-bind="props" icon="i-lucide:ellipsis" variant="text" size="x-small" class="text-muted" />
+            <VBtn v-bind="props" icon="i-lucide:ellipsis" variant="text" size="x-small" class="text-muted" />
           </template>
-        </v-tooltip>
-        <v-tooltip :text="t('nav.newTask')" location="bottom">
+        </VTooltip>
+        <VTooltip :text="t('nav.newTask')" location="bottom">
           <template #activator="{ props }">
-            <v-btn
+            <VBtn
               v-bind="props"
               icon="i-lucide:plus"
               variant="text"
@@ -46,37 +46,37 @@ const opened = ref(['project'])
               @click="store.createSession()"
             />
           </template>
-        </v-tooltip>
+        </VTooltip>
       </div>
     </div>
 
     <!-- 当前项目 + 会话列表（list-group：项目为 activator，会话为子项） -->
     <div v-if="projectOpen" class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-      <v-list v-model:opened="opened" class="-mx-1 p-0" nav>
-        <v-list-group value="project">
+      <VList v-model:opened="opened" class="-mx-1 p-0" nav>
+        <VListGroup value="project">
           <template #activator="{ props: activatorProps }">
-            <v-list-item
+            <VListItem
               v-bind="activatorProps"
               prepend-icon="i-lucide:folder"
               class="mb-0.5 bg-elevated"
             >
-              <v-list-item-title class="truncate text-sm">{{ projectName }}</v-list-item-title>
-            </v-list-item>
+              <VListItemTitle class="truncate text-sm">{{ projectName }}</VListItemTitle>
+            </VListItem>
           </template>
 
-          <v-list-item
+          <VListItem
             v-for="s in filteredSessions"
             :key="s.id"
             :active="s.id === activeSessionId"
             class="mb-0.5"
             @click="store.select(s.id)"
           >
-            <v-list-item-title class="truncate text-sm">
+            <VListItemTitle class="truncate text-sm">
               {{ s.title || t('session.new') }}
-            </v-list-item-title>
-          </v-list-item>
-        </v-list-group>
-      </v-list>
+            </VListItemTitle>
+          </VListItem>
+        </VListGroup>
+      </VList>
       <div v-if="!filteredSessions.length" class="py-2 text-sm text-faint">
         {{ keyword ? t('session.notFound') : t('session.empty') }}
       </div>

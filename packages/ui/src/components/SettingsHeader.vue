@@ -10,19 +10,19 @@ const hasOverlayControls = isFrameless && !isMac
 </script>
 
 <template>
-  <v-app-bar
+  <VAppBar
     density="compact"
     color="background"
-    class="pl-2"
+    class="pl-2 pr-2"
 
-    :class="[isFrameless ? 'ds-drag' : '', 'pr-2']"
+    :class="[isFrameless ? 'ds-drag' : '']"
     :style="hasOverlayControls ? { paddingRight: `${TITLEBAR_OVERLAY_WIDTH}px` } : undefined"
   >
-    <v-spacer />
+    <VSpacer />
 
-    <v-btn icon="i-lucide:circle-help" variant="text" size="small" class="text-muted" />
-    <v-btn variant="outlined" size="small" rounded="pill" class="px-3 text-muted">
+    <VBtn icon="i-lucide:circle-help" variant="text" size="small" class="text-muted" />
+    <VBtn variant="outlined" size="small" rounded="pill" class="px-3 text-muted">
       {{ t('settingsPage.help') }}
-    </v-btn>
-  </v-app-bar>
+    </VBtn>
+  </VAppBar>
 </template>

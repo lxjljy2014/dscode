@@ -54,7 +54,7 @@ const groups = computed(() => [
 
     <!-- 返回工作区 -->
     <div class="shrink-0 px-2 pb-2">
-      <v-btn
+      <VBtn
         variant="text"
         size="small"
         class="-ml-1 px-2 text-muted"
@@ -62,7 +62,7 @@ const groups = computed(() => [
         @click="router.push('/')"
       >
         {{ t('settingsPage.back') }}
-      </v-btn>
+      </VBtn>
     </div>
 
     <!-- 设置导航 -->
@@ -71,8 +71,8 @@ const groups = computed(() => [
         <div class="mb-1 mt-3 px-3 text-xs font-medium text-faint first:mt-1">
           {{ group.label }}
         </div>
-        <v-list class="p-0" nav>
-          <v-list-item
+        <VList class="p-0" nav>
+          <VListItem
             v-for="item in group.items"
             :key="item.key"
             :prepend-icon="item.icon"
@@ -81,11 +81,11 @@ const groups = computed(() => [
             class="mb-0.5"
             @click="router.push(`/settings/${item.key}`)"
           >
-            <v-list-item-title class="text-sm">
+            <VListItemTitle class="text-sm">
               {{ t(`settingsPage.section.${item.key}`) }}
-            </v-list-item-title>
-          </v-list-item>
-        </v-list>
+            </VListItemTitle>
+          </VListItem>
+        </VList>
       </template>
     </div>
   </div>

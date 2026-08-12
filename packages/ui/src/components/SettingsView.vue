@@ -15,20 +15,20 @@ const title = computed(() =>
 
 <template>
   <!-- 设置路由：完整布局（设置导航侧栏常驻 + 顶栏 + 内容区） -->
-  <v-navigation-drawer permanent width="280" class="border-r border-line">
+  <VNavigationDrawer permanent width="280" class="border-r border-line">
     <SettingsSidebar />
-  </v-navigation-drawer>
+  </VNavigationDrawer>
 
   <SettingsHeader />
 
-  <v-main>
+  <VMain>
     <div class="h-full flex flex-col bg-base">
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto max-w-180 px-8 pb-10 pt-6">
           <h1 class="mb-5 select-none text-2xl font-semibold">{{ title }}</h1>
-          <router-view />
+          <RouterView />
         </div>
       </div>
     </div>
-  </v-main>
+  </VMain>
 </template>

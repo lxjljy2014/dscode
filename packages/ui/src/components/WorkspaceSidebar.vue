@@ -54,9 +54,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
       class="h-12 shrink-0 flex items-center gap-0.5 pr-2"
       :class="[isFrameless ? 'ds-drag' : '', isMac ? 'pl-[84px]' : 'pl-2']"
     >
-      <v-tooltip :text="t('settings.toggleLeft')" location="bottom">
+      <VTooltip :text="t('settings.toggleLeft')" location="bottom">
         <template #activator="{ props }">
-          <v-icon-btn
+          <VIconBtn
             v-bind="props"
             icon="i-lucide:panel-left-close"
             variant="text"
@@ -65,34 +65,34 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
             @click="ui.toggleLeft()"
           />
         </template>
-      </v-tooltip>
+      </VTooltip>
     </div>
 
     <!-- 主导航 -->
-    <v-list class="shrink-0 px-2 pt-2" nav>
-      <v-list-item prepend-icon="i-lucide:circle-plus" @click="store.createSession()">
-        <v-list-item-title class="text-sm">{{ t('nav.newTask') }}</v-list-item-title>
+    <VList class="shrink-0 px-2 pt-2" nav>
+      <VListItem prepend-icon="i-lucide:circle-plus" @click="store.createSession()">
+        <VListItemTitle class="text-sm">{{ t('nav.newTask') }}</VListItemTitle>
         <template #append>
           <span class="text-xs text-faint">{{ modKey }} N</span>
         </template>
-      </v-list-item>
-      <v-list-item prepend-icon="i-lucide:search" :active="searchVisible" @click="toggleSearch()">
-        <v-list-item-title class="text-sm">{{ t('nav.search') }}</v-list-item-title>
+      </VListItem>
+      <VListItem prepend-icon="i-lucide:search" :active="searchVisible" @click="toggleSearch()">
+        <VListItemTitle class="text-sm">{{ t('nav.search') }}</VListItemTitle>
         <template #append>
           <span class="text-xs text-faint">{{ modKey }} K</span>
         </template>
-      </v-list-item>
-      <v-list-item prepend-icon="i-lucide:bot">
-        <v-list-item-title class="text-sm">{{ t('nav.automation') }}</v-list-item-title>
-      </v-list-item>
-      <v-list-item prepend-icon="i-lucide:wand-sparkles">
-        <v-list-item-title class="text-sm">{{ t('nav.skills') }}</v-list-item-title>
-      </v-list-item>
-    </v-list>
+      </VListItem>
+      <VListItem prepend-icon="i-lucide:bot">
+        <VListItemTitle class="text-sm">{{ t('nav.automation') }}</VListItemTitle>
+      </VListItem>
+      <VListItem prepend-icon="i-lucide:wand-sparkles">
+        <VListItemTitle class="text-sm">{{ t('nav.skills') }}</VListItemTitle>
+      </VListItem>
+    </VList>
 
     <!-- 展开的搜索框 -->
     <div v-if="searchVisible" class="shrink-0 px-3 pb-1 pt-2">
-      <v-text-field
+      <VTextField
         ref="searchRef"
         v-model="keyword"
         density="compact"

@@ -28,7 +28,7 @@ function isDir(node: FileNode) {
       class="shrink-0 overflow-y-auto border-b border-line p-2"
       :class="selectedFile ? 'max-h-[42%]' : 'flex-1'"
     >
-      <v-treeview
+      <VTreeview
         v-model:opened="opened"
         :items="fileTree"
         item-title="name"
@@ -45,7 +45,7 @@ function isDir(node: FileNode) {
             :class="isDir(item) ? 'i-lucide:folder' : 'i-lucide:file-text'"
           />
         </template>
-      </v-treeview>
+      </VTreeview>
     </div>
 
     <!-- 文件内容 -->

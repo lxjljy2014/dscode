@@ -12,7 +12,7 @@ const ui = useUiStore()
 
 <template>
   <!-- 工作区路由：完整布局（左侧栏 + 顶栏 + 右侧 diff 抽屉 + 主区） -->
-  <v-navigation-drawer
+  <VNavigationDrawer
     v-model="ui.leftVisible"
     :permanent="ui.leftVisible"
     width="280"
@@ -22,7 +22,7 @@ const ui = useUiStore()
     <template #append>
       <UserBar />
     </template>
-  </v-navigation-drawer>
+  </VNavigationDrawer>
 
   <AppHeader />
 
@@ -30,8 +30,7 @@ const ui = useUiStore()
 
   <TerminalPanel />
 
-  <v-main scrollable>
+  <VMain scrollable>
     <ChatView />
-  </v-main>
-
+  </VMain>
 </template>

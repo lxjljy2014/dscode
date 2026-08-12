@@ -7,12 +7,12 @@ const uiStore = useUiStore()
 </script>
 
 <template>
-  <v-navigation-drawer
+  <VNavigationDrawer
     v-model="uiStore.terminalVisible"
     :permanent="uiStore.terminalVisible"
     location="bottom"
     width="280"
   >
     {{ t('terminal.placeholder') }}
-  </v-navigation-drawer>
+  </VNavigationDrawer>
 </template>

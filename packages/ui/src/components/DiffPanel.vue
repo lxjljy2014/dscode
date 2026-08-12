@@ -13,20 +13,20 @@ const tab = defineModel<'changes' | 'files'>({ default: 'changes' })
 
 <template>
   <div class="h-full flex flex-col bg-surface">
-    <v-tabs v-model="tab" class="shrink-0 border-b border-line" slider-color="primary">
-      <v-tab value="changes" class="text-sm">
+    <VTabs v-model="tab" class="shrink-0 border-b border-line" slider-color="primary">
+      <VTab value="changes" class="text-sm">
         <span class="i-lucide:file-diff mr-1.5 text-3.5" />
         {{ t('diff.changes') }}
-      </v-tab>
-      <v-tab value="files" class="text-sm">
+      </VTab>
+      <VTab value="files" class="text-sm">
         <span class="i-lucide:folder-tree mr-1.5 text-3.5" />
         {{ t('diff.files') }}
-      </v-tab>
-    </v-tabs>
+      </VTab>
+    </VTabs>
 
-    <v-tabs-window v-model="tab" class="min-h-0 flex-1">
+    <VTabsWindow v-model="tab" class="min-h-0 flex-1">
       <!-- 变更 -->
-      <v-tabs-window-item value="changes" class="h-full">
+      <VTabsWindowItem value="changes" class="h-full">
         <div v-if="diffFiles.length" class="h-full overflow-y-auto">
           <div v-for="f in diffFiles" :key="f.path" class="border-b border-line">
             <div
@@ -84,12 +84,12 @@ const tab = defineModel<'changes' | 'files'>({ default: 'changes' })
           <span class="i-lucide:file-check-2 text-6" />
           <span class="text-xs">{{ t('diff.emptyChanges') }}</span>
         </div>
-      </v-tabs-window-item>
+      </VTabsWindowItem>
 
       <!-- 文件 -->
-      <v-tabs-window-item value="files" class="h-full">
+      <VTabsWindowItem value="files" class="h-full">
         <FileTree />
-      </v-tabs-window-item>
-    </v-tabs-window>
+      </VTabsWindowItem>
+    </VTabsWindow>
   </div>
 </template>

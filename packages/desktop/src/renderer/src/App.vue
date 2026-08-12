@@ -37,7 +37,7 @@ watch(
 
 <template>
   <!-- 仅提供最外层 v-app，布局由各路由页面自行声明 -->
-  <v-app>
-    <router-view />
-  </v-app>
+  <VApp>
+    <RouterView />
+  </VApp>
 </template>

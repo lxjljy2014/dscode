@@ -6,7 +6,7 @@ const ui = useUiStore()
 </script>
 
 <template>
-  <v-navigation-drawer
+  <VNavigationDrawer
     v-model="ui.rightVisible"
     :permanent="ui.rightVisible"
     location="right"
@@ -14,5 +14,5 @@ const ui = useUiStore()
     class="border-l border-line"
   >
     <DiffPanel />
-  </v-navigation-drawer>
+  </VNavigationDrawer>
 </template>
