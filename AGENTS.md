@@ -72,7 +72,7 @@ pnpm fmt            # oxfmt 格式化
 
 Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror 镜像）下载；`.npmrc` 的 `electron_mirror` 对 pnpm 无效（pnpm 不会把 `.npmrc` 配置转成 `npm_config_*` 环境变量传给 postinstall），不要回退到那种写法。注意 `.pnpmfile.cjs` 内容变化会使 lockfile 的 `pnpmfileChecksum` 失效，需执行一次 `pnpm install --no-frozen-lockfile` 更新。
 
-`pnpm-workspace.yaml` 里的 `allowBuilds` / `onlyBuiltDependencies` 是 pnpm 11 的依赖构建白名单：**新增带 postinstall 的原生依赖必须在此登记，否则其 build scripts 不会执行**；`minimumReleaseAgeExclude` 用于绕过 electron 的发布年龄检查（目前登记了 `electron@43.4.0`）。
+`pnpm-workspace.yaml` 里的 `allowBuilds` 是 pnpm 11 的依赖构建白名单：**新增带 postinstall 的原生依赖必须在此登记，否则其 build scripts 不会执行**；`minimumReleaseAgeExclude` 用于绕过 electron 的发布年龄检查（目前登记了 `electron@43.4.0`）。
 
 ## 代码约定
 
@@ -93,7 +93,7 @@ Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror �
 
 ## Electron 主进程要点
 
-- 无边框窗口（`titleBarStyle: 'hidden'`）：macOS 用 `trafficLightPosition` 悬浮红绿灯，Windows 用 `titleBarOverlay` 原生悬浮按钮（配色透明，渲染端主题切换时经 IPC `win:set-titlebar-overlay` 同步）。渲染端需为系统控件预留位置，相关常量在 `@dscode/ui` 的 `host.ts`（`TITLEBAR_OVERLAY_WIDTH = 150`，macOS 左侧让位 84px）。
+- 无边框窗口（`titleBarStyle: 'hidden'`）：macOS 用 `trafficLightPosition` 悬浮红绿灯，Windows 用 `titleBarOverlay` 原生悬浮按钮（背景色固定透明，渲染端主题切换时经 IPC `win:set-titlebar-overlay` 只同步 `symbolColor` 符号色）。渲染端需为系统控件预留位置，相关常量在 `@dscode/ui` 的 `host.ts`（`TITLEBAR_OVERLAY_WIDTH = 150`，macOS 左侧让位 84px）。
 - 渲染端通过 `.ds-drag` / `.ds-no-drag` CSS 类处理标题栏拖拽区（见 `global.css`）。
 - 安全设置：`contextIsolation: true`、`nodeIntegration: false`、`sandbox: false`；外部链接一律 `shell.openExternal`，`window.open` 被 deny。
 - preload 只暴露 `window.dscode`（platform、versions、setTitleBarOverlay）；纯浏览器环境下为 `undefined`，组件须降级处理。
@@ -102,8 +102,8 @@ Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror �
 
 - 无单元测试 / E2E 测试设施。若引入测试，需自行选型并在本节补充说明。
 - **lint 双轨并存**（配置都在仓库根）：
-  - `oxlint`（`.oxlintrc.json`）：Rust 实现、毫秒级；内置 vue 插件 lint `.vue` 的 `<script>` 块（模板规则暂缺，官方语言插件路线图中）；自动读取 `.gitignore` 排除产物
-  - `eslint`（`eslint.config.js`，flat config，基于 `@soybeanjs/eslint-config-vue`）：全量 Vue 规则含模板；全局 ignores 必须放在数组第一项的无 files config 里（soybean 自带的 ignores 带 files 不生效，会误扫 `out/`）
+  - `oxlint`（`.oxlintrc.json`）：Rust 实现、毫秒级；内置 vue 插件 lint `.vue` 的 `<script>` 块（模板规则暂缺，官方语言插件路线图中）；自动读取 `.gitignore` 排除产物。**负责全部 TS/JS 文件**
+  - `eslint`（`eslint.config.js`，flat config，基于 `@soybeanjs/eslint-config-vue`）：**仅覆盖 `.vue` 文件**（soybean 的 defineConfig 硬编码 `files: ['**/*.vue']`），提供模板相关规则；全局 ignores 必须放在数组第一项的无 files config 里（soybean 自带的 ignores 带 files 不生效，会误扫 `out/`）
   - 两套规则都要求模板组件标签 PascalCase（`VBtn` 而非 `v-btn`）、语句带分号——由 `oxfmt`（`.oxfmtrc.json`）负责格式化，`pnpm fmt` 一键执行
 - 提交前：`pnpm typecheck` 与 `pnpm lint` 必须通过（注意 `noUnusedLocals`/`noUnusedParameters` 已开启）。
 

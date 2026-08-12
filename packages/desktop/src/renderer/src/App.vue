@@ -10,14 +10,13 @@ const theme = useTheme();
 const { locale } = useI18n();
 const { current } = useLocale();
 
-// 主题：store → Vuetify + color-scheme + Windows 标题栏悬浮按钮配色
+// 主题：store → Vuetify + color-scheme + Windows 标题栏悬浮按钮符号色
 watchEffect(() => {
   theme.global.name.value = ui.theme;
   document.documentElement.style.colorScheme = ui.theme;
   const colors = ui.theme === 'dark' ? darkTheme.colors : lightTheme.colors;
   if (host && colors) {
     host.setTitleBarOverlay({
-      color: colors.surface as string,
       symbolColor: colors['on-surface'] as string
     });
   }

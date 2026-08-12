@@ -43,7 +43,7 @@ const hasOverlayControls = isFrameless && !isMac;
         />
       </template>
     </VTooltip>
-    <span v-if="sessionStore.hasMessage" class="text-muted">任务名称</span>
+    <span v-if="sessionStore.hasMessage" class="text-muted">{{ t('header.taskName') }}</span>
     <div v-if="sessionStore.hasMessage" class="flex gap-2 px-2 py-1">
       <!-- 项目选择条 -->
       <VMenu location="top start" :offset="4">

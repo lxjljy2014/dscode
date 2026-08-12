@@ -6,15 +6,5 @@ export default [
   {
     ignores: ['**/out/**', '**/dist/**', '**/node_modules/**', '**/.zcode/**', '**/coverage/**']
   },
-  ...(await defineConfig({
-    overrides: {
-      'vue/component-name-in-template-casing': [
-        'warn',
-        'PascalCase',
-        {
-          registeredComponentsOnly: false
-        }
-      ]
-    }
-  }))
+  ...(await defineConfig())
 ];

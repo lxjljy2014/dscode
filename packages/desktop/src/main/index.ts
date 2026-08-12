@@ -74,26 +74,25 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  // 渲染端主题切换后同步悬浮按钮配色（仅 Windows 生效）
+  // 渲染端主题切换后同步悬浮按钮符号色（仅 Windows 生效；背景色固定透明）
   ipcMain.on('win:set-titlebar-overlay', (e, options: unknown) => {
     if (!isWindows) return;
-    // 只接受主窗口发来的请求，并校验参数类型（非法颜色值会让 setTitleBarOverlay 抛错）
+    // 只接受主窗口发来的请求，并校验参数类型
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) return;
     if (
       typeof options !== 'object' ||
       options === null ||
-      typeof (options as Record<string, unknown>)['color'] !== 'string' ||
       typeof (options as Record<string, unknown>)['symbolColor'] !== 'string'
     ) {
       return;
     }
-    const { symbolColor } = options as { color: string; symbolColor: string };
-    win.setTitleBarOverlay({
-      color: 'rgba(0, 0, 0, 0)',
-      symbolColor,
-      height: TITLEBAR_HEIGHT
-    });
+    const { symbolColor } = options as { symbolColor: string };
+    try {
+      win.setTitleBarOverlay({ color: 'rgba(0, 0, 0, 0)', symbolColor, height: TITLEBAR_HEIGHT });
+    } catch {
+      // 非法颜色值由 Electron 抛错，兜底避免主进程崩溃
+    }
   });
 
   createWindow();

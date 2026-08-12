@@ -5,6 +5,9 @@
     "automation": "Automation",
     "skills": "Skills"
   },
+  "header": {
+    "taskName": "Task name"
+  },
   "sidebar": {
     "project": "Projects",
     "more": "More"

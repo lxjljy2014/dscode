@@ -5,9 +5,5 @@ allowBuilds:
   esbuild: true
   sass-embedded: true
   '@parcel/watcher': true
-onlyBuiltDependencies:
-  - electron
-  - esbuild
-  - sass-embedded
 minimumReleaseAgeExclude:
   - electron@43.4.0

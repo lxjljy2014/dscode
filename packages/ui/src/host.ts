@@ -4,9 +4,7 @@
  */
 
 export interface TitleBarOverlayOptions {
-  /** 标题栏背景色（与 header 背景一致） */
-  color: string;
-  /** 按钮符号色 */
+  /** 按钮符号色（背景色固定为透明，不随主题变化） */
   symbolColor: string;
 }
 

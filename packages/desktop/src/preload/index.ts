@@ -7,8 +7,8 @@ const api = {
     chrome: process.versions.chrome,
     node: process.versions.node
   },
-  /** 同步 Windows 原生标题栏悬浮按钮的配色（主题切换时调用） */
-  setTitleBarOverlay: (options: { color: string; symbolColor: string }) =>
+  /** 同步 Windows 原生标题栏悬浮按钮的符号色（主题切换时调用；背景色固定透明） */
+  setTitleBarOverlay: (options: { symbolColor: string }) =>
     ipcRenderer.send('win:set-titlebar-overlay', options)
 };
 

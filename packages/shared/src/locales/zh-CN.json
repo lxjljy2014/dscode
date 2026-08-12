@@ -5,6 +5,9 @@
     "automation": "自动化",
     "skills": "技能"
   },
+  "header": {
+    "taskName": "任务名称"
+  },
   "sidebar": {
     "project": "项目",
     "more": "更多"
