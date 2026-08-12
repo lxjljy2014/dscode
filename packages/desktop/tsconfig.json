@@ -2,7 +2,15 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext"],
-    "types": ["electron-vite/node", "node"]
+    "types": ["electron-vite/node", "node"],
+    "baseUrl": "../../",
+    "paths": {
+      "@dscode/shared": ["packages/shared/src/index.ts"],
+      "@dscode/shared/locales/*": ["packages/shared/src/locales/*"],
+      "@dscode/ui": ["packages/ui/src/index.ts"],
+      "@dscode/ui/tokens": ["packages/ui/src/theme/tokens.ts"],
+      "@dscode/ui/global.css": ["packages/ui/src/theme/global.css"]
+    }
   },
   "include": ["electron.vite.config.ts", "uno.config.ts", "src/main/**/*", "src/preload/**/*"]
 }
