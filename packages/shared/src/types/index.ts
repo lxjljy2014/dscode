@@ -1,42 +1,42 @@
-export type MessageRole = 'user' | 'assistant'
+export type MessageRole = 'user' | 'assistant';
 
 export interface Message {
-  id: string
-  role: MessageRole
-  content: string
+  id: string;
+  role: MessageRole;
+  content: string;
   /** 流式输出中 */
-  streaming?: boolean
-  createdAt: number
+  streaming?: boolean;
+  createdAt: number;
 }
 
 export interface Session {
-  id: string
-  title: string
-  createdAt: number
-  updatedAt: number
-  messages: Message[]
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: Message[];
 }
 
-export type DiffLineType = 'add' | 'del' | 'context' | 'hunk'
+export type DiffLineType = 'add' | 'del' | 'context' | 'hunk';
 
 export interface DiffLine {
-  type: DiffLineType
-  content: string
-  oldLineNo?: number
-  newLineNo?: number
+  type: DiffLineType;
+  content: string;
+  oldLineNo?: number;
+  newLineNo?: number;
 }
 
 export interface DiffFile {
-  path: string
-  additions: number
-  deletions: number
-  lines: DiffLine[]
+  path: string;
+  additions: number;
+  deletions: number;
+  lines: DiffLine[];
 }
 
 export interface FileNode {
-  name: string
-  path: string
-  type: 'file' | 'dir'
-  children?: FileNode[]
-  content?: string
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  children?: FileNode[];
+  content?: string;
 }

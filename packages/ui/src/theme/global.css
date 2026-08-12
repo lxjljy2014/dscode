@@ -68,7 +68,8 @@ html {
 
 /* ---- 流式光标 ---- */
 @keyframes ds-blink {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

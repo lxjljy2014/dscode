@@ -1,10 +1,5 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
-import {
-  SettingsGeneral,
-  SettingsPlaceholder,
-  SettingsView,
-  WorkspaceView
-} from '@dscode/ui'
+import { createRouter, createWebHashHistory } from 'vue-router';
+import { SettingsGeneral, SettingsPlaceholder, SettingsView, WorkspaceView } from '@dscode/ui';
 
 /**
  * 每个路由都是独立完整页面，仅共享最外层 v-app：
@@ -26,4 +21,4 @@ export const router = createRouter({
       ]
     }
   ]
-})
+});

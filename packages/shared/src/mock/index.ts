@@ -1,9 +1,9 @@
-import type { DiffFile, FileNode, Session } from '../types'
+import type { DiffFile, FileNode, Session } from '../types';
 
-const now = Date.now()
-const min = 60_000
-const hour = 60 * min
-const day = 24 * hour
+const now = Date.now();
+const min = 60_000;
+const hour = 60 * min;
+const day = 24 * hour;
 
 export const mockSessions: Session[] = [
   {
@@ -90,7 +90,7 @@ export const mockSessions: Session[] = [
       }
     ]
   }
-]
+];
 
 export const mockDiffFiles: DiffFile[] = [
   {
@@ -105,12 +105,17 @@ export const mockDiffFiles: DiffFile[] = [
       { type: 'add', content: "import { mockSessions } from '@dscode/shared'", newLineNo: 3 },
       { type: 'add', content: "import type { Session } from '@dscode/shared'", newLineNo: 4 },
       { type: 'context', content: '', oldLineNo: 4, newLineNo: 5 },
-      { type: 'context', content: "export const useSessionStore = defineStore('session', () => {", oldLineNo: 5, newLineNo: 6 },
+      {
+        type: 'context',
+        content: "export const useSessionStore = defineStore('session', () => {",
+        oldLineNo: 5,
+        newLineNo: 6
+      },
       { type: 'del', content: '  const sessions = ref(mockSessions)', oldLineNo: 6 },
       { type: 'add', content: '  const sessions = ref<Session[]>(mockSessions)', newLineNo: 7 },
       { type: 'add', content: '  const activeSessionId = ref(sessions.value[0]?.id ?? null)', newLineNo: 8 },
       { type: 'hunk', content: '@@ -10,8 +14,22 @@' },
-      { type: 'context', content: '  const keyword = ref(\'\')', oldLineNo: 10, newLineNo: 14 },
+      { type: 'context', content: "  const keyword = ref('')", oldLineNo: 10, newLineNo: 14 },
       { type: 'context', content: '', oldLineNo: 11, newLineNo: 15 },
       { type: 'del', content: '  function select(id: string) {', oldLineNo: 12 },
       { type: 'del', content: '    activeSessionId.value = id', oldLineNo: 13 },
@@ -118,7 +123,11 @@ export const mockDiffFiles: DiffFile[] = [
       { type: 'add', content: '  const filteredSessions = computed(() => {', newLineNo: 16 },
       { type: 'add', content: '    const k = keyword.value.trim().toLowerCase()', newLineNo: 17 },
       { type: 'add', content: '    if (!k) return sessions.value', newLineNo: 18 },
-      { type: 'add', content: '    return sessions.value.filter(s => s.title.toLowerCase().includes(k))', newLineNo: 19 },
+      {
+        type: 'add',
+        content: '    return sessions.value.filter(s => s.title.toLowerCase().includes(k))',
+        newLineNo: 19
+      },
       { type: 'add', content: '  })', newLineNo: 20 },
       { type: 'add', content: '', newLineNo: 21 },
       { type: 'add', content: '  function select(id: string) {', newLineNo: 22 },
@@ -138,7 +147,7 @@ export const mockDiffFiles: DiffFile[] = [
       { type: 'add', content: "import { storeToRefs } from 'pinia'", newLineNo: 3 },
       { type: 'add', content: "import { useSessionStore } from '../stores/session'", newLineNo: 4 },
       { type: 'context', content: '', oldLineNo: 5, newLineNo: 5 },
-      { type: 'del', content: 'const keyword = ref(\'\')', oldLineNo: 6 },
+      { type: 'del', content: "const keyword = ref('')", oldLineNo: 6 },
       { type: 'del', content: 'const sessions = ref(mockSessions)', oldLineNo: 7 },
       { type: 'del', content: 'const filtered = computed(() => /* ... */ sessions.value)', oldLineNo: 8 },
       { type: 'add', content: 'const store = useSessionStore()', newLineNo: 6 },
@@ -160,7 +169,7 @@ export const mockDiffFiles: DiffFile[] = [
       { type: 'context', content: "    primary: '#ececec',", oldLineNo: 22, newLineNo: 23 }
     ]
   }
-]
+];
 
 export const mockFileTree: FileNode[] = [
   {
@@ -209,14 +218,14 @@ export const mockFileTree: FileNode[] = [
                     path: 'packages/ui/src/components/SessionSidebar.vue',
                     type: 'file',
                     content:
-                      "<script setup lang=\"ts\">\nimport { storeToRefs } from 'pinia'\nimport { useSessionStore } from '../stores/session'\n\nconst store = useSessionStore()\nconst { filteredSessions, activeSessionId } = storeToRefs(store)\nconst { select, createSession } = store\n</script>\n\n<template>\n  <v-list>\n    <v-list-item\n      v-for=\"s in filteredSessions\"\n      :key=\"s.id\"\n      :active=\"s.id === activeSessionId\"\n      :title=\"s.title\"\n      @click=\"select(s.id)\"\n    />\n  </v-list>\n</template>\n"
+                      '<script setup lang="ts">\nimport { storeToRefs } from \'pinia\'\nimport { useSessionStore } from \'../stores/session\'\n\nconst store = useSessionStore()\nconst { filteredSessions, activeSessionId } = storeToRefs(store)\nconst { select, createSession } = store\n</script>\n\n<template>\n  <v-list>\n    <v-list-item\n      v-for="s in filteredSessions"\n      :key="s.id"\n      :active="s.id === activeSessionId"\n      :title="s.title"\n      @click="select(s.id)"\n    />\n  </v-list>\n</template>\n'
                   },
                   {
                     name: 'ChatView.vue',
                     path: 'packages/ui/src/components/ChatView.vue',
                     type: 'file',
                     content:
-                      "<script setup lang=\"ts\">\nimport { useSessionStore } from '../stores/session'\n\nconst store = useSessionStore()\n</script>\n\n<template>\n  <div class=\"chat-view\">\n    <!-- message list -->\n  </div>\n</template>\n"
+                      '<script setup lang="ts">\nimport { useSessionStore } from \'../stores/session\'\n\nconst store = useSessionStore()\n</script>\n\n<template>\n  <div class="chat-view">\n    <!-- message list -->\n  </div>\n</template>\n'
                   }
                 ]
               },
@@ -240,4 +249,4 @@ export const mockFileTree: FileNode[] = [
       }
     ]
   }
-]
+];

@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
-import SettingsHeader from './SettingsHeader.vue'
-import SettingsSidebar from './SettingsSidebar.vue'
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useRoute } from 'vue-router';
+import SettingsHeader from './SettingsHeader.vue';
+import SettingsSidebar from './SettingsSidebar.vue';
 
-const { t } = useI18n()
-const route = useRoute()
+const { t } = useI18n();
+const route = useRoute();
 
-const title = computed(() =>
-  t(`settingsPage.section.${(route.params.section as string | undefined) ?? 'general'}`)
-)
+const title = computed(() => t(`settingsPage.section.${(route.params.section as string | undefined) ?? 'general'}`));
 </script>
 
 <template>

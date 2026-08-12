@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import { useUiStore } from '../stores/ui'
+import { useI18n } from 'vue-i18n';
+import { useUiStore } from '../stores/ui';
 
-const { t } = useI18n()
-const uiStore = useUiStore()
+const { t } = useI18n();
+const uiStore = useUiStore();
 </script>
 
 <template>

@@ -40,16 +40,16 @@ packages/
 
 ## 技术栈
 
-| 层 | 选型 |
-| --- | --- |
-| 桌面壳 | Electron 43，electron-vite 5 构建（main/preload/renderer 三目标） |
-| UI 框架 | Vue 3.5（`<script setup lang="ts">`）+ Vuetify 4（autoImport，sass 变量定制） |
-| 原子化 CSS | UnoCSS（presetWind4 + presetIcons/Lucide），与 Vuetify 共存 |
-| 状态 | Pinia 3（setup 风格 store） |
-| 路由 | vue-router 4，hash 模式（`createWebHashHistory`） |
-| 国际化 | vue-i18n 11（`zh-CN` / `en-US`，默认中文） |
-| 包管理 | **pnpm 11.17.0**（workspace，必须用 pnpm，不要用 npm/yarn） |
-| 语言 | TypeScript 5.9，strict 模式 |
+| 层         | 选型                                                                          |
+| ---------- | ----------------------------------------------------------------------------- |
+| 桌面壳     | Electron 43，electron-vite 5 构建（main/preload/renderer 三目标）             |
+| UI 框架    | Vue 3.5（`<script setup lang="ts">`）+ Vuetify 4（autoImport，sass 变量定制） |
+| 原子化 CSS | UnoCSS（presetWind4 + presetIcons/Lucide），与 Vuetify 共存                   |
+| 状态       | Pinia 3（setup 风格 store）                                                   |
+| 路由       | vue-router 4，hash 模式（`createWebHashHistory`）                             |
+| 国际化     | vue-i18n 11（`zh-CN` / `en-US`，默认中文）                                    |
+| 包管理     | **pnpm 11.17.0**（workspace，必须用 pnpm，不要用 npm/yarn）                   |
+| 语言       | TypeScript 5.9，strict 模式                                                   |
 
 ## 常用命令
 

@@ -2,17 +2,16 @@
   "name": "dscode",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.17.0",
   "scripts": {
-    "dev": "pnpm --filter @dscode/desktop dev",
     "build": "pnpm --filter @dscode/desktop build",
+    "dev": "pnpm --filter @dscode/desktop dev",
     "fmt": "oxfmt",
-    "start": "pnpm --filter @dscode/desktop start",
-    "typecheck": "pnpm --filter @dscode/desktop typecheck",
     "lint": "eslint . && oxlint .",
-    "lint:fast": "oxlint .",
     "lint:eslint": "eslint .",
-    "lint:fix": "eslint . --fix && oxlint . --fix"
+    "lint:fast": "oxlint .",
+    "lint:fix": "eslint . --fix && oxlint . --fix",
+    "start": "pnpm --filter @dscode/desktop start",
+    "typecheck": "pnpm --filter @dscode/desktop typecheck"
   },
   "devDependencies": {
     "@soybeanjs/eslint-config-vue": "^0.1.1",
@@ -20,5 +19,6 @@
     "eslint-plugin-vue": "^10.10.0",
     "oxfmt": "^0.59.0",
     "oxlint": "^1.78.0"
-  }
+  },
+  "packageManager": "pnpm@11.17.0"
 }

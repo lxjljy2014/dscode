@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useUiStore } from '../stores/ui'
-import DiffPanel from './DiffPanel.vue'
+import { useUiStore } from '../stores/ui';
+import DiffPanel from './DiffPanel.vue';
 
-const ui = useUiStore()
+const ui = useUiStore();
 </script>
 
 <template>

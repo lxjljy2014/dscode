@@ -1,4 +1,4 @@
-import type { ThemeDefinition } from 'vuetify'
+import type { ThemeDefinition } from 'vuetify';
 
 /**
  * 中性色阶（唯一事实源）。
@@ -19,7 +19,7 @@ export const neutral = {
   900: '#171717',
   925: '#121212',
   950: '#0d0d0d'
-} as const
+} as const;
 
 export const lightTheme: ThemeDefinition = {
   dark: false,
@@ -54,7 +54,7 @@ export const lightTheme: ThemeDefinition = {
     'medium-emphasis-opacity': 0.6,
     'idle-opacity': 0.04
   }
-}
+};
 
 export const darkTheme: ThemeDefinition = {
   dark: true,
@@ -89,7 +89,7 @@ export const darkTheme: ThemeDefinition = {
     'medium-emphasis-opacity': 0.6,
     'idle-opacity': 0.06
   }
-}
+};
 
 /**
  * UnoCSS 颜色 → Vuetify CSS 变量。
@@ -108,10 +108,10 @@ export const unoColors = {
   'on-primary': 'rgb(var(--v-theme-on-primary))',
   'diff-add': '#2da44e',
   'diff-del': '#cf222e'
-} as const
+} as const;
 
 export const fontFamilySans =
-  "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif"
+  "'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif";
 
 export const fontFamilyMono =
-  "'JetBrains Mono Variable', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace"
+  "'JetBrains Mono Variable', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";

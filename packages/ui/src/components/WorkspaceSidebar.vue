@@ -1,50 +1,50 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { isFrameless, isMac } from '../host'
-import { useSessionStore } from '../stores/session'
-import { useUiStore } from '../stores/ui'
-import SessionSidebar from './SessionSidebar.vue'
+import { storeToRefs } from 'pinia';
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { isFrameless, isMac } from '../host';
+import { useSessionStore } from '../stores/session';
+import { useUiStore } from '../stores/ui';
+import SessionSidebar from './SessionSidebar.vue';
 
-const { t } = useI18n()
-const store = useSessionStore()
-const ui = useUiStore()
-const { keyword } = storeToRefs(store)
+const { t } = useI18n();
+const store = useSessionStore();
+const ui = useUiStore();
+const { keyword } = storeToRefs(store);
 
 // 搜索：默认收起，⌘K 或导航项展开
-const searchVisible = ref(false)
-const searchRef = ref<{ focus: () => void } | null>(null)
+const searchVisible = ref(false);
+const searchRef = ref<{ focus: () => void } | null>(null);
 
 async function toggleSearch() {
-  searchVisible.value = !searchVisible.value
+  searchVisible.value = !searchVisible.value;
   if (searchVisible.value) {
-    await nextTick()
-    searchRef.value?.focus()
+    await nextTick();
+    searchRef.value?.focus();
   } else {
-    keyword.value = ''
+    keyword.value = '';
   }
 }
 
-const modKey = isMac ? '⌘' : 'Ctrl'
+const modKey = isMac ? '⌘' : 'Ctrl';
 
 function onGlobalKeydown(e: KeyboardEvent) {
   // 输入场景（含 IME 组合态）不拦截，避免打断打字
-  if (e.isComposing) return
-  const target = e.target as HTMLElement | null
-  if (target?.closest('input, textarea, select, [contenteditable]')) return
-  if (!(e.metaKey || e.ctrlKey)) return
+  if (e.isComposing) return;
+  const target = e.target as HTMLElement | null;
+  if (target?.closest('input, textarea, select, [contenteditable]')) return;
+  if (!(e.metaKey || e.ctrlKey)) return;
   if (e.key === 'n') {
-    e.preventDefault()
-    store.createSession()
+    e.preventDefault();
+    store.createSession();
   } else if (e.key === 'k') {
-    e.preventDefault()
-    if (!searchVisible.value) toggleSearch()
+    e.preventDefault();
+    if (!searchVisible.value) toggleSearch();
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
+onMounted(() => window.addEventListener('keydown', onGlobalKeydown));
+onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown));
 </script>
 
 <template>

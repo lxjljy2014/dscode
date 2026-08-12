@@ -1,8 +1,8 @@
-import { createVuetify } from 'vuetify'
-import { aliases, lucide } from 'vuetify/iconsets/lucide'
-import { en, zhHans } from 'vuetify/locale'
-import 'vuetify/styles'
-import { darkTheme, lightTheme } from '../theme/tokens'
+import { createVuetify } from 'vuetify';
+import { aliases, lucide } from 'vuetify/iconsets/lucide';
+import { en, zhHans } from 'vuetify/locale';
+import 'vuetify/styles';
+import { darkTheme, lightTheme } from '../theme/tokens';
 
 /**
  * Vuetify 4 配置：
@@ -42,7 +42,7 @@ export function createVuetifyPlugin() {
       VIconBtn: {
         variant: 'text',
         rounded: 'lg',
-        size: 'small',
+        size: 'small'
       },
       VBtnToggle: {
         rounded: 'lg'
@@ -70,7 +70,7 @@ export function createVuetifyPlugin() {
       VListItem: {
         rounded: 'lg',
         VIcon: {
-          size: 'small',
+          size: 'small'
         }
       },
       VAppBar: {
@@ -100,5 +100,5 @@ export function createVuetifyPlugin() {
         size: 'large'
       }
     }
-  })
+  });
 }

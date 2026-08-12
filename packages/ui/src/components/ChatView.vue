@@ -1,42 +1,40 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useI18n } from 'vue-i18n'
-import { useSessionStore } from '../stores/session'
-import ChatInput from './ChatInput.vue'
-import MessageItem from './MessageItem.vue'
+import { computed, nextTick, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
+import { useSessionStore } from '../stores/session';
+import ChatInput from './ChatInput.vue';
+import MessageItem from './MessageItem.vue';
 
-const { t } = useI18n()
-const store = useSessionStore()
-const { activeSession, generating } = storeToRefs(store)
+const { t } = useI18n();
+const store = useSessionStore();
+const { activeSession, generating } = storeToRefs(store);
 
-const messages = computed(() => activeSession.value?.messages ?? [])
-const listRef = ref<HTMLElement>()
+const messages = computed(() => activeSession.value?.messages ?? []);
+const listRef = ref<HTMLElement>();
 
 // 按时段的问候语（空状态展示）
 const greeting = computed(() => {
-  const h = new Date().getHours()
-  if (h >= 5 && h < 11) return t('chat.greeting.morning')
-  if (h >= 11 && h < 14) return t('chat.greeting.noon')
-  if (h >= 14 && h < 18) return t('chat.greeting.afternoon')
-  if (h >= 18 && h < 23) return t('chat.greeting.evening')
-  return t('chat.greeting.night')
-})
+  const h = new Date().getHours();
+  if (h >= 5 && h < 11) return t('chat.greeting.morning');
+  if (h >= 11 && h < 14) return t('chat.greeting.noon');
+  if (h >= 14 && h < 18) return t('chat.greeting.afternoon');
+  if (h >= 18 && h < 23) return t('chat.greeting.evening');
+  return t('chat.greeting.night');
+});
 
 function scrollToBottom() {
   nextTick(() => {
-    const el = listRef.value
-    if (el) el.scrollTop = el.scrollHeight
-  })
+    const el = listRef.value;
+    if (el) el.scrollTop = el.scrollHeight;
+  });
 }
 
-watch(
-  () => [messages.value.length, messages.value[messages.value.length - 1]?.content],
-  scrollToBottom,
-  { flush: 'post' }
-)
+watch(() => [messages.value.length, messages.value[messages.value.length - 1]?.content], scrollToBottom, {
+  flush: 'post'
+});
 
-watch(activeSession, scrollToBottom, { flush: 'post' })
+watch(activeSession, scrollToBottom, { flush: 'post' });
 </script>
 
 <template>

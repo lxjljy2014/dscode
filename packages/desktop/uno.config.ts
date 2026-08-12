@@ -1,6 +1,6 @@
-import { defineConfig, presetIcons } from 'unocss'
-import presetWind4 from '@unocss/preset-wind4'
-import { fontFamilyMono, fontFamilySans, unoColors } from '@dscode/ui/tokens'
+import { defineConfig, presetIcons } from 'unocss';
+import presetWind4 from '@unocss/preset-wind4';
+import { fontFamilyMono, fontFamilySans, unoColors } from '@dscode/ui/tokens';
 
 export default defineConfig({
   presets: [
@@ -9,7 +9,7 @@ export default defineConfig({
     // Vuetify 官方文档要求：保留默认 i- 前缀，并删除 color 属性
     presetIcons({
       processor(props) {
-        delete props.color
+        delete props.color;
       }
     })
   ],
@@ -21,4 +21,4 @@ export default defineConfig({
       mono: fontFamilyMono
     }
   }
-})
+});

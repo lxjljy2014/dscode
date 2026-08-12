@@ -4,9 +4,9 @@
 // 把 .npmrc 配置转成 npm_config_* 环境变量传给 postinstall，所以只能在这里
 // 直接写 process.env（postinstall 子进程会继承）。
 if (!process.env.ELECTRON_MIRROR) {
-  process.env.ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/'
+  process.env.ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/';
 }
 
 module.exports = {
-  hooks: {},
-}
+  hooks: {}
+};

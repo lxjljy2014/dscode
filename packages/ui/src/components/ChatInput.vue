@@ -1,40 +1,40 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useSessionStore } from '../stores/session'
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useSessionStore } from '../stores/session';
 
-const props = defineProps<{ generating: boolean }>()
+const props = defineProps<{ generating: boolean }>();
 const emit = defineEmits<{
-  send: [content: string]
-  stop: []
-}>()
+  send: [content: string];
+  stop: [];
+}>();
 
-const { t } = useI18n()
-const sessionStore = useSessionStore()
-const input = ref('')
+const { t } = useI18n();
+const sessionStore = useSessionStore();
+const input = ref('');
 
 // 以下为占位选择器状态，接入真实 agent 后改为从配置/store 读取
-const mode = ref<'plan' | 'agent'>('plan')
-const modes = ['plan', 'agent'] as const
+const mode = ref<'plan' | 'agent'>('plan');
+const modes = ['plan', 'agent'] as const;
 
-const model = ref('deepseek/deepseek-v4-flash')
-const models = ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro']
+const model = ref('deepseek/deepseek-v4-flash');
+const models = ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro'];
 
-const effort = ref<'close' | 'high' | 'max'>('max')
-const efforts = ['close', 'high', 'max'] as const
+const effort = ref<'close' | 'high' | 'max'>('max');
+const efforts = ['close', 'high', 'max'] as const;
 
 function submit() {
-  const content = input.value.trim()
-  if (!content || props.generating) return
-  emit('send', content)
-  input.value = ''
+  const content = input.value.trim();
+  if (!content || props.generating) return;
+  emit('send', content);
+  input.value = '';
 }
 
 function onKeydown(e: KeyboardEvent) {
   // 输入法组合中不触发发送
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-    e.preventDefault()
-    submit()
+    e.preventDefault();
+    submit();
   }
 }
 </script>
@@ -130,12 +130,7 @@ function onKeydown(e: KeyboardEvent) {
             </VBtn>
           </template>
           <VList min-width="140" nav>
-            <VListItem
-              v-for="m in modes"
-              :key="m"
-              :active="mode === m"
-              @click="mode = m"
-            >
+            <VListItem v-for="m in modes" :key="m" :active="mode === m" @click="mode = m">
               <VListItemTitle class="text-sm">
                 {{ m === 'plan' ? t('input.planMode') : t('input.agentMode') }}
               </VListItemTitle>
@@ -162,12 +157,7 @@ function onKeydown(e: KeyboardEvent) {
             </VBtn>
           </template>
           <VList min-width="220" nav>
-            <VListItem
-              v-for="m in models"
-              :key="m"
-              :active="model === m"
-              @click="model = m"
-            >
+            <VListItem v-for="m in models" :key="m" :active="model === m" @click="model = m">
               <VListItemTitle>{{ m }}</VListItemTitle>
               <template #append>
                 <VIcon v-if="model === m" icon="i-lucide:check" size="16" />
@@ -191,12 +181,7 @@ function onKeydown(e: KeyboardEvent) {
             </VBtn>
           </template>
           <VList min-width="120" nav>
-            <VListItem
-              v-for="e in efforts"
-              :key="e"
-              :active="effort === e"
-              @click="effort = e"
-            >
+            <VListItem v-for="e in efforts" :key="e" :active="effort === e" @click="effort = e">
               <VListItemTitle class="text-sm">{{ t(`input.effort.${e}`) }}</VListItemTitle>
               <template #append>
                 <VIcon v-if="effort === e" icon="i-lucide:check" size="16" />

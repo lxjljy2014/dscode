@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { useI18n } from 'vue-i18n'
-import { useSessionStore } from '../stores/session'
-import FileTree from './FileTree.vue'
+import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
+import { useSessionStore } from '../stores/session';
+import FileTree from './FileTree.vue';
 
-const { t } = useI18n()
-const store = useSessionStore()
-const { diffFiles } = storeToRefs(store)
+const { t } = useI18n();
+const store = useSessionStore();
+const { diffFiles } = storeToRefs(store);
 
-const tab = defineModel<'changes' | 'files'>({ default: 'changes' })
+const tab = defineModel<'changes' | 'files'>({ default: 'changes' });
 </script>
 
 <template>
@@ -29,9 +29,7 @@ const tab = defineModel<'changes' | 'files'>({ default: 'changes' })
       <VTabsWindowItem value="changes" class="h-full">
         <div v-if="diffFiles.length" class="h-full overflow-y-auto">
           <div v-for="f in diffFiles" :key="f.path" class="border-b border-line">
-            <div
-              class="sticky top-0 z-1 flex items-center gap-2 border-b border-line bg-elevated px-3 py-1.5"
-            >
+            <div class="sticky top-0 z-1 flex items-center gap-2 border-b border-line bg-elevated px-3 py-1.5">
               <span class="i-lucide:file-diff shrink-0 text-3.5 text-muted" />
               <span class="truncate font-mono text-xs text-fg">{{ f.path }}</span>
               <span class="ml-auto shrink-0 font-mono text-xs text-diff-add">

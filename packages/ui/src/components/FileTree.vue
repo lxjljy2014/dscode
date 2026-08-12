@@ -1,33 +1,30 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useI18n } from 'vue-i18n'
-import { useSessionStore } from '../stores/session'
-import type { FileNode } from '@dscode/shared'
+import { ref } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
+import { useSessionStore } from '../stores/session';
+import type { FileNode } from '@dscode/shared';
 
-const { t } = useI18n()
-const store = useSessionStore()
-const { fileTree, selectedFile, selectedFilePath } = storeToRefs(store)
+const { t } = useI18n();
+const store = useSessionStore();
+const { fileTree, selectedFile, selectedFilePath } = storeToRefs(store);
 
-const opened = ref<string[]>([])
+const opened = ref<string[]>([]);
 
 function onActivate(ids: unknown) {
-  const path = Array.isArray(ids) ? (ids[0] as string | undefined) : undefined
-  if (path) store.selectFile(path)
+  const path = Array.isArray(ids) ? (ids[0] as string | undefined) : undefined;
+  if (path) store.selectFile(path);
 }
 
 function isDir(node: FileNode) {
-  return node.type === 'dir'
+  return node.type === 'dir';
 }
 </script>
 
 <template>
   <div class="h-full flex flex-col">
     <!-- 文件树 -->
-    <div
-      class="shrink-0 overflow-y-auto border-b border-line p-2"
-      :class="selectedFile ? 'max-h-[42%]' : 'flex-1'"
-    >
+    <div class="shrink-0 overflow-y-auto border-b border-line p-2" :class="selectedFile ? 'max-h-[42%]' : 'flex-1'">
       <VTreeview
         v-model:opened="opened"
         :items="fileTree"
@@ -40,10 +37,7 @@ function isDir(node: FileNode) {
         @update:activated="onActivate"
       >
         <template #prepend="{ item }">
-          <span
-            class="text-3.5 text-muted"
-            :class="isDir(item) ? 'i-lucide:folder' : 'i-lucide:file-text'"
-          />
+          <span class="text-3.5 text-muted" :class="isDir(item) ? 'i-lucide:folder' : 'i-lucide:file-text'" />
         </template>
       </VTreeview>
     </div>
@@ -55,9 +49,7 @@ function isDir(node: FileNode) {
           <span class="i-lucide:file-text shrink-0 text-3.5 text-muted" />
           <span class="truncate font-mono text-xs text-fg">{{ selectedFile.path }}</span>
         </div>
-        <pre
-          class="p-3 font-mono text-xs leading-[22px] text-fg"
-        ><code>{{ selectedFile.content }}</code></pre>
+        <pre class="p-3 font-mono text-xs leading-[22px] text-fg"><code>{{ selectedFile.content }}</code></pre>
       </template>
 
       <div v-else class="h-full flex flex-col items-center justify-center gap-2 text-faint">

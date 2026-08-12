@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useSessionStore } from '../stores/session'
+import { storeToRefs } from 'pinia';
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useSessionStore } from '../stores/session';
 
-const { t } = useI18n()
-const store = useSessionStore()
-const { filteredSessions, activeSessionId, keyword } = storeToRefs(store)
+const { t } = useI18n();
+const store = useSessionStore();
+const { filteredSessions, activeSessionId, keyword } = storeToRefs(store);
 
 // 当前项目（占位，接入真实工作区后从项目状态读取）
-const projectName = 'dscode'
+const projectName = 'dscode';
 // 项目区折叠状态
-const projectOpen = ref(true)
+const projectOpen = ref(true);
 // v-list-group 展开的分组（默认展开当前项目）
-const opened = ref(['project'])
+const opened = ref(['project']);
 </script>
 
 <template>
@@ -55,11 +55,7 @@ const opened = ref(['project'])
       <VList v-model:opened="opened" class="-mx-1 p-0" nav>
         <VListGroup value="project">
           <template #activator="{ props: activatorProps }">
-            <VListItem
-              v-bind="activatorProps"
-              prepend-icon="i-lucide:folder"
-              class="mb-0.5 bg-elevated"
-            >
+            <VListItem v-bind="activatorProps" prepend-icon="i-lucide:folder" class="mb-0.5 bg-elevated">
               <VListItemTitle class="truncate text-sm">{{ projectName }}</VListItemTitle>
             </VListItem>
           </template>

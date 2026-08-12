@@ -1,34 +1,32 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { supportedLocales } from '../plugins/i18n'
-import type { LocaleSetting } from '../stores/ui'
-import { useUiStore } from '../stores/ui'
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { supportedLocales } from '../plugins/i18n';
+import type { LocaleSetting } from '../stores/ui';
+import { useUiStore } from '../stores/ui';
 
-const { t } = useI18n()
-const ui = useUiStore()
+const { t } = useI18n();
+const ui = useUiStore();
 
 // 界面语言：system + 支持的语言列表
 const languageItems = computed(() => [
   { title: t('settingsPage.general.langSystem'), value: 'system' as LocaleSetting },
   ...supportedLocales.map(l => ({ title: l.label, value: l.value as LocaleSetting }))
-])
+]);
 
 const language = computed<LocaleSetting>({
   get: () => ui.locale,
   set: value => ui.setLocale(value)
-})
+});
 
-const languageLabel = computed(
-  () => languageItems.value.find(item => item.value === ui.locale)?.title ?? ''
-)
+const languageLabel = computed(() => languageItems.value.find(item => item.value === ui.locale)?.title ?? '');
 
 // 以下为占位设置项：仅组件内状态，接入真实配置后改从设置 store 读写
-const inheritProfile = ref(true)
-const terminalFont = ref('')
-const enhancedFindGrep = ref(true)
-const httpProxy = ref('')
-const proxyExceptions = ref('')
+const inheritProfile = ref(true);
+const terminalFont = ref('');
+const enhancedFindGrep = ref(true);
+const httpProxy = ref('');
+const proxyExceptions = ref('');
 </script>
 
 <template>

@@ -1,8 +1,8 @@
-import { fileURLToPath, URL } from 'node:url'
-import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'electron-vite'
-import UnoCSS from 'unocss/vite'
-import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
+import { fileURLToPath, URL } from 'node:url';
+import vue from '@vitejs/plugin-vue';
+import { defineConfig } from 'electron-vite';
+import UnoCSS from 'unocss/vite';
+import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify';
 
 export default defineConfig({
   main: {
@@ -31,4 +31,4 @@ export default defineConfig({
       UnoCSS({ configFile: fileURLToPath(new URL('./uno.config.ts', import.meta.url)) })
     ]
   }
-})
+});

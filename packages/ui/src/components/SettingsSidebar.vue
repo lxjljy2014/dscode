@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
-import { isFrameless, isMac } from '../host'
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useRoute, useRouter } from 'vue-router';
+import { isFrameless, isMac } from '../host';
 
-const { t } = useI18n()
-const route = useRoute()
-const router = useRouter()
+const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
 
-const activeSection = computed(() => (route.params.section as string | undefined) ?? 'general')
+const activeSection = computed(() => (route.params.section as string | undefined) ?? 'general');
 
 // 设置导航分组：icon 与 section key 一一对应，文案走 settingsPage.section.*
 const groups = computed(() => [
@@ -41,16 +41,13 @@ const groups = computed(() => [
       { key: 'onboarding', icon: 'i-lucide:rocket', dashed: true }
     ]
   }
-])
+]);
 </script>
 
 <template>
   <div class="flex h-full flex-col">
     <!-- 顶部拖拽条：macOS 让位红绿灯 -->
-    <div
-      class="h-12 shrink-0"
-      :class="[isFrameless ? 'ds-drag' : '', isMac ? 'pl-[84px]' : 'pl-2']"
-    />
+    <div class="h-12 shrink-0" :class="[isFrameless ? 'ds-drag' : '', isMac ? 'pl-[84px]' : 'pl-2']" />
 
     <!-- 返回工作区 -->
     <div class="shrink-0 px-2 pb-2">
