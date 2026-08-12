@@ -53,9 +53,7 @@ export function createVuetifyPlugin() {
         rounded: 'lg'
       },
       VTextField: {
-        variant: 'outlined',
         density: 'compact',
-        rounded: 'lg',
         hideDetails: true
       },
       VTextarea: {

@@ -18,10 +18,6 @@ const sessionStore = useSessionStore();
 const settingsStore = useSettingsStore();
 const input = ref('');
 
-// 模式 / 模型 / 推理强度（接入真实 agent 后改为从配置读取）
-const mode = ref<'plan' | 'agent'>('plan');
-const modes = ['plan', 'agent'] as const;
-
 const model = ref('deepseek/deepseek-v4-flash');
 const models = ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro'];
 
@@ -275,10 +271,12 @@ async function selectPermission(value: PermissionMode): Promise<void> {
         </template>
         <VCard min-width="300" rounded="16px">
           <VTextField
-            density="comfortable"
+            density="compact"
             hide-details
+            bg-color="surface"
+            base-color="surface"
             prepend-inner-icon="i-lucide:search"
-            color="primary"
+            color="surface"
             :placeholder="t('project.search')"
           />
           <!-- 最近打开的工作空间 -->
@@ -304,7 +302,12 @@ async function selectPermission(value: PermissionMode): Promise<void> {
               rounded="pill"
               @click="openFolder"
             />
-            <VListItem :title="t('project.remote')" rounded="pill" prepend-icon="i-lucide:cloud" @click="remoteConnect" />
+            <VListItem
+              :title="t('project.remote')"
+              rounded="pill"
+              prepend-icon="i-lucide:cloud"
+              @click="remoteConnect"
+            />
             <VListItem
               :title="t('project.noProject')"
               rounded="pill"
@@ -339,7 +342,7 @@ async function selectPermission(value: PermissionMode): Promise<void> {
         <VCard min-width="300" rounded="16px">
           <VTextField
             v-model="branchSearch"
-            density="comfortable"
+            density="compact"
             hide-details
             prepend-inner-icon="i-lucide:search"
             color="primary"
@@ -376,7 +379,12 @@ async function selectPermission(value: PermissionMode): Promise<void> {
               rounded="pill"
               @click="openCreateBranch"
             />
-            <VListItem :title="t('branch.graph')" prepend-icon="i-lucide:git-graph" rounded="pill" @click="graphDialog = true" />
+            <VListItem
+              :title="t('branch.graph')"
+              prepend-icon="i-lucide:git-graph"
+              rounded="pill"
+              @click="graphDialog = true"
+            />
           </VList>
         </VCard>
       </VMenu>
@@ -404,32 +412,6 @@ async function selectPermission(value: PermissionMode): Promise<void> {
             <VBtn v-bind="tipProps" icon="i-lucide:plus" variant="text" size="small" class="text-muted" />
           </template>
         </VTooltip>
-
-        <!-- 模式选择 -->
-        <VMenu location="top start" :offset="4">
-          <template #activator="{ props: menuProps }">
-            <VBtn
-              v-bind="menuProps"
-              variant="text"
-              size="small"
-              class="px-2 text-muted"
-              prepend-icon="i-lucide:clipboard-list"
-              append-icon="i-lucide:chevron-down"
-            >
-              {{ mode === 'plan' ? t('input.planMode') : t('input.agentMode') }}
-            </VBtn>
-          </template>
-          <VList min-width="140" nav>
-            <VListItem v-for="m in modes" :key="m" :active="mode === m" @click="mode = m">
-              <VListItemTitle class="text-sm">
-                {{ m === 'plan' ? t('input.planMode') : t('input.agentMode') }}
-              </VListItemTitle>
-              <template #append>
-                <VIcon v-if="mode === m" icon="i-lucide:check" size="16" />
-              </template>
-            </VListItem>
-          </VList>
-        </VMenu>
 
         <!-- 权限模式 -->
         <VMenu v-model="permMenuOpen" location="top start" :offset="4">
@@ -542,7 +524,12 @@ async function selectPermission(value: PermissionMode): Promise<void> {
         <VCardActions>
           <VSpacer />
           <VBtn :text="t('dialog.cancel')" @click="createBranchDialog = false" />
-          <VBtn color="primary" :text="t('dialog.create')" :disabled="!newBranchName.trim()" @click="confirmCreateBranch" />
+          <VBtn
+            color="primary"
+            :text="t('dialog.create')"
+            :disabled="!newBranchName.trim()"
+            @click="confirmCreateBranch"
+          />
         </VCardActions>
       </VCard>
     </VDialog>
