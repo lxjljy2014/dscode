@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext"],
-    "types": ["electron-vite/node"]
+    "types": ["electron-vite/node", "node"]
   },
   "include": [
     "electron.vite.config.ts",
