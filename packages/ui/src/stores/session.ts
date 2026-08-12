@@ -71,6 +71,8 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   let timer: ReturnType<typeof setInterval> | undefined
+  /** 正在生成的回复（绑定所属会话，防止切换会话后 stop 作用错对象） */
+  let activeReply: { sessionId: string; messageId: string } | null = null
 
   function sendMessage(content: string) {
     const session = activeSession.value
@@ -96,6 +98,7 @@ export const useSessionStore = defineStore('session', () => {
     }
     session.messages.push(reply)
     generating.value = true
+    activeReply = { sessionId: session.id, messageId: reply.id }
 
     const fullText = mockReplies[Math.floor(Math.random() * mockReplies.length)]
     let cursor = 0
@@ -113,13 +116,18 @@ export const useSessionStore = defineStore('session', () => {
       clearInterval(timer)
       timer = undefined
     }
-    generating.value = false
-    const session = activeSession.value
-    const last = session?.messages[session.messages.length - 1]
-    if (last?.streaming) {
-      last.streaming = false
-      session!.updatedAt = Date.now()
+    // 按生成时绑定的会话与消息定位，避免切换会话后清错对象
+    if (activeReply) {
+      const { sessionId, messageId } = activeReply
+      const session = sessions.value.find(s => s.id === sessionId)
+      const reply = session?.messages.find(m => m.id === messageId)
+      if (session && reply?.streaming) {
+        reply.streaming = false
+        session.updatedAt = Date.now()
+      }
+      activeReply = null
     }
+    generating.value = false
   }
 
   return {

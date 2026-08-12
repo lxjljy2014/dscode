@@ -1,7 +1,4 @@
 {
-  "app": {
-    "title": "DSCode"
-  },
   "nav": {
     "newTask": "New task",
     "search": "Search",
@@ -10,9 +7,7 @@
   },
   "sidebar": {
     "project": "Projects",
-    "more": "More",
-    "back": "Back",
-    "forward": "Forward"
+    "more": "More"
   },
   "session": {
     "new": "New task",
@@ -24,7 +19,6 @@
     "placeholder": "Ask DSCode, use {'@'} to add context, / for commands or skills",
     "send": "Send",
     "stop": "Stop generating",
-    "thinking": "Generating…",
     "greeting": {
       "morning": "Good morning. How can I help?",
       "noon": "Good afternoon. Fancy a break?",
@@ -53,9 +47,10 @@
     "additions": "{n} additions",
     "deletions": "{n} deletions"
   },
+  "terminal": {
+    "placeholder": "Terminal panel (placeholder)"
+  },
   "settings": {
-    "theme": "Toggle theme",
-    "language": "Language",
     "toggleLeft": "Toggle chat sidebar",
     "toggleRight": "Toggle changes panel",
     "terminal": "Terminal"

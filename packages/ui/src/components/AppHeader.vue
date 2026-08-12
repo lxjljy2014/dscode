@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { isFrameless, isMac } from '../host'
-import { supportedLocales } from '../plugins/i18n'
+import { computed } from 'vue'
+import { isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from '../host'
 import { useUiStore } from '../stores/ui'
 import { useSessionStore } from '../stores/session'
-import {computed} from "vue";
 
 const { t } = useI18n()
 const ui = useUiStore()
@@ -27,9 +26,9 @@ const hasOverlayControls = isFrameless && !isMac
     :class="{
     'ds-drag': isFrameless,
     'pl-[84px]': isMac && !ui.leftVisible,
-    'pr-[138px]': hasOverlayControls,
     'border-b border-line': messages.length
     }"
+    :style="hasOverlayControls ? { paddingRight: `${TITLEBAR_OVERLAY_WIDTH}px` } : undefined"
   >
     <!-- 左侧栏切换平时在侧栏顶栏；侧栏隐藏时回到 header（macOS 下左 padding 已让位红绿灯） -->
     <v-tooltip v-if="!ui.leftVisible" :text="t('settings.toggleLeft')" location="bottom">
@@ -59,7 +58,7 @@ const hasOverlayControls = isFrameless && !isMac
       <v-icon-btn
           v-if="messages.length"
           v-tooltip="{text: t('settings.toggleRight'), location: 'bottom'}"
-          :icon="ui.rightVisible ? 'i-lucide:panel-right-close' : 'i-lucide:panel-left-close'"
+          :icon="ui.rightVisible ? 'i-lucide:panel-right-close' : 'i-lucide:panel-right-open'"
           variant="text"
           size="small"
           rounded="lg"

@@ -95,8 +95,8 @@ export const mockSessions: Session[] = [
 export const mockDiffFiles: DiffFile[] = [
   {
     path: 'packages/ui/src/stores/session.ts',
-    additions: 42,
-    deletions: 6,
+    additions: 13,
+    deletions: 5,
     lines: [
       { type: 'hunk', content: '@@ -1,6 +1,10 @@' },
       { type: 'context', content: "import { defineStore } from 'pinia'", oldLineNo: 1, newLineNo: 1 },
@@ -128,8 +128,8 @@ export const mockDiffFiles: DiffFile[] = [
   },
   {
     path: 'packages/ui/src/components/SessionSidebar.vue',
-    additions: 18,
-    deletions: 11,
+    additions: 5,
+    deletions: 5,
     lines: [
       { type: 'hunk', content: '@@ -2,14 +2,12 @@' },
       { type: 'context', content: '<script setup lang="ts">', oldLineNo: 2, newLineNo: 2 },
@@ -149,8 +149,8 @@ export const mockDiffFiles: DiffFile[] = [
   },
   {
     path: 'packages/ui/src/theme/tokens.ts',
-    additions: 9,
-    deletions: 2,
+    additions: 2,
+    deletions: 1,
     lines: [
       { type: 'hunk', content: '@@ -20,8 +20,13 @@' },
       { type: 'context', content: "    background: '#0d0d0d',", oldLineNo: 20, newLineNo: 20 },

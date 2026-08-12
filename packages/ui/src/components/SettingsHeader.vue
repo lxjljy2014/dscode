@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { isFrameless, isMac } from '../host'
+import { isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from '../host'
 
 const { t } = useI18n()
 
@@ -15,7 +15,8 @@ const hasOverlayControls = isFrameless && !isMac
     color="background"
     class="pl-2"
 
-    :class="[isFrameless ? 'ds-drag' : '', hasOverlayControls ? 'pr-[138px]' : 'pr-2']"
+    :class="[isFrameless ? 'ds-drag' : '', 'pr-2']"
+    :style="hasOverlayControls ? { paddingRight: `${TITLEBAR_OVERLAY_WIDTH}px` } : undefined"
   >
     <v-spacer />
 

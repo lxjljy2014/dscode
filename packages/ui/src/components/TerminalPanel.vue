@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useUiStore } from '../stores/ui'
-import DiffPanel from './DiffPanel.vue'
 
+const { t } = useI18n()
 const uiStore = useUiStore()
 </script>
 
@@ -12,8 +13,6 @@ const uiStore = useUiStore()
     location="bottom"
     width="280"
   >
-<!--    <DiffPanel />-->
-
-    你好
+    {{ t('terminal.placeholder') }}
   </v-navigation-drawer>
 </template>

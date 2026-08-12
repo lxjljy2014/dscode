@@ -29,6 +29,10 @@ async function toggleSearch() {
 const modKey = isMac ? '⌘' : 'Ctrl'
 
 function onGlobalKeydown(e: KeyboardEvent) {
+  // 输入场景（含 IME 组合态）不拦截，避免打断打字
+  if (e.isComposing) return
+  const target = e.target as HTMLElement | null
+  if (target?.closest('input, textarea, select, [contenteditable]')) return
   if (!(e.metaKey || e.ctrlKey)) return
   if (e.key === 'n') {
     e.preventDefault()
@@ -48,7 +52,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
     <!-- 顶栏：macOS 让位红绿灯；侧栏切换 + 前进/后退（暂无历史，禁用占位） -->
     <div
       class="h-12 shrink-0 flex items-center gap-0.5 pr-2"
-      :class="[isFrameless ? 'ds-drag' : '', isMac ? 'pl-[76px]' : 'pl-2']"
+      :class="[isFrameless ? 'ds-drag' : '', isMac ? 'pl-[84px]' : 'pl-2']"
     >
       <v-tooltip :text="t('settings.toggleLeft')" location="bottom">
         <template #activator="{ props }">

@@ -49,7 +49,7 @@ const groups = computed(() => [
     <!-- 顶部拖拽条：macOS 让位红绿灯 -->
     <div
       class="h-12 shrink-0"
-      :class="[isFrameless ? 'ds-drag' : '', isMac ? 'pl-[76px]' : 'pl-2']"
+      :class="[isFrameless ? 'ds-drag' : '', isMac ? 'pl-[84px]' : 'pl-2']"
     />
 
     <!-- 返回工作区 -->

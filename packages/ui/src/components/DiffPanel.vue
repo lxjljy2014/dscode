@@ -34,8 +34,12 @@ const tab = defineModel<'changes' | 'files'>({ default: 'changes' })
             >
               <span class="i-lucide:file-diff shrink-0 text-3.5 text-muted" />
               <span class="truncate font-mono text-xs text-fg">{{ f.path }}</span>
-              <span class="ml-auto shrink-0 font-mono text-xs text-diff-add">+{{ f.additions }}</span>
-              <span class="shrink-0 font-mono text-xs text-diff-del">-{{ f.deletions }}</span>
+              <span class="ml-auto shrink-0 font-mono text-xs text-diff-add">
+                {{ t('diff.additions', { n: f.additions }) }}
+              </span>
+              <span class="shrink-0 font-mono text-xs text-diff-del">
+                {{ t('diff.deletions', { n: f.deletions }) }}
+              </span>
             </div>
 
             <div class="py-1 font-mono text-xs leading-[22px]">

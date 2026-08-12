@@ -7,10 +7,24 @@ const isWindows = process.platform === 'win32'
 // 标题栏高 48px，与渲染端 header 对齐
 const TITLEBAR_HEIGHT = 48
 
+// 允许交给系统浏览器打开的协议白名单
+const ALLOWED_OPEN_PROTOCOLS = ['https:', 'http:']
+
+/** 校验后把 http(s) 链接交给系统浏览器打开，其余协议一律忽略 */
+function openExternalIfAllowed(url: string): void {
+  try {
+    if (ALLOWED_OPEN_PROTOCOLS.includes(new URL(url).protocol)) {
+      shell.openExternal(url)
+    }
+  } catch {
+    // URL 无法解析时直接忽略
+  }
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: 1200,
+    height: 800,
     minWidth: 960,
     minHeight: 600,
     show: false,
@@ -38,9 +52,18 @@ function createWindow(): void {
     win.show()
   })
 
+  // 新窗口一律拒绝，仅 http(s) 链接交给系统浏览器
   win.webContents.setWindowOpenHandler(details => {
-    shell.openExternal(details.url)
+    openExternalIfAllowed(details.url)
     return { action: 'deny' }
+  })
+
+  // 拦截窗口内导航：仅放行自身 dev server / 本地文件，其余交给系统浏览器或直接拦截
+  win.webContents.on('will-navigate', (event, url) => {
+    const devUrl = process.env['ELECTRON_RENDERER_URL']
+    if (devUrl ? url.startsWith(devUrl) : url.startsWith('file:')) return
+    event.preventDefault()
+    openExternalIfAllowed(url)
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -52,17 +75,26 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   // 渲染端主题切换后同步悬浮按钮配色（仅 Windows 生效）
-  ipcMain.on(
-    'win:set-titlebar-overlay',
-    (e, options: { color: string; symbolColor: string }) => {
-      if (!isWindows) return
-      BrowserWindow.fromWebContents(e.sender)?.setTitleBarOverlay({
-        color: options.color,
-        symbolColor: options.symbolColor,
-        height: TITLEBAR_HEIGHT
-      })
+  ipcMain.on('win:set-titlebar-overlay', (e, options: unknown) => {
+    if (!isWindows) return
+    // 只接受主窗口发来的请求，并校验参数类型（非法颜色值会让 setTitleBarOverlay 抛错）
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win) return
+    if (
+      typeof options !== 'object' ||
+      options === null ||
+      typeof (options as Record<string, unknown>)['color'] !== 'string' ||
+      typeof (options as Record<string, unknown>)['symbolColor'] !== 'string'
+    ) {
+      return
     }
-  )
+    const { color, symbolColor } = options as { color: string; symbolColor: string }
+    win.setTitleBarOverlay({
+      color,
+      symbolColor,
+      height: TITLEBAR_HEIGHT
+    })
+  })
 
   createWindow()
 

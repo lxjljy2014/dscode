@@ -29,6 +29,7 @@ watch(
   value => {
     locale.value = value
     current.value = vuetifyLocaleMap[value]
+    document.documentElement.lang = value
   },
   { immediate: true }
 )
