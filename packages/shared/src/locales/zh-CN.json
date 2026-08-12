@@ -1,0 +1,109 @@
+{
+  "app": {
+    "title": "DSCode"
+  },
+  "nav": {
+    "newTask": "新建任务",
+    "search": "搜索",
+    "automation": "自动化",
+    "skills": "技能"
+  },
+  "sidebar": {
+    "project": "项目",
+    "more": "更多",
+    "back": "后退",
+    "forward": "前进"
+  },
+  "session": {
+    "new": "新建任务",
+    "search": "搜索任务…",
+    "empty": "暂无任务",
+    "notFound": "没有匹配的任务"
+  },
+  "chat": {
+    "placeholder": "向 DSCode 提问，使用 {'@'} 添加上下文，使用 / 选择命令或能力",
+    "send": "发送",
+    "stop": "停止生成",
+    "thinking": "正在生成…",
+    "greeting": {
+      "morning": "早上好，有什么可以帮你？",
+      "noon": "中午好呀，要不要先休息一下",
+      "afternoon": "下午好，有什么可以帮你？",
+      "evening": "晚上好，有什么可以帮你？",
+      "night": "夜深了，注意休息"
+    }
+  },
+  "input": {
+    "selectProject": "选择项目",
+    "planMode": "计划模式",
+    "agentMode": "代理模式",
+    "addContext": "添加上下文",
+    "effort": {
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "max": "最高"
+    }
+  },
+  "diff": {
+    "changes": "变更",
+    "files": "文件",
+    "emptyChanges": "暂无变更",
+    "selectFile": "选择一个文件查看内容",
+    "additions": "{n} 处新增",
+    "deletions": "{n} 处删除"
+  },
+  "settings": {
+    "theme": "切换主题",
+    "language": "语言",
+    "toggleLeft": "切换会话侧栏",
+    "toggleRight": "切换变更面板",
+    "terminal": "终端"
+  },
+  "settingsPage": {
+    "back": "返回工作区",
+    "help": "帮助",
+    "save": "保存",
+    "comingSoon": "即将推出",
+    "group": {
+      "basic": "基础设置",
+      "agent": "Agent 能力",
+      "data": "数据与统计"
+    },
+    "section": {
+      "general": "常规",
+      "appearance": "外观",
+      "model": "模型设置",
+      "browser": "浏览器",
+      "memory": "记忆",
+      "plugins": "插件",
+      "skills": "技能",
+      "subagents": "子智能体",
+      "mcp": "MCP 服务器",
+      "commands": "命令",
+      "hooks": "钩子",
+      "index": "索引库",
+      "usage": "使用统计",
+      "onboarding": "引导"
+    },
+    "general": {
+      "default": "系统默认",
+      "language": "界面语言",
+      "languageDesc": "选择应用 UI 的显示语言。",
+      "langSystem": "系统默认",
+      "inheritProfile": "继承系统终端 Profile",
+      "inheritProfileDesc": "启动内置终端时尽量继承登录 shell 环境、代理、Kube 变量和本机终端字体。",
+      "terminalFont": "终端字体",
+      "terminalFontDesc": "留空时自动探测系统终端配置；填写后作为 DSCode 终端的字体覆盖。",
+      "terminalFontPlaceholder": "留空自动继承，例如 MesloLGS NF, monospace",
+      "findGrep": "增强 Find 和 Grep",
+      "findGrepDesc": "在新建会话或应用重启后恢复的会话中使用增强 Find 和 Grep。当前会话保持现有设置；Windows 的 Find 保持不变。",
+      "httpProxy": "HTTP 代理",
+      "httpProxyDesc": "模型、MCP、命令工具与应用渲染层的出口流量将经此代理；留空时直连，不读取系统环境变量。修改后需重启应用生效。",
+      "httpProxyPlaceholder": "留空直连，例如 http://127.0.0.1:7890",
+      "proxyExceptions": "代理例外",
+      "proxyExceptionsDesc": "匹配这些主机的请求将直连，不经过 HTTP 代理。多个规则用英文逗号分隔。修改后需重启应用生效。",
+      "proxyExceptionsPlaceholder": "例如 localhost, 127.0.0.1, *.internal"
+    }
+  }
+}

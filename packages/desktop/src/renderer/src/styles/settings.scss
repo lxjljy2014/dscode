@@ -1,0 +1,28 @@
+@use 'vuetify/settings' with (
+  $border-radius-root: 10px,
+  $list-item-one-line-min-height: 40px,
+  $list-item-nav-title-font-size: .875rem,
+  $body-font-family: (
+    'Inter Variable',
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    sans-serif
+  ),
+  $heading-font-family: (
+    'Inter Variable',
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    sans-serif
+  ),
+  $line-height-root: 1.6
+);

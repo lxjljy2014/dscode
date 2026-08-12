@@ -1,0 +1,99 @@
+/* 全局精修：滚动条、选区、过渡、动效 */
+
+:root {
+  --ds-duration: 180ms;
+  --ds-easing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- 细滚动条 ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.35);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.55);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---- 文本选区 ---- */
+::selection {
+  background: rgba(var(--v-theme-on-surface), 0.18);
+}
+
+/* ---- 焦点 ---- */
+:focus-visible {
+  outline: 2px solid rgba(var(--v-theme-on-surface), 0.35);
+  outline-offset: 1px;
+}
+
+/* ---- 消息淡入 ---- */
+@keyframes ds-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ds-fade-in {
+  animation: ds-fade-in var(--ds-duration) var(--ds-easing);
+}
+
+/* ---- 流式光标 ---- */
+@keyframes ds-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.ds-streaming-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  background: currentColor;
+  animation: ds-blink 0.9s ease-in-out infinite;
+}
+
+/* ---- 无边框窗口：标题栏拖拽区 ---- */
+.ds-drag {
+  -webkit-app-region: drag;
+}
+
+/* 拖拽区内的可交互元素必须排除，否则点击被拖拽吞掉 */
+.ds-drag button,
+.ds-no-drag {
+  -webkit-app-region: no-drag;
+}

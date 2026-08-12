@@ -1,0 +1,109 @@
+{
+  "app": {
+    "title": "DSCode"
+  },
+  "nav": {
+    "newTask": "New task",
+    "search": "Search",
+    "automation": "Automation",
+    "skills": "Skills"
+  },
+  "sidebar": {
+    "project": "Projects",
+    "more": "More",
+    "back": "Back",
+    "forward": "Forward"
+  },
+  "session": {
+    "new": "New task",
+    "search": "Search tasks…",
+    "empty": "No tasks yet",
+    "notFound": "No matching tasks"
+  },
+  "chat": {
+    "placeholder": "Ask DSCode, use {'@'} to add context, / for commands or skills",
+    "send": "Send",
+    "stop": "Stop generating",
+    "thinking": "Generating…",
+    "greeting": {
+      "morning": "Good morning. How can I help?",
+      "noon": "Good afternoon. Fancy a break?",
+      "afternoon": "Good afternoon. How can I help?",
+      "evening": "Good evening. How can I help?",
+      "night": "Up late — don't forget to rest"
+    }
+  },
+  "input": {
+    "selectProject": "Select project",
+    "planMode": "Plan mode",
+    "agentMode": "Agent mode",
+    "addContext": "Add context",
+    "effort": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "max": "Max"
+    }
+  },
+  "diff": {
+    "changes": "Changes",
+    "files": "Files",
+    "emptyChanges": "No changes yet",
+    "selectFile": "Select a file to view its content",
+    "additions": "{n} additions",
+    "deletions": "{n} deletions"
+  },
+  "settings": {
+    "theme": "Toggle theme",
+    "language": "Language",
+    "toggleLeft": "Toggle chat sidebar",
+    "toggleRight": "Toggle changes panel",
+    "terminal": "Terminal"
+  },
+  "settingsPage": {
+    "back": "Back to workspace",
+    "help": "Help",
+    "save": "Save",
+    "comingSoon": "Coming soon",
+    "group": {
+      "basic": "Basics",
+      "agent": "Agent capabilities",
+      "data": "Data & stats"
+    },
+    "section": {
+      "general": "General",
+      "appearance": "Appearance",
+      "model": "Models",
+      "browser": "Browser",
+      "memory": "Memory",
+      "plugins": "Plugins",
+      "skills": "Skills",
+      "subagents": "Subagents",
+      "mcp": "MCP servers",
+      "commands": "Commands",
+      "hooks": "Hooks",
+      "index": "Index",
+      "usage": "Usage",
+      "onboarding": "Onboarding"
+    },
+    "general": {
+      "default": "System default",
+      "language": "Interface language",
+      "languageDesc": "Choose the display language for the app UI.",
+      "langSystem": "System default",
+      "inheritProfile": "Inherit system terminal profile",
+      "inheritProfileDesc": "When starting the built-in terminal, inherit the login shell environment, proxy, Kube variables and the local terminal font where possible.",
+      "terminalFont": "Terminal font",
+      "terminalFontDesc": "Leave empty to auto-detect the system terminal configuration; a value overrides the DSCode terminal font.",
+      "terminalFontPlaceholder": "Empty to inherit, e.g. MesloLGS NF, monospace",
+      "findGrep": "Enhanced Find and Grep",
+      "findGrepDesc": "Use enhanced Find and Grep in new sessions and sessions restored after an app restart. Current sessions keep their settings; Find on Windows is unchanged.",
+      "httpProxy": "HTTP proxy",
+      "httpProxyDesc": "Outbound traffic from models, MCP, command tools and the app renderer goes through this proxy; empty means direct connection without reading system environment variables. Restart required after changes.",
+      "httpProxyPlaceholder": "Empty for direct, e.g. http://127.0.0.1:7890",
+      "proxyExceptions": "Proxy exceptions",
+      "proxyExceptionsDesc": "Requests to matching hosts connect directly, bypassing the HTTP proxy. Separate multiple rules with commas. Restart required after changes.",
+      "proxyExceptionsPlaceholder": "e.g. localhost, 127.0.0.1, *.internal"
+    }
+  }
+}
