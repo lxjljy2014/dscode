@@ -39,6 +39,11 @@ export const useSessionStore = defineStore('session', () => {
   const activeSession = computed<Session | null>(
     () => sessions.value.find(s => s.id === activeSessionId.value) ?? null
   )
+  const hasMessage = computed(() => {
+    const messages = activeSession.value?.messages ?? []
+    return  messages.length > 0
+  })
+
 
   const filteredSessions = computed(() => {
     const k = keyword.value.trim().toLowerCase()
@@ -139,6 +144,7 @@ export const useSessionStore = defineStore('session', () => {
     fileTree,
     selectedFilePath,
     activeSession,
+    hasMessage,
     filteredSessions,
     selectedFile,
     select,

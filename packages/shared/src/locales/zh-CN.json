@@ -29,12 +29,12 @@
   },
   "input": {
     "selectProject": "选择项目",
+    "gitBranch": "GIT分支",
     "planMode": "计划模式",
     "agentMode": "代理模式",
     "addContext": "添加上下文",
     "effort": {
-      "low": "低",
-      "medium": "中",
+      "close": "关闭",
       "high": "高",
       "max": "最高"
     }

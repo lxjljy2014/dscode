@@ -6,7 +6,7 @@ import { useUiStore } from '../stores/ui'
 import { useSessionStore } from '../stores/session'
 
 const { t } = useI18n()
-const ui = useUiStore()
+const uiStore = useUiStore()
 const sessionStore = useSessionStore()
 
 const messages = computed(() => sessionStore.activeSession?.messages ?? [])
@@ -14,7 +14,7 @@ const messages = computed(() => sessionStore.activeSession?.messages ?? [])
 // 平台布局差异（仅预留位置，控件由系统绘制）：
 // macOS：红绿灯悬浮在左上角 —— 左侧栏展开时落在侧栏顶部让位区，header 无需预留；
 //        侧栏隐藏时 header 顶到窗口左缘，需左 padding 84px 让位
-// Windows：原生悬浮按钮叠在 header 右侧 → 右 padding 约 138px
+// Windows：原生悬浮按钮叠在 header 右侧 → 右 padding 约 150px
 const hasOverlayControls = isFrameless && !isMac
 </script>
 
@@ -25,13 +25,13 @@ const hasOverlayControls = isFrameless && !isMac
     class="px-2"
     :class="{
     'ds-drag': isFrameless,
-    'pl-[84px]': isMac && !ui.leftVisible,
+    'pl-[84px]': isMac && !uiStore.leftVisible,
     'border-b border-line': messages.length
     }"
     :style="hasOverlayControls ? { paddingRight: `${TITLEBAR_OVERLAY_WIDTH}px` } : undefined"
   >
     <!-- 左侧栏切换平时在侧栏顶栏；侧栏隐藏时回到 header（macOS 下左 padding 已让位红绿灯） -->
-    <v-tooltip v-if="!ui.leftVisible" :text="t('settings.toggleLeft')" location="bottom">
+    <v-tooltip v-if="!uiStore.leftVisible" :text="t('settings.toggleLeft')" location="bottom">
       <template #activator="{ props }">
         <v-btn
           v-bind="props"
@@ -39,10 +39,63 @@ const hasOverlayControls = isFrameless && !isMac
           variant="text"
           size="small"
           class="text-muted"
-          @click="ui.toggleLeft()"
+          @click="uiStore.toggleLeft()"
         />
       </template>
     </v-tooltip>
+    <span v-if="sessionStore.hasMessage" class="text-muted"> 任务名称 </span>
+    <div v-if="sessionStore.hasMessage" class="flex gap-2 px-2 py-1">
+      <!-- 项目选择条 -->
+      <v-menu location="top start" :offset="4">
+        <template #activator="{ props: menuProps }">
+          <v-btn
+              v-bind="!sessionStore.hasMessage ? menuProps : null"
+              :variant="sessionStore.hasMessage ? 'tonal' : 'text'"
+              :base-color="sessionStore.hasMessage ? 'surface' : ''"
+              rounded="pill"
+              size="small"
+              class="text-muted"
+              prepend-icon="i-lucide:folder"
+              append-icon="i-lucide:chevron-down"
+          >
+            {{ t('input.selectProject') }}
+          </v-btn>
+        </template>
+        <v-list min-width="200" nav>
+          <v-list-item active prepend-icon="i-lucide:folder">
+            <v-list-item-title class="text-sm">dscode</v-list-item-title>
+            <template #append>
+              <v-icon icon="i-lucide:check" size="16" />
+            </template>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+      <!--      git 分支-->
+      <v-menu location="top start" :offset="4">
+        <template #activator="{ props: menuProps }">
+          <v-btn
+              v-bind="menuProps"
+              :variant="sessionStore.hasMessage ? 'tonal' : 'text'"
+              :base-color="sessionStore.hasMessage ? 'surface' : ''"
+              rounded="pill"
+              size="small"
+              class="text-muted"
+              prepend-icon="i-lucide:git-branch"
+              append-icon="i-lucide:chevron-down"
+          >
+            {{ t('input.gitBranch') }}
+          </v-btn>
+        </template>
+        <v-list min-width="200" nav>
+          <v-list-item active prepend-icon="i-lucide:folder">
+            <v-list-item-title class="text-sm">dscode</v-list-item-title>
+            <template #append>
+              <v-icon icon="i-lucide:check" size="16" />
+            </template>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+    </div>
     <v-spacer />
     <div class="flex items-center gap-1">
       <v-icon-btn
@@ -52,18 +105,18 @@ const hasOverlayControls = isFrameless && !isMac
           size="small"
           density="comfortable"
           class="text-muted"
-          @click="ui.toggleTerminal()"
+          @click="uiStore.toggleTerminal()"
       />
 
       <v-icon-btn
           v-if="messages.length"
           v-tooltip="{text: t('settings.toggleRight'), location: 'bottom'}"
-          :icon="ui.rightVisible ? 'i-lucide:panel-right-close' : 'i-lucide:panel-right-open'"
+          :icon="uiStore.rightVisible ? 'i-lucide:panel-right-close' : 'i-lucide:panel-right-open'"
           variant="text"
           size="small"
           rounded="lg"
           class="text-muted"
-          @click="ui.toggleRight()"
+          @click="uiStore.toggleRight()"
       />
     </div>
   </v-app-bar>

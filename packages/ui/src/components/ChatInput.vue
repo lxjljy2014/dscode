@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useSessionStore } from '../stores/session'
 
 const props = defineProps<{ generating: boolean }>()
 const emit = defineEmits<{
@@ -9,6 +10,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const sessionStore = useSessionStore()
 const input = ref('')
 
 // 以下为占位选择器状态，接入真实 agent 后改为从配置/store 读取
@@ -18,8 +20,8 @@ const modes = ['plan', 'agent'] as const
 const model = ref('deepseek/deepseek-v4-flash')
 const models = ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro']
 
-const effort = ref<'low' | 'medium' | 'high' | 'max'>('max')
-const efforts = ['low', 'medium', 'high', 'max'] as const
+const effort = ref<'close' | 'high' | 'max'>('max')
+const efforts = ['close', 'high', 'max'] as const
 
 function submit() {
   const content = input.value.trim()
@@ -38,21 +40,23 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-2">
-    <!-- 项目选择条 -->
-    <v-menu location="top start" :offset="4">
-      <template #activator="{ props: menuProps }">
-        <v-btn
-          v-bind="menuProps"
-          variant="text"
-          rounded="xl"
-          class="shrink-0 self-start border border-line bg-elevated px-3 text-muted"
-          prepend-icon="i-lucide:folder"
-          append-icon="i-lucide:chevron-down"
-        >
-          {{ t('input.selectProject') }}
-        </v-btn>
-      </template>
+  <v-sheet class="flex flex-col" rounded="2xl">
+    <div v-if="!sessionStore.hasMessage" class="flex gap-2 px-2 py-1">
+      <!-- 项目选择条 -->
+      <v-menu location="top start" :offset="4">
+        <template #activator="{ props: menuProps }">
+          <v-btn
+              v-bind="menuProps"
+              variant="text"
+              rounded="pill"
+              size="small"
+              class="text-muted"
+              prepend-icon="i-lucide:folder"
+              append-icon="i-lucide:chevron-down"
+          >
+            {{ t('input.selectProject') }}
+          </v-btn>
+        </template>
         <v-list min-width="200" nav>
           <v-list-item active prepend-icon="i-lucide:folder">
             <v-list-item-title class="text-sm">dscode</v-list-item-title>
@@ -61,18 +65,46 @@ function onKeydown(e: KeyboardEvent) {
             </template>
           </v-list-item>
         </v-list>
-
-    </v-menu>
+      </v-menu>
+<!--      git 分支-->
+      <v-menu location="top start" :offset="4">
+        <template #activator="{ props: menuProps }">
+          <v-btn
+              v-bind="menuProps"
+              variant="text"
+              rounded="pill"
+              size="small"
+              class="text-muted"
+              prepend-icon="i-lucide:git-branch"
+              append-icon="i-lucide:chevron-down"
+          >
+            {{ t('input.gitBranch') }}
+          </v-btn>
+        </template>
+        <v-list min-width="200" nav>
+          <v-list-item active prepend-icon="i-lucide:folder">
+            <v-list-item-title class="text-sm">dscode</v-list-item-title>
+            <template #append>
+              <v-icon icon="i-lucide:check" size="16" />
+            </template>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+    </div>
 
     <!-- 输入卡片 -->
-    <div class="rounded-2xl border border-line bg-elevated">
+    <div class="rounded-2xl border bg-elevated">
       <v-textarea
         v-model="input"
         :placeholder="t('chat.placeholder')"
-        variant="plain"
-        auto-grow
+        variant="solo"
+        density="compact"
+        flat
         rows="2"
         max-rows="5"
+        auto-grow
+        bg-color="elevated"
+        hide-details
         @keydown="onKeydown"
       />
 
@@ -158,7 +190,7 @@ function onKeydown(e: KeyboardEvent) {
               {{ t(`input.effort.${effort}`) }}
             </v-btn>
           </template>
-            <v-list min-width="120" class="p-1">
+            <v-list min-width="120" nav>
               <v-list-item
                   v-for="e in efforts"
                   :key="e"
@@ -188,5 +220,5 @@ function onKeydown(e: KeyboardEvent) {
         </v-tooltip>
       </div>
     </div>
-  </div>
+  </v-sheet>
 </template>

@@ -38,7 +38,7 @@ function createWindow(): void {
     // Windows：原生悬浮按钮叠在 header 右侧（渲染端右侧留出按钮宽度）
     // 初始为暗色主题色值，渲染端主题切换时通过 IPC 同步
     ...(isWindows
-      ? { titleBarOverlay: { color: '#171717', symbolColor: '#ececec', height: TITLEBAR_HEIGHT } }
+      ? { titleBarOverlay: { color: 'rgba(0, 0, 0, 0)', symbolColor: '#ececec', height: TITLEBAR_HEIGHT } }
       : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -88,9 +88,9 @@ app.whenReady().then(() => {
     ) {
       return
     }
-    const { color, symbolColor } = options as { color: string; symbolColor: string }
+    const { symbolColor } = options as { color: string; symbolColor: string }
     win.setTitleBarOverlay({
-      color,
+      color: 'rgba(0, 0, 0, 0)',
       symbolColor,
       height: TITLEBAR_HEIGHT
     })

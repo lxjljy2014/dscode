@@ -29,12 +29,12 @@
   },
   "input": {
     "selectProject": "Select project",
+    "gitBranch": "GIT Branch",
     "planMode": "Plan mode",
     "agentMode": "Agent mode",
     "addContext": "Add context",
     "effort": {
-      "low": "Low",
-      "medium": "Medium",
+      "close": "Close",
       "high": "High",
       "max": "Max"
     }

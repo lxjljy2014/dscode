@@ -31,4 +31,4 @@ export const isMac = host?.platform === 'darwin'
 export const isFrameless = host !== undefined
 
 /** Windows 原生悬浮按钮占用 header 右侧的宽度（3 个按钮，每个约 46px） */
-export const TITLEBAR_OVERLAY_WIDTH = 138
+export const TITLEBAR_OVERLAY_WIDTH = 150
