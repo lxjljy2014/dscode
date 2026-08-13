@@ -57,6 +57,7 @@
     "openFolder": "打开文件夹",
     "noProject": "不在项目中工作",
     "empty": "暂无最近项目",
+    "noMatch": "无匹配结果",
     "remote": "远程连接",
     "remoteNotReady": "远程连接功能尚未实现"
   },

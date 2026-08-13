@@ -54,6 +54,13 @@ const homeDir = ref('');
 const projectMenuOpen = ref(false);
 const snackbarText = ref('');
 const snackbarShow = ref(false);
+/** 项目搜索关键词（按名称 + 路径不区分大小写过滤） */
+const projectKeyword = ref('');
+const filteredProjects = computed(() => {
+  const k = projectKeyword.value.trim().toLowerCase();
+  if (!k) return recentProjects.value;
+  return recentProjects.value.filter(p => `${p.name} ${p.path}`.toLowerCase().includes(k));
+});
 
 function dirName(p: string): string {
   return (
@@ -175,6 +182,7 @@ async function selectPermission(value: PermissionMode): Promise<void> {
         </template>
         <VCard min-width="300" rounded="16px">
           <VTextField
+            v-model="projectKeyword"
             density="compact"
             hide-details
             bg-color="surface"
@@ -188,10 +196,10 @@ async function selectPermission(value: PermissionMode): Promise<void> {
             </template>
           </VTextField>
           <VDivider></VDivider>
-          <!-- 最近打开的工作空间 -->
+          <!-- 最近打开的工作空间（按关键词过滤） -->
           <VList v-if="recentProjects.length > 0" nav density="compact" prepend-gap="12">
             <VListItem
-              v-for="p in recentProjects"
+              v-for="p in filteredProjects"
               :key="p.path"
               :title="p.name"
               :subtitle="p.path"
@@ -199,6 +207,7 @@ async function selectPermission(value: PermissionMode): Promise<void> {
               rounded="pill"
               @click="selectProject(p.path)"
             />
+            <VListItem v-if="!filteredProjects.length" :title="t('project.noMatch')" rounded="pill" disabled />
           </VList>
           <VList v-else nav density="compact" prepend-gap="12">
             <VListItem :title="t('project.empty')" rounded="pill" disabled />

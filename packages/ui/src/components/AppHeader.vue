@@ -4,13 +4,23 @@ import { computed } from 'vue';
 import { isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from '../host';
 import { useUiStore } from '../stores/ui';
 import { useSessionStore } from '../stores/session';
+import { useSettingsStore } from '../stores/settings';
 import GitBranchMenu from './GitBranchMenu.vue';
 
 const { t } = useI18n();
 const uiStore = useUiStore();
 const sessionStore = useSessionStore();
+const settingsStore = useSettingsStore();
 
 const messages = computed(() => sessionStore.activeSession?.messages ?? []);
+
+/** 当前工作空间：只读展示（有消息后工作空间已锁定，切换入口在空会话的输入卡上） */
+const currentWorkspace = computed(() => settingsStore.settings.workingDirectory);
+const currentWorkspaceName = computed(() => {
+  const wd = currentWorkspace.value;
+  if (!wd) return '';
+  return wd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || wd;
+});
 
 // 平台布局差异（仅预留位置，控件由系统绘制）：
 // macOS：红绿灯悬浮在左上角 —— 左侧栏展开时落在侧栏顶部让位区，header 无需预留；
@@ -45,32 +55,19 @@ const hasOverlayControls = isFrameless && !isMac;
       </template>
     </VTooltip>
     <span v-if="sessionStore.hasMessage" class="text-muted">{{ t('header.taskName') }}</span>
-    <div v-if="sessionStore.hasMessage" class="flex gap-2 px-2 py-1">
-      <!-- 项目选择条 -->
-      <VMenu location="top start" :offset="4">
-        <template #activator="{ props: menuProps }">
-          <VBtn
-            v-bind="!sessionStore.hasMessage ? menuProps : null"
-            :variant="sessionStore.hasMessage ? 'tonal' : 'text'"
-            :base-color="sessionStore.hasMessage ? 'surface' : ''"
-            rounded="pill"
-            size="small"
-            class="text-muted"
-            prepend-icon="i-lucide:folder"
-            append-icon="i-lucide:chevron-down"
+    <div v-if="sessionStore.hasMessage" class="flex items-center gap-2 px-2 py-1">
+      <!-- 当前工作空间：只读展示（有消息后工作空间已锁定，切换入口在空会话的输入卡） -->
+      <VTooltip :text="currentWorkspace || t('input.selectProject')" location="bottom">
+        <template #activator="{ props }">
+          <div
+            v-bind="props"
+            class="flex max-w-44 cursor-default items-center gap-1.5 rounded-full bg-elevated px-2.5 py-1 text-xs text-muted"
           >
-            {{ t('input.selectProject') }}
-          </VBtn>
+            <span class="i-lucide:folder shrink-0 text-3.5" />
+            <span class="truncate">{{ currentWorkspaceName || t('input.selectProject') }}</span>
+          </div>
         </template>
-        <VList min-width="200" nav>
-          <VListItem active prepend-icon="i-lucide:folder">
-            <VListItemTitle class="text-sm">dscode</VListItemTitle>
-            <template #append>
-              <VIcon icon="i-lucide:check" size="16" />
-            </template>
-          </VListItem>
-        </VList>
-      </VMenu>
+      </VTooltip>
       <!-- git 分支：与输入卡片共用 GitBranchMenu（tonal 样式贴合 header） -->
       <GitBranchMenu tonal />
     </div>

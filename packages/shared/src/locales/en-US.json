@@ -57,6 +57,7 @@
     "openFolder": "Open folder",
     "noProject": "Work outside a project",
     "empty": "No recent projects",
+    "noMatch": "No matching results",
     "remote": "Remote connection",
     "remoteNotReady": "Remote connection is not implemented yet"
   },
