@@ -54,7 +54,10 @@ const hasOverlayControls = isFrameless && !isMac;
         />
       </template>
     </VTooltip>
-    <span v-if="sessionStore.hasMessage" class="text-muted">{{ t('header.taskName') }}</span>
+    <!-- 当前任务名称（与激活会话联动；无标题时显示占位标签） -->
+    <span v-if="sessionStore.hasMessage" class="max-w-60 truncate text-muted">
+      {{ sessionStore.activeSession?.title || t('header.taskName') }}
+    </span>
     <div v-if="sessionStore.hasMessage" class="flex items-center gap-2 px-2 py-1">
       <!-- 当前工作空间：只读展示（有消息后工作空间已锁定，切换入口在空会话的输入卡） -->
       <VTooltip :text="currentWorkspace || t('input.selectProject')" location="bottom">
