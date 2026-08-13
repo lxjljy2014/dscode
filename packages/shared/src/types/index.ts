@@ -6,7 +6,46 @@ export interface Message {
   content: string;
   /** 流式输出中 */
   streaming?: boolean;
+  /** agent 错误码（渲染端映射 i18n 文案） */
+  errorCode?: string;
   createdAt: number;
+}
+
+/** agent 可调用的工具名 */
+export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file';
+
+/** 工具事件（聊天流中与消息交错展示） */
+export interface AgentToolEvent {
+  id: string;
+  name: AgentToolName;
+  /** 参数 JSON 字符串（原样展示） */
+  args: string;
+  status: 'running' | 'done' | 'error' | 'confirming' | 'denied';
+  /** 结果摘要（截断后的开头部分） */
+  summary?: string;
+  error?: string;
+  createdAt: number;
+}
+
+/** agent:start 传入的消息历史（渲染端 → 主进程） */
+export interface ChatMessagePayload {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** agent:error 事件负载 */
+export interface AgentErrorEvent {
+  sessionId: string;
+  code: 'no-api-key' | 'api' | 'network' | 'aborted' | 'unknown';
+  detail?: string;
+}
+
+/** agent:confirm 确认请求负载 */
+export interface AgentConfirmRequest {
+  sessionId: string;
+  toolEventId: string;
+  name: AgentToolName;
+  args: string;
 }
 
 export interface Session {
@@ -15,6 +54,8 @@ export interface Session {
   createdAt: number;
   updatedAt: number;
   messages: Message[];
+  /** 会话内的工具事件（瞬态展示，不持久化） */
+  toolEvents: AgentToolEvent[];
 }
 
 export type DiffLineType = 'add' | 'del' | 'context' | 'hunk';

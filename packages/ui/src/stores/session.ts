@@ -65,7 +65,8 @@ export const useSessionStore = defineStore('session', () => {
       title: '',
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      messages: []
+      messages: [],
+      toolEvents: []
     };
     sessions.value.unshift(session);
     activeSessionId.value = session.id;

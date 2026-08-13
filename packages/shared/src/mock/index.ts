@@ -25,7 +25,8 @@ export const mockSessions: Session[] = [
           '好的。我先梳理了现状：`SessionSidebar` 内部同时维护着会话列表、选中态和搜索关键词，这会让跨组件共享变得困难。\n\n我的方案：\n\n- 新建 `session` store，集中管理 `sessions` / `activeSessionId` / `keyword`\n- 组件只保留纯展示逻辑，通过 store 的 getters 读取过滤后的列表\n- 切换会话、新建会话改为 store actions，便于后续接入真实数据\n\n主要改动在 `stores/session.ts` 和 `SessionSidebar.vue`，你可以查看右侧的变更。',
         createdAt: now - 2 * hour + 3 * min
       }
-    ]
+    ],
+    toolEvents: []
   },
   {
     id: 's2',
@@ -46,7 +47,8 @@ export const mockSessions: Session[] = [
           "Done. The toggle lives in `AppHeader` and drives Vuetify's `useTheme()`. The choice is persisted to `localStorage` and re-applied on launch, defaulting to the system preference when nothing is stored.",
         createdAt: now - day + 4 * min
       }
-    ]
+    ],
+    toolEvents: []
   },
   {
     id: 's3',
@@ -67,7 +69,8 @@ export const mockSessions: Session[] = [
           '已调整：行高从 18px 提到 22px，行号列加宽并右对齐，与代码之间用 1px 的 outline 色分隔；hunk 头（@@）单独一行、弱化显示。整体对比度保持不变，长时间阅读更舒服。',
         createdAt: now - 2 * day + 6 * min
       }
-    ]
+    ],
+    toolEvents: []
   },
   {
     id: 's4',
@@ -88,7 +91,8 @@ export const mockSessions: Session[] = [
           'All sidebar strings now go through `vue-i18n`. I added the keys to both `zh-CN.json` and `en-US.json`, and wired the language menu so Vuetify component locales switch along with it.',
         createdAt: now - 3 * day + 5 * min
       }
-    ]
+    ],
+    toolEvents: []
   }
 ];
 
