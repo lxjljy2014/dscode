@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["vite/client"],
+    "composite": true,
     "baseUrl": "../../",
     "paths": {
       "@dscode/shared": ["packages/shared/src/index.ts"],

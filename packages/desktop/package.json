@@ -7,7 +7,7 @@
     "build": "electron-vite build",
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json"
+    "typecheck": "vue-tsc --noEmit -p tsconfig.web.json --composite false && tsc --noEmit -p tsconfig.node.json --composite false"
   },
   "dependencies": {
     "@dscode/shared": "workspace:*",
