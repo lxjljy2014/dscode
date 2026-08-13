@@ -119,3 +119,195 @@ html {
 .ds-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* ---- Markdown 排版（assistant 正文 .ds-md） ----
+   颜色全部引用 --v-theme-* 变量（tokens.ts 唯一事实源），不写死色值；
+   等宽字体栈与 tokens.fontFamilyMono 保持一致。 */
+.ds-md {
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.ds-md h1,
+.ds-md h2,
+.ds-md h3,
+.ds-md h4,
+.ds-md h5,
+.ds-md h6 {
+  margin: 1em 0 0.5em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.ds-md h1 { font-size: 1.3em; }
+.ds-md h2 { font-size: 1.18em; }
+.ds-md h3 { font-size: 1.08em; }
+.ds-md h4,
+.ds-md h5,
+.ds-md h6 { font-size: 1em; }
+
+.ds-md h1:first-child,
+.ds-md h2:first-child,
+.ds-md h3:first-child,
+.ds-md h4:first-child,
+.ds-md p:first-child {
+  margin-top: 0;
+}
+
+.ds-md p {
+  margin: 0.5em 0;
+}
+
+.ds-md ul,
+.ds-md ol {
+  margin: 0.5em 0;
+  padding-left: 1.6em;
+}
+
+.ds-md li {
+  margin: 0.25em 0;
+}
+
+.ds-md li > ul,
+.ds-md li > ol {
+  margin: 0.1em 0;
+}
+
+.ds-md blockquote {
+  margin: 0.6em 0;
+  padding: 0.1em 0 0.1em 0.9em;
+  border-left: 3px solid rgba(var(--v-theme-on-surface), 0.18);
+  color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.ds-md a {
+  color: rgb(var(--v-theme-syntax-attr));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ds-md hr {
+  margin: 1em 0;
+  border: none;
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+}
+
+.ds-md code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(var(--v-theme-on-surface), 0.08);
+  font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+
+.ds-md pre {
+  margin: 0.6em 0;
+  padding: 0.8em 1em;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 8px;
+  background: rgb(var(--v-theme-syntax-bg));
+  overflow-x: auto;
+}
+
+.ds-md pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 0.8em;
+  line-height: 1.6;
+}
+
+.ds-md table {
+  margin: 0.6em 0;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.ds-md th,
+.ds-md td {
+  padding: 0.35em 0.7em;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
+}
+
+.ds-md th {
+  background: rgba(var(--v-theme-on-surface), 0.06);
+  font-weight: 600;
+}
+
+.ds-md img {
+  max-width: 100%;
+}
+
+/* ---- 语法高亮 token 颜色（--v-theme-syntax-* 由 tokens.syntaxPalette 生成） ---- */
+.hljs-comment,
+.hljs-quote {
+  color: rgb(var(--v-theme-syntax-comment));
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-name {
+  color: rgb(var(--v-theme-syntax-keyword));
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: rgb(var(--v-theme-syntax-string));
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: rgb(var(--v-theme-syntax-number));
+}
+
+.hljs-title,
+.hljs-function .hljs-title,
+.hljs-section,
+.hljs-title.function_ {
+  color: rgb(var(--v-theme-syntax-function));
+}
+
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_,
+.hljs-built_in {
+  color: rgb(var(--v-theme-syntax-title));
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params {
+  color: rgb(var(--v-theme-syntax-variable));
+}
+
+.hljs-tag {
+  color: rgb(var(--v-theme-syntax-tag));
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: rgb(var(--v-theme-syntax-attr));
+}
+
+.hljs-meta {
+  color: rgb(var(--v-theme-syntax-meta));
+}
+
+.hljs-deletion {
+  color: rgb(var(--v-theme-error));
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}

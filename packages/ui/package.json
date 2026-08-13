@@ -12,8 +12,11 @@
   },
   "dependencies": {
     "@dscode/shared": "workspace:*",
+    "@types/markdown-it": "^14.1.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "highlight.js": "^11.12.0",
+    "markdown-it": "^15.0.0",
     "pinia": "^3.0.0",
     "vue": "^3.5.41",
     "vue-i18n": "^11.4.8",

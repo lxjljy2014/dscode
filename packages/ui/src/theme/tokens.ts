@@ -21,9 +21,46 @@ export const neutral = {
   950: '#0d0d0d'
 } as const;
 
+/**
+ * 语法高亮色板（markdown 代码块用，light/dark 各一套，key 带 `syntax-` 前缀）。
+ * 挂进 Vuetify theme colors 后生成 `--v-theme-syntax-*` CSS 变量，global.css 的 .hljs-* 引用。
+ * 色值参考 GitHub 明暗配色，语义对齐上方语义色（红=错误/关键字、绿=字符串、蓝=类型）。
+ */
+export const syntaxPalette = {
+  light: {
+    'syntax-comment': neutral[500],
+    'syntax-string': '#0a3069',
+    'syntax-number': '#953800',
+    'syntax-keyword': '#cf222e',
+    'syntax-function': '#8250df',
+    'syntax-title': '#0550ae',
+    'syntax-variable': neutral[900],
+    'syntax-tag': '#116329',
+    'syntax-attr': '#0550ae',
+    'syntax-literal': '#0550ae',
+    'syntax-meta': '#57606a',
+    'syntax-bg': '#f6f8fa'
+  },
+  dark: {
+    'syntax-comment': neutral[500],
+    'syntax-string': '#7ee787',
+    'syntax-number': '#f2cc60',
+    'syntax-keyword': '#ff7b72',
+    'syntax-function': '#d2a8ff',
+    'syntax-title': '#79c0ff',
+    'syntax-variable': '#ececec',
+    'syntax-tag': '#7ee787',
+    'syntax-attr': '#79c0ff',
+    'syntax-literal': '#79c0ff',
+    'syntax-meta': neutral[400],
+    'syntax-bg': neutral[925]
+  }
+} as const;
+
 export const lightTheme: ThemeDefinition = {
   dark: false,
   colors: {
+    ...syntaxPalette.light,
     background: '#ffffff',
     'on-background': neutral[900],
     surface: neutral[100],
@@ -59,6 +96,7 @@ export const lightTheme: ThemeDefinition = {
 export const darkTheme: ThemeDefinition = {
   dark: true,
   colors: {
+    ...syntaxPalette.dark,
     background: neutral[950],
     'on-background': '#ececec',
     surface: neutral[900],

@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Message } from '@dscode/shared';
+import { renderMarkdown } from '../utils/markdown';
 
-defineProps<{ message: Message }>();
+const props = defineProps<{ message: Message }>();
 
 const { t } = useI18n();
+
+/** assistant 正文的 markdown 渲染结果（流式期间逐 chunk 重渲染） */
+const renderedContent = computed(() => renderMarkdown(props.message.content));
 </script>
 
 <template>
@@ -33,7 +38,9 @@ const { t } = useI18n();
             {{ message.reasoning }}
           </div>
         </details>
-        <div v-if="message.content" class="whitespace-pre-wrap">{{ message.content }}</div>
+        <!-- v-html 豁免：markdown-it html:false 转义原始 HTML，且默认阻断 javascript:/file: 等协议链接 -->
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div v-if="message.content" class="ds-md" v-html="renderedContent" />
         <span v-if="message.streaming" class="ds-streaming-cursor" />
         <!-- agent 错误提示（code 映射 i18n 文案） -->
         <div v-if="message.errorCode" class="mt-2 flex items-center gap-1.5 text-xs text-warning">
