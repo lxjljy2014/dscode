@@ -54,18 +54,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown));
       class="h-12 shrink-0 flex items-center gap-0.5 pr-2"
       :class="[isFrameless ? 'ds-drag' : '', isMac ? 'pl-[84px]' : 'pl-2']"
     >
-      <VTooltip :text="t('settings.toggleLeft')" location="bottom">
-        <template #activator="{ props }">
-          <VIconBtn
-            v-bind="props"
-            icon="i-lucide:panel-left-close"
-            variant="text"
-            size="small"
-            class="text-muted"
-            @click="ui.toggleLeft()"
-          />
-        </template>
-      </VTooltip>
+      <VIconBtn
+        v-tooltip="{
+          text: t('settings.toggleLeft'),
+          location: 'bottom'
+        }"
+        icon="i-lucide:panel-left-close"
+        variant="text"
+        size="small"
+        class="text-muted"
+        @click="ui.toggleLeft()"
+      />
     </div>
 
     <!-- 主导航 -->
