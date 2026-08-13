@@ -232,12 +232,13 @@ async function selectPermission(value: PermissionMode): Promise<void> {
         rows="2"
         max-rows="5"
         auto-grow
+        rounded="2xl"
         bg-color="elevated"
         hide-details
         @keydown="onKeydown"
       />
 
-      <div class="flex items-center gap-1 px-2 pb-2">
+      <div class="flex items-center gap-1 px-2">
         <VTooltip :text="t('input.addContext')" location="top">
           <template #activator="{ props: tipProps }">
             <VBtn v-bind="tipProps" icon="i-lucide:plus" variant="text" size="small" class="text-muted" />
@@ -333,6 +334,7 @@ async function selectPermission(value: PermissionMode): Promise<void> {
               v-bind="tipProps"
               :icon="generating ? 'i-lucide:square' : 'i-lucide:arrow-up'"
               color="primary"
+              density="comfortable"
               size="small"
               :disabled="!generating && !input.trim()"
               @click="generating ? emit('stop') : submit()"

@@ -77,6 +77,12 @@ export const useUiStore = defineStore('ui', () => {
     terminalVisible.value = !terminalVisible.value;
   }
 
+  /** 新建任务等场景：收起右侧面板与终端（不重置尺寸与内容） */
+  function hideSidePanels() {
+    rightVisible.value = false;
+    terminalVisible.value = false;
+  }
+
   function setTerminalHeight(value: number) {
     terminalHeight.value = value;
   }
@@ -95,6 +101,7 @@ export const useUiStore = defineStore('ui', () => {
     setLocale,
     toggleLeft,
     toggleRight,
+    hideSidePanels,
     terminalVisible,
     toggleTerminal,
     terminalHeight,

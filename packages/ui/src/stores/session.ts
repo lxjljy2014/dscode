@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { mockDiffFiles, mockFileTree, mockSessions } from '@dscode/shared';
 import type { FileNode, Message, Session } from '@dscode/shared';
+import { useUiStore } from './ui';
 
 /** 模拟流式回复的语料 */
 const mockReplies = [
@@ -68,6 +69,8 @@ export const useSessionStore = defineStore('session', () => {
     };
     sessions.value.unshift(session);
     activeSessionId.value = session.id;
+    // 新建任务时收起右侧面板与终端，聚焦对话区
+    useUiStore().hideSidePanels();
   }
 
   function selectFile(path: string) {

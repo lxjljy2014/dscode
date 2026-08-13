@@ -78,7 +78,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 开发模式两个配置陷阱（`renderer/index.html` / `src/boot.ts`）：
 
-- dev 冷启动时 vite-plugin-vuetify 的虚拟样式模块（`virtual:plugin-vuetify:*`）偶发 404、应用无法挂载（刷新后服务器已暖、正常）。`index.html` 里的 `.app-splash` 启动占位页（应用图标图片 `./icon.png`（`renderer/public/` 方形原图；`resources/icon.png` 为经 `scripts/make-icon-rounded.mjs` 预处理的透明圆角版，供 macOS Dock——Dock 不会自动给自定义图标加圆角；`resources/icon-win.png` 为方形满幅版，供 Windows/Linux 窗口/任务栏图标）+ 同步光晕 + 环境光背景，5s 周期轻微呼吸、无任何文字，背景色对齐 tokens 的 neutral 色阶，深浅色由 boot.ts 按持久化主题打 `ds-theme-dark`/`ds-theme-light` 类、回退系统偏好）盖住加载期黑屏；`src/boot.ts`（先于 main.ts 加载）在 dev 下 10 秒未挂载时自动刷新一次（sessionStorage 防循环），让失败自愈。两者都别删。
+- dev 冷启动时 vite-plugin-vuetify 的虚拟样式模块（`virtual:plugin-vuetify:*`）偶发 404、应用无法挂载（刷新后服务器已暖、正常）。`index.html` 里的 `.app-splash` 启动占位页（应用图标图片 `./icon.png`（`renderer/public/` 方形原图；`resources/icon.png` 为经 `scripts/make-icon-rounded.mjs` 预处理的透明圆角版，供 macOS Dock——Dock 不会自动给自定义图标加圆角；`resources/icon-win.png` 为同脚本按 `contentScale=1` 生成的满幅圆角版（内容满幅、圆角外透明），供 Windows/Linux 窗口/任务栏图标）+ 同步光晕 + 环境光背景，5s 周期轻微呼吸、无任何文字，背景色对齐 tokens 的 neutral 色阶，深浅色由 boot.ts 按持久化主题打 `ds-theme-dark`/`ds-theme-light` 类、回退系统偏好）盖住加载期黑屏；`src/boot.ts`（先于 main.ts 加载）在 dev 下 10 秒未挂载时自动刷新一次（sessionStorage 防循环），让失败自愈。两者都别删。
 - CSP 里 `worker-src 'self' blob:` 必须保留：Vite 7 dev client 会创建 blob worker，被 `script-src 'self'` 拦截会在控制台报错。
 
 ## 代码约定

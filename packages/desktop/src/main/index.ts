@@ -10,8 +10,8 @@ const isWindows = process.platform === 'win32';
 const TITLEBAR_HEIGHT = 48;
 
 // 应用图标：resources/ 与 out/ 同级（dev/构建产物布局一致；打包配置未引入前暂按此路径兜底）
-// macOS Dock 用透明圆角版（scripts/make-icon-rounded.mjs 预处理，Dock 不会自动加圆角）；
-// Windows/Linux 任务栏/标题栏用方形满幅版（任务栏为方形槽位，留白会显得偏小）
+// macOS Dock 用透明圆角版（内容缩至 80% 安全区，Dock 不会自动给自定义图标加圆角）；
+// Windows/Linux 任务栏/标题栏用满幅圆角版（满幅内容避免方形槽位里显得偏小，圆角画在内容上、角外透明）
 const MAC_DOCK_ICON = join(__dirname, '../../resources/icon.png');
 const WINDOW_ICON = join(__dirname, '../../resources/icon-win.png');
 
