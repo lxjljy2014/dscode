@@ -55,7 +55,7 @@ const hasOverlayControls = isFrameless && !isMac;
       </template>
     </VTooltip>
     <!-- 当前任务名称（与激活会话联动；无标题时显示占位标签） -->
-    <span v-if="sessionStore.hasMessage" class="max-w-60 truncate text-muted">
+    <span v-if="sessionStore.hasMessage" class="max-w-48 truncate text-xs text-muted">
       {{ sessionStore.activeSession?.title || t('header.taskName') }}
     </span>
     <div v-if="sessionStore.hasMessage" class="flex items-center gap-2 px-2 py-1">
