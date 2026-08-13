@@ -64,6 +64,28 @@ export const useSessionStore = defineStore('session', () => {
     return sessions.value.filter(s => s.title.toLowerCase().includes(k));
   });
 
+  /**
+   * 工作空间分组：当前工作空间置顶（即使没有任务），
+   * 其余按组内最新活动倒序；任务在组内按 updatedAt 倒序。
+   */
+  const workspaceGroups = computed<Array<{ path: string; sessions: Session[] }>>(() => {
+    const currentWd = useSettingsStore().settings.workingDirectory;
+    const map = new Map<string, Session[]>();
+    for (const s of filteredSessions.value) {
+      const key = s.workingDirectory || '';
+      const list = map.get(key);
+      if (list) list.push(s);
+      else map.set(key, [s]);
+    }
+    const byUpdated = (list: Session[]) => list.sort((a, b) => b.updatedAt - a.updatedAt);
+    const current = byUpdated(map.get(currentWd) ?? []);
+    map.delete(currentWd);
+    const others = [...map.entries()]
+      .map(([path, list]) => ({ path, sessions: byUpdated(list) }))
+      .sort((a, b) => b.sessions[0].updatedAt - a.sessions[0].updatedAt);
+    return [{ path: currentWd, sessions: current }, ...others];
+  });
+
   const selectedFile = computed(() => {
     if (!selectedFilePath.value) return null;
     const node = findFileNode(fileTree.value, selectedFilePath.value);
@@ -90,6 +112,7 @@ export const useSessionStore = defineStore('session', () => {
     void host.sessionsCreate({
       id: session.id,
       title: session.title,
+      workingDirectory: session.workingDirectory,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       toolEvents: [],
@@ -113,6 +136,8 @@ export const useSessionStore = defineStore('session', () => {
     const session: Session = {
       id: nextId('s'),
       title: '',
+      // 任务绑定创建时的工作空间，侧边栏按此分组
+      workingDirectory: useSettingsStore().settings.workingDirectory,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       messages: [],
@@ -315,13 +340,17 @@ export const useSessionStore = defineStore('session', () => {
   subscribeEvents();
   void load();
 
-  // 工作目录变化后刷新文件树
+  // 工作目录变化：刷新文件树 + 切到该工作空间最近的任务（无任务则空态）
   if (host) {
     const h = host;
     watch(
       () => useSettingsStore().settings.workingDirectory,
-      async () => {
+      async wd => {
         fileTree.value = await h.workspaceTree();
+        const list = sessions.value
+          .filter(s => (s.workingDirectory || '') === wd)
+          .sort((a, b) => b.updatedAt - a.updatedAt);
+        activeSessionId.value = list[0]?.id ?? null;
       }
     );
   }
@@ -338,6 +367,7 @@ export const useSessionStore = defineStore('session', () => {
     activeSession,
     hasMessage,
     filteredSessions,
+    workspaceGroups,
     selectedFile,
     select,
     createSession,

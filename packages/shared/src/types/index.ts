@@ -53,6 +53,8 @@ export interface AgentConfirmRequest {
 export interface Session {
   id: string;
   title: string;
+  /** 所属工作空间（创建时的 workingDirectory），侧边栏按此分组 */
+  workingDirectory: string;
   createdAt: number;
   updatedAt: number;
   messages: Message[];

@@ -1,25 +1,37 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '../stores/session';
 import { useSettingsStore } from '../stores/settings';
 
 const { t } = useI18n();
 const store = useSessionStore();
-const { filteredSessions, activeSessionId, keyword } = storeToRefs(store);
+const { activeSessionId, keyword, workspaceGroups } = storeToRefs(store);
 const settingsStore = useSettingsStore();
 
-/** 当前项目名：工作目录 basename（未选择时显示占位文案） */
-const projectName = computed(() => {
-  const wd = settingsStore.settings.workingDirectory;
-  if (!wd) return t('input.selectProject');
-  return wd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || wd;
-});
 // 项目区折叠状态
 const projectOpen = ref(true);
-// v-list-group 展开的分组（默认展开当前项目）
-const opened = ref(['project']);
+
+/** 组 value 用前缀区分（'ws:' + 工作目录路径） */
+const groupValue = (path: string) => `ws:${path}`;
+
+/** 工作空间显示名：basename；未选择时显示占位 */
+function groupName(path: string): string {
+  if (!path) return t('project.noProject');
+  return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path;
+}
+
+// 默认展开当前工作空间组；切换工作空间时跟随展开
+const currentGroup = computed(() => groupValue(settingsStore.settings.workingDirectory));
+const opened = ref<string[]>([]);
+watch(
+  currentGroup,
+  v => {
+    if (v && !opened.value.includes(v)) opened.value = [...opened.value, v];
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -56,18 +68,18 @@ const opened = ref(['project']);
       </div>
     </div>
 
-    <!-- 当前项目 + 会话列表（list-group：项目为 activator，会话为子项） -->
+    <!-- 工作空间分组：每个工作空间一个项目组，任务按归属挂在组下 -->
     <div v-if="projectOpen" class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
       <VList v-model:opened="opened" class="-mx-1 p-0" nav>
-        <VListGroup value="project">
+        <VListGroup v-for="g in workspaceGroups" :key="groupValue(g.path)" :value="groupValue(g.path)">
           <template #activator="{ props: activatorProps }">
             <VListItem v-bind="activatorProps" prepend-icon="i-lucide:folder" class="mb-0.5 bg-elevated">
-              <VListItemTitle class="truncate text-sm">{{ projectName }}</VListItemTitle>
+              <VListItemTitle class="truncate text-sm">{{ groupName(g.path) }}</VListItemTitle>
             </VListItem>
           </template>
 
           <VListItem
-            v-for="s in filteredSessions"
+            v-for="s in g.sessions"
             :key="s.id"
             :active="s.id === activeSessionId"
             class="mb-0.5"
@@ -77,11 +89,12 @@ const opened = ref(['project']);
               {{ s.title || t('session.new') }}
             </VListItemTitle>
           </VListItem>
+
+          <div v-if="!g.sessions.length" class="py-2 pl-9 text-sm text-faint">
+            {{ keyword ? t('session.notFound') : t('session.empty') }}
+          </div>
         </VListGroup>
       </VList>
-      <div v-if="!filteredSessions.length" class="py-2 text-sm text-faint">
-        {{ keyword ? t('session.notFound') : t('session.empty') }}
-      </div>
     </div>
     <div v-else class="flex-1" />
   </div>

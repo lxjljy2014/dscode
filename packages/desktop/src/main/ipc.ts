@@ -7,7 +7,7 @@ import { verifyProvider } from './provider';
 import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './terminal';
 import { resolveConfirm, startAgent, stopAgent } from './agent';
 import { readWorkspaceFile, scanTree } from './workspace';
-import { initSessions, listSessions, upsertMessage, upsertSession } from './sessions';
+import { initSessions, listSessions, backfillSessions, upsertMessage, upsertSession } from './sessions';
 
 /**
  * 业务 IPC 注册（ipcMain.handle / ipcRenderer.invoke；终端输入/尺寸为 ipcMain.on 单向通道）。
@@ -44,6 +44,8 @@ export function registerIpcHandlers(): void {
   const homeDir = app.getPath('home');
   initProjects(projectsFile);
   initSessions(sessionsFile);
+  // 旧数据迁移：无工作空间归属的会话回填到当前工作目录
+  backfillSessions(sessionsFile, loadSettings(settingsFile, homeDir).workingDirectory);
 
   // ---- settings ----
   ipcMain.handle(
@@ -125,7 +127,8 @@ export function registerIpcHandlers(): void {
       if (typeof session !== 'object' || session === null) return { ok: false, error: 'invalid session' };
       const s = session as Session;
       if (typeof s.id !== 'string' || typeof s.title !== 'string') return { ok: false, error: 'invalid session' };
-      upsertSession(sessionsFile, s);
+      // workingDirectory 缺省按空字符串处理（正常来自渲染端 createSession）
+      upsertSession(sessionsFile, { ...s, workingDirectory: typeof s.workingDirectory === 'string' ? s.workingDirectory : '' });
       return { ok: true };
     })
   );

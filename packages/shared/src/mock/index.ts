@@ -8,6 +8,7 @@ const day = 24 * hour;
 export const mockSessions: Session[] = [
   {
     id: 's1',
+    workingDirectory: '',
     title: '重构会话状态管理',
     createdAt: now - 2 * hour,
     updatedAt: now - 12 * min,
@@ -30,6 +31,7 @@ export const mockSessions: Session[] = [
   },
   {
     id: 's2',
+    workingDirectory: '',
     title: 'Add dark mode support',
     createdAt: now - day,
     updatedAt: now - 5 * hour,
@@ -52,6 +54,7 @@ export const mockSessions: Session[] = [
   },
   {
     id: 's3',
+    workingDirectory: '',
     title: '优化 diff 面板的可读性',
     createdAt: now - 2 * day,
     updatedAt: now - day,
@@ -74,6 +77,7 @@ export const mockSessions: Session[] = [
   },
   {
     id: 's4',
+    workingDirectory: '',
     title: 'Internationalize the sidebar',
     createdAt: now - 3 * day,
     updatedAt: now - 2 * day,
