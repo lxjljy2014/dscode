@@ -12,7 +12,7 @@ const ui = useUiStore();
 
 <template>
   <!-- 工作区路由：完整布局（左侧栏 + 顶栏 + 右侧 diff 抽屉 + 主区） -->
-  <VNavigationDrawer v-model="ui.leftVisible" :permanent="ui.leftVisible" width="280" class="border-r border-line">
+  <VNavigationDrawer v-model="ui.leftVisible" :permanent="ui.leftVisible" class="border-r border-line">
     <WorkspaceSidebar />
     <template #append>
       <UserBar />

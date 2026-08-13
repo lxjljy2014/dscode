@@ -23,7 +23,12 @@ const currentWorkspace = computed(() => settingsStore.settings.workingDirectory)
 function displayName(g: { path: string; name: string }): string {
   if (g.name) return g.name;
   if (!g.path) return t('project.noProject');
-  return g.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || g.path;
+  return (
+    g.path
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .pop() || g.path
+  );
 }
 
 // 默认展开当前工作空间组；切换工作空间时跟随展开
@@ -73,11 +78,11 @@ watch(
     </div>
 
     <!-- 工作空间分组：VList 默认样式，组头 + 子任务列表 -->
-    <div v-if="projectOpen" class="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+    <div v-if="projectOpen" class="min-h-0 flex-1 overflow-y-auto pb-3">
       <VList v-model:opened="opened" nav>
         <VListGroup v-for="g in workspaceGroups" :key="groupValue(g.path)" :value="groupValue(g.path)">
           <template #activator="{ props: activatorProps }">
-            <VListItem v-bind="activatorProps" :title="displayName(g)" prepend-icon="i-lucide:folder" />
+            <VListItem v-bind="activatorProps" :title="displayName(g)" prepend-icon="i-lucide:folder" append-icon="" />
           </template>
 
           <VListItem
