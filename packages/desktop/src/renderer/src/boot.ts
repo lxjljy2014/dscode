@@ -22,7 +22,9 @@ function applySplashTheme(): void {
 }
 applySplashTheme();
 
-if (import.meta.env.DEV) {
+// 用 process.env.NODE_ENV 而非 import.meta.env.DEV：等价语义，且避免部分编辑器
+// tsconfig 解析不到 import.meta 时误报 TS1343
+if (process.env.NODE_ENV === 'development') {
   const RETRY_KEY = 'dscode.boot-retried';
   // 占位页替换为 VApp 即视为挂载成功；阈值要大于「正常冷启动耗时 + 占位页最短展示」
   // （main.ts 的 SPLASH_MIN_MS 会把挂载延后），避免误判正常慢加载为失败
