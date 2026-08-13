@@ -1,10 +1,6 @@
 /// <reference types="vite/client" />
 
-declare module '*.vue' {
-  import type { DefineComponent } from 'vue';
-  const component: DefineComponent<Record<string, never>, Record<string, never>, unknown>;
-  export default component;
-}
+// *.vue 模块声明已移至 @dscode/ui 的 src/env.d.ts（供根 tsconfig 与 renderer 共用）
 
 // Vite/electron-vite 在渲染端注入 process.env.NODE_ENV（开发 development / 构建 production），
 // 与 import.meta.env.DEV 语义等价；显式声明以配合 boot.ts 的使用（tsconfig.web 未引入 node 类型）

@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": [
+    "packages/ui/src/**/*.ts",
+    "packages/ui/src/**/*.vue",
+    "packages/shared/src/**/*.ts"
+  ]
+}
