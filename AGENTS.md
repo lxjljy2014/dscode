@@ -4,7 +4,7 @@
 
 ## 项目概览
 
-**DSCode** 是一个 AI 编程助手的桌面端应用骨架（类似 coding agent 的 GUI 客户端），基于 **Electron + Vue 3 + TypeScript**。当前处于早期原型阶段：界面完整，但数据全部为前端 mock（会话、diff、文件树均来自 `packages/shared/src/mock`），尚未接入真实后端或 agent 能力。
+**DSCode** 是一个 AI 编程助手的桌面端应用（类似 coding agent 的 GUI 客户端），基于 **Electron + Vue 3 + TypeScript**。已接入真实 agent 能力：主进程 agent 运行时（DeepSeek/OpenAI 兼容 API 流式对话 + 工具循环），聊天/文件树/diff 均为真实数据（`packages/shared/src/mock` 仅作为纯浏览器降级与历史 mock 数据保留）。
 
 主要界面：
 
@@ -19,18 +19,18 @@ packages/
 │   ├── electron.vite.config.ts
 │   ├── uno.config.ts
 │   └── src/
-│       ├── main/     # Electron 主进程（index.ts 窗口/IPC；git.ts git CLI 封装；projects.ts 最近项目 SQLite；config.ts settings 持久化；terminal.ts 集成终端 node-pty 会话；ipc.ts 业务 handler）
+│       ├── main/     # Electron 主进程（index.ts 窗口/IPC；agent.ts agent 循环（SSE 流式+工具调用）；agent-tools.ts 工具集（读/列/搜/命令/写/编辑）；agent-gate.ts 权限门控；workspace.ts 文件树/读文件；diff.ts 快照行级 diff；sessions.ts 会话 SQLite；git.ts git CLI 封装；projects.ts 最近项目 SQLite；config.ts settings 持久化；terminal.ts 集成终端 node-pty 会话；ipc.ts 业务 handler）
 │       ├── preload/  # contextBridge 暴露 window.dscode
 │       └── renderer/ # Vue 应用入口（App.vue / router.ts / main.ts）
-├── shared/           # @dscode/shared —— 纯 TS：类型定义、mock 数据、i18n 语言包
+├── shared/           # @dscode/shared —— 纯 TS：类型定义、mock 数据（仅浏览器降级用）、i18n 语言包
 │   └── src/
-│       ├── types/    # Session / Message / DiffFile / FileNode 等类型
-│       ├── mock/     # mockSessions / mockDiffFiles / mockFileTree
+│       ├── types/    # Session / Message / DiffFile / FileNode / AgentToolEvent 等类型
+│       ├── mock/     # mockSessions / mockDiffFiles / mockFileTree（纯浏览器环境降级）
 │       └── locales/  # zh-CN.json / en-US.json
 └── ui/               # @dscode/ui —— 全部 UI：组件、Pinia stores、插件、主题
     └── src/
-        ├── components/  # 19 个 Vue SFC（WorkspaceView、ChatView、DiffPanel、ResizeHandle、GitGraphDialog 等）
-        ├── stores/      # ui.ts（主题/语言/侧栏显隐/面板尺寸）、session.ts（会话/流式回复模拟）、settings.ts（工作目录/权限模式，主进程持久化）
+        ├── components/  # 20 个 Vue SFC（WorkspaceView、ChatView、DiffPanel、ToolEventCard、ResizeHandle、GitGraphDialog 等）
+        ├── stores/      # ui.ts（主题/语言/侧栏显隐/面板尺寸）、session.ts（会话/agent 事件分发/持久化）、settings.ts（工作目录/权限模式，主进程持久化）
         ├── plugins/     # vuetify.ts、i18n.ts（createXxxPlugin 工厂函数）
         ├── theme/       # tokens.ts（主题色唯一事实源）、global.css（滚动条/选区/拖拽区）
         └── host.ts      # window.dscode 桥接 API 的类型封装
@@ -110,6 +110,10 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
   - `settings:get` / `settings:set` —— 工作目录 + 权限模式（`userData/settings.json` 持久化；set 时工作目录变化自动记入最近项目）
   - `projects:list` —— 最近项目（`node:sqlite`，`userData/projects.db`，无原生依赖）
   - `dialog:pick-directory` —— 选择工作目录（取消返回 null）
+  - `provider:verify` —— API key 校验（主进程 fetch `GET {baseUrl}/models`）
+  - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（主进程 `agent.ts`：SSE 流式 + 工具循环 + 门控；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求，120s 超时自动拒绝）/ `agent:done` / `agent:error`（code: no-api-key/api/network/aborted/unknown），均带 sessionId
+  - `workspace:tree` / `workspace:read-file` —— 真实文件树扫描与文件读取（路径限定工作目录内）；`workspace:diff` 事件 —— 写/执行工具后主进程按「agent 启动快照 vs 当前内容」LCS 行级 diff 推送
+  - `sessions:list` / `sessions:create` / `sessions:append` —— 会话持久化（`node:sqlite`，`userData/sessions.db`，toolEvents 不落库）
   - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` —— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合
   - `terminal:ensure` / `terminal:write` / `terminal:resize` / `terminal:kill` —— 集成终端（主进程 node-pty，多会话按渲染端生成的 sessionId 管理、按窗口归属统一回收，见 `main/terminal.ts`）；pty 输出经 `terminal:data` / `terminal:exit` 事件（带 sessionId）推给渲染端，write/resize 为高频单向 `on` 通道
   - 每个 handler 校验 sender 属于主窗口 + 参数类型；新增业务 IPC 沿用此模式

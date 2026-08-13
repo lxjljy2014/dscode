@@ -4,7 +4,7 @@
  * - auto-edit（自动编辑）：写工具直接放行，执行（bash）仍需确认
  * - plan（计划模式）：写/执行一律拒绝，只读 + 出方案
  * - full-access（完全访问）：全部放行
- * 当前 mock 骨架只持久化该值，真实门控等接入 agent 后实现。
+ * 门控实现在主进程 `desktop/src/main/agent-gate.ts`（确认等待 120s 超时自动拒绝）。
  */
 export type PermissionMode = 'confirm' | 'auto-edit' | 'plan' | 'full-access';
 
