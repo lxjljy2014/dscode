@@ -119,8 +119,11 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function sendMessage(content: string, model = '') {
+    if (generating.value) return;
+    // 空会话状态（无激活任务）直接发送：自动新建任务，避免静默吞掉输入
+    if (!activeSession.value) createSession();
     const session = activeSession.value;
-    if (!session || generating.value) return;
+    if (!session) return;
 
     const userMsg: Message = {
       id: nextId('m'),
@@ -164,7 +167,13 @@ export const useSessionStore = defineStore('session', () => {
     const history: ChatMessagePayload[] = session.messages
       .filter(m => !m.streaming)
       .map(m => ({ role: m.role, content: m.content }));
-    const r = await host.agentStart(session.id, model, history);
+    let r: { ok: boolean };
+    try {
+      r = await host.agentStart(session.id, model, history);
+    } catch {
+      // IPC 异常兜底：避免 generating 卡死
+      r = { ok: false };
+    }
     if (!r.ok) {
       reply.streaming = false;
       reply.errorCode = 'unknown';
@@ -203,10 +212,16 @@ export const useSessionStore = defineStore('session', () => {
 
   // ---- agent/workspace 事件订阅（按 sessionId 分发） ----
 
-  function onDelta(ev: { sessionId: string; content: string }) {
+  function onDelta(ev: { sessionId: string; content: string; kind: 'content' | 'reasoning' }) {
     const session = sessions.value.find(s => s.id === ev.sessionId);
     const reply = session ? streamingReply(session) : null;
-    if (reply) reply.content += ev.content;
+    if (!reply) return;
+    // 推理模型的思维链与正文分流展示（思维链不落库）
+    if (ev.kind === 'reasoning') {
+      reply.reasoning = (reply.reasoning ?? '') + ev.content;
+    } else {
+      reply.content += ev.content;
+    }
   }
 
   function onTool(ev: { sessionId: string; event: AgentToolEvent }) {
