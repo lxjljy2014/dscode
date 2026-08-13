@@ -55,8 +55,18 @@ export const useSessionStore = defineStore('session', () => {
   /** 已加载的文件内容缓存（path → content） */
   const fileContents = ref<Record<string, string>>({});
 
-  /** 最近工作空间（主进程最近项目表，侧边栏分组的来源：所有选过的工作空间都出现） */
+  /** 最近工作空间（主进程最近项目表，侧边栏分组与输入卡项目菜单的同一数据源） */
   const recentWorkspaces = ref<Array<{ path: string; name: string; lastOpenedAt: number }>>([]);
+  /** 用户家目录（「不在项目中工作」的落点） */
+  const homeDir = ref('');
+
+  /** 刷新最近工作空间与家目录（工作目录变化、项目菜单打开时调用） */
+  async function refreshWorkspaces(): Promise<void> {
+    if (!host) return;
+    const r = await host.listRecentProjects();
+    recentWorkspaces.value = r.projects;
+    homeDir.value = r.homeDir;
+  }
 
   const activeSession = computed<Session | null>(
     () => sessions.value.find(s => s.id === activeSessionId.value) ?? null
@@ -363,6 +373,7 @@ export const useSessionStore = defineStore('session', () => {
     sessions.value = list;
     fileTree.value = tree;
     recentWorkspaces.value = projects.projects;
+    homeDir.value = projects.homeDir;
     // 选中当前工作空间最近的任务（与 wd watch 同一规则；settings 未加载时由 watch 接管）
     const wd = useSettingsStore().settings.workingDirectory;
     const inWd = list.filter(s => (s.workingDirectory || '') === wd).sort((a, b) => b.updatedAt - a.updatedAt);
@@ -379,8 +390,7 @@ export const useSessionStore = defineStore('session', () => {
       () => useSettingsStore().settings.workingDirectory,
       async wd => {
         fileTree.value = await h.workspaceTree();
-        const projects = await h.listRecentProjects();
-        recentWorkspaces.value = projects.projects;
+        await refreshWorkspaces();
         const list = sessions.value
           .filter(s => (s.workingDirectory || '') === wd)
           .sort((a, b) => b.updatedAt - a.updatedAt);
@@ -394,6 +404,9 @@ export const useSessionStore = defineStore('session', () => {
     activeSessionId,
     keyword,
     generating,
+    recentWorkspaces,
+    homeDir,
+    refreshWorkspaces,
     diffFiles,
     fileTree,
     selectedFilePath,

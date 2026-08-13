@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import type { PermissionMode } from '@dscode/shared';
 import { host } from '../host';
@@ -48,18 +49,17 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-// ---- 项目选择 ----
-const recentProjects = ref<Array<{ path: string; name: string; lastOpenedAt: number }>>([]);
-const homeDir = ref('');
+// ---- 项目选择（最近工作空间与侧边栏共用 session store 的同一数据源） ----
 const projectMenuOpen = ref(false);
 const snackbarText = ref('');
 const snackbarShow = ref(false);
 /** 项目搜索关键词（按名称 + 路径不区分大小写过滤） */
 const projectKeyword = ref('');
+const { recentWorkspaces, homeDir } = storeToRefs(sessionStore);
 const filteredProjects = computed(() => {
   const k = projectKeyword.value.trim().toLowerCase();
-  if (!k) return recentProjects.value;
-  return recentProjects.value.filter(p => `${p.name} ${p.path}`.toLowerCase().includes(k));
+  if (!k) return recentWorkspaces.value;
+  return recentWorkspaces.value.filter(p => `${p.name} ${p.path}`.toLowerCase().includes(k));
 });
 
 function dirName(p: string): string {
@@ -77,15 +77,8 @@ const currentProject = computed(() => {
   return wd ? dirName(wd) : '';
 });
 
-async function loadProjects(): Promise<void> {
-  if (!host) return;
-  const r = await host.listRecentProjects();
-  recentProjects.value = r.projects;
-  homeDir.value = r.homeDir;
-}
-
 function onProjectMenu(open: boolean): void {
-  if (open) void loadProjects();
+  if (open) void sessionStore.refreshWorkspaces();
 }
 
 async function selectProject(path: string): Promise<void> {
@@ -102,7 +95,7 @@ async function openFolder(): Promise<void> {
 
 /** 不在项目中工作：工作目录归零到默认（家目录） */
 async function resetProject(): Promise<void> {
-  if (!homeDir.value) await loadProjects();
+  if (!homeDir.value) await sessionStore.refreshWorkspaces();
   if (!homeDir.value) return;
   await selectProject(homeDir.value);
 }
@@ -196,8 +189,14 @@ async function selectPermission(value: PermissionMode): Promise<void> {
             </template>
           </VTextField>
           <VDivider></VDivider>
-          <!-- 最近打开的工作空间（按关键词过滤） -->
-          <VList v-if="recentProjects.length > 0" nav density="compact" prepend-gap="12">
+          <!-- 最近打开的工作空间（按关键词过滤；超长滚动） -->
+          <VList
+            v-if="recentWorkspaces.length > 0"
+            nav
+            density="compact"
+            prepend-gap="12"
+            class="max-h-64 overflow-y-auto"
+          >
             <VListItem
               v-for="p in filteredProjects"
               :key="p.path"
