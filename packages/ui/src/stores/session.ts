@@ -32,6 +32,11 @@ function findFileNode(nodes: FileNode[], path: string): FileNode | null {
   return null;
 }
 
+/** 路径 basename（兼容 Windows 反斜杠） */
+function basename(p: string): string {
+  return p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p;
+}
+
 export const useSessionStore = defineStore('session', () => {
   const sessions = ref<Session[]>(host ? [] : mockSessions);
   const activeSessionId = ref<string | null>(sessions.value[0]?.id ?? null);
@@ -50,6 +55,9 @@ export const useSessionStore = defineStore('session', () => {
   /** 已加载的文件内容缓存（path → content） */
   const fileContents = ref<Record<string, string>>({});
 
+  /** 最近工作空间（主进程最近项目表，侧边栏分组的来源：所有选过的工作空间都出现） */
+  const recentWorkspaces = ref<Array<{ path: string; name: string; lastOpenedAt: number }>>([]);
+
   const activeSession = computed<Session | null>(
     () => sessions.value.find(s => s.id === activeSessionId.value) ?? null
   );
@@ -65,25 +73,41 @@ export const useSessionStore = defineStore('session', () => {
   });
 
   /**
-   * 工作空间分组：当前工作空间置顶（即使没有任务），
-   * 其余按组内最新活动倒序；任务在组内按 updatedAt 倒序。
+   * 工作空间分组：来源 = 最近项目列表（所有选过的工作空间都会出现）∪ 有任务的工作空间兜底。
+   * 当前工作空间置顶（即使没有任务）；其余按最近打开时间倒序；任务在组内按 updatedAt 倒序。
    */
-  const workspaceGroups = computed<Array<{ path: string; sessions: Session[] }>>(() => {
+  const workspaceGroups = computed<Array<{ path: string; name: string; sessions: Session[] }>>(() => {
     const currentWd = useSettingsStore().settings.workingDirectory;
-    const map = new Map<string, Session[]>();
+    const byWd = new Map<string, Session[]>();
     for (const s of filteredSessions.value) {
       const key = s.workingDirectory || '';
-      const list = map.get(key);
+      const list = byWd.get(key);
       if (list) list.push(s);
-      else map.set(key, [s]);
+      else byWd.set(key, [s]);
     }
     const byUpdated = (list: Session[]) => list.sort((a, b) => b.updatedAt - a.updatedAt);
-    const current = byUpdated(map.get(currentWd) ?? []);
-    map.delete(currentWd);
-    const others = [...map.entries()]
-      .map(([path, list]) => ({ path, sessions: byUpdated(list) }))
-      .sort((a, b) => b.sessions[0].updatedAt - a.sessions[0].updatedAt);
-    return [{ path: currentWd, sessions: current }, ...others];
+
+    const seen = new Set<string>();
+    const groups: Array<{ path: string; name: string; sessions: Session[] }> = [];
+    // 当前工作空间置顶
+    seen.add(currentWd);
+    groups.push({
+      path: currentWd,
+      name: basename(currentWd),
+      sessions: byUpdated(byWd.get(currentWd) ?? [])
+    });
+    // 最近项目（所有选过的工作空间，即使无任务也显示）
+    for (const rp of recentWorkspaces.value) {
+      if (seen.has(rp.path)) continue;
+      seen.add(rp.path);
+      groups.push({ path: rp.path, name: rp.name, sessions: byUpdated(byWd.get(rp.path) ?? []) });
+    }
+    // 兜底：有任务但不在最近项目里的工作空间
+    for (const [wd, list] of byWd) {
+      if (seen.has(wd)) continue;
+      groups.push({ path: wd, name: basename(wd), sessions: byUpdated(list) });
+    }
+    return groups;
   });
 
   const selectedFile = computed(() => {
@@ -331,22 +355,32 @@ export const useSessionStore = defineStore('session', () => {
 
   async function load(): Promise<void> {
     if (!host) return;
-    const [list, tree] = await Promise.all([host.sessionsList(), host.workspaceTree()]);
+    const [list, tree, projects] = await Promise.all([
+      host.sessionsList(),
+      host.workspaceTree(),
+      host.listRecentProjects()
+    ]);
     sessions.value = list;
-    activeSessionId.value = sessions.value[0]?.id ?? null;
     fileTree.value = tree;
+    recentWorkspaces.value = projects.projects;
+    // 选中当前工作空间最近的任务（与 wd watch 同一规则；settings 未加载时由 watch 接管）
+    const wd = useSettingsStore().settings.workingDirectory;
+    const inWd = list.filter(s => (s.workingDirectory || '') === wd).sort((a, b) => b.updatedAt - a.updatedAt);
+    activeSessionId.value = inWd[0]?.id ?? null;
   }
 
   subscribeEvents();
   void load();
 
-  // 工作目录变化：刷新文件树 + 切到该工作空间最近的任务（无任务则空态）
+  // 工作目录变化：刷新文件树与最近工作空间 + 切到该工作空间最近的任务（无任务则空态）
   if (host) {
     const h = host;
     watch(
       () => useSettingsStore().settings.workingDirectory,
       async wd => {
         fileTree.value = await h.workspaceTree();
+        const projects = await h.listRecentProjects();
+        recentWorkspaces.value = projects.projects;
         const list = sessions.value
           .filter(s => (s.workingDirectory || '') === wd)
           .sort((a, b) => b.updatedAt - a.updatedAt);

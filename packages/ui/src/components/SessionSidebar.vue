@@ -16,10 +16,11 @@ const projectOpen = ref(true);
 /** 组 value 用前缀区分（'ws:' + 工作目录路径） */
 const groupValue = (path: string) => `ws:${path}`;
 
-/** 工作空间显示名：basename；未选择时显示占位 */
-function groupName(path: string): string {
-  if (!path) return t('project.noProject');
-  return path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path;
+/** 组显示名：优先最近项目的 name，回退 basename，无路径时显示占位 */
+function displayName(g: { path: string; name: string }): string {
+  if (g.name) return g.name;
+  if (!g.path) return t('project.noProject');
+  return g.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || g.path;
 }
 
 // 默认展开当前工作空间组；切换工作空间时跟随展开
@@ -74,7 +75,7 @@ watch(
         <VListGroup v-for="g in workspaceGroups" :key="groupValue(g.path)" :value="groupValue(g.path)">
           <template #activator="{ props: activatorProps }">
             <VListItem v-bind="activatorProps" prepend-icon="i-lucide:folder" class="mb-0.5 bg-elevated">
-              <VListItemTitle class="truncate text-sm">{{ groupName(g.path) }}</VListItemTitle>
+              <VListItemTitle class="truncate text-sm">{{ displayName(g) }}</VListItemTitle>
             </VListItem>
           </template>
 
