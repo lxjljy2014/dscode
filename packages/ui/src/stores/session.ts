@@ -84,14 +84,28 @@ export const useSessionStore = defineStore('session', () => {
     return null;
   }
 
+  /** 持久化会话行（IPC 结构化克隆不支持 Vue 响应式 Proxy，须传普通对象） */
   function persistSession(session: Session): void {
     if (!host) return;
-    void host.sessionsCreate(session);
+    void host.sessionsCreate({
+      id: session.id,
+      title: session.title,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      toolEvents: [],
+      messages: []
+    });
   }
 
   function persistMessage(session: Session, message: Message): void {
     if (!host) return;
-    void host.sessionsAppend(session.id, message);
+    void host.sessionsAppend(session.id, {
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      createdAt: message.createdAt,
+      ...(message.errorCode ? { errorCode: message.errorCode } : {})
+    });
     persistSession(session);
   }
 
