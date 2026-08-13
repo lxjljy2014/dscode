@@ -152,12 +152,15 @@
     }
   },
   "onboarding": {
-    "title": "Connect DeepSeek",
-    "subtitle": "Your API key is stored only on this machine",
+    "title": "Welcome to DSCode",
+    "subtitle": "Set up your API key to unlock AI coding",
     "deepseekApiKey": "DeepSeek API Key",
     "apiKey": "API Key",
     "apiKeyPlaceholder": "sk-…",
-    "start": "Get started",
-    "skip": "Later"
+    "start": "Verify & get started",
+    "howTo": "How to get an API key?",
+    "localOnly": "Your key is stored locally and never uploaded",
+    "verifyInvalid": "Invalid API key. Check it and try again",
+    "verifyFailed": "Verification failed. Check your network and try again"
   }
 }

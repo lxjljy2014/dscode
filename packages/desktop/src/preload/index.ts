@@ -5,6 +5,7 @@ import type {
   GitListResult,
   GitOpResult,
   ProjectsListResult,
+  ProviderVerifyResult,
   SettingsPatch,
   TerminalDataEvent,
   TerminalEnsureResult,
@@ -28,6 +29,10 @@ const api = {
   // ---- 最近项目 / 目录选择 ----
   listRecentProjects: (): Promise<ProjectsListResult> => ipcRenderer.invoke('projects:list'),
   pickDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-directory'),
+
+  // ---- 供应商校验 ----
+  verifyProvider: (baseUrl: string, apiKey: string): Promise<ProviderVerifyResult> =>
+    ipcRenderer.invoke('provider:verify', baseUrl, apiKey),
 
   // ---- git ----
   gitListBranches: (cwd: string): Promise<GitListResult> => ipcRenderer.invoke('git:list-branches', cwd),

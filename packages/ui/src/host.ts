@@ -4,6 +4,7 @@ import type {
   GitListResult,
   GitOpResult,
   ProjectsListResult,
+  ProviderVerifyResult,
   SettingsPatch,
   TerminalDataEvent,
   TerminalEnsureResult,
@@ -32,6 +33,9 @@ export interface HostApi {
   // ---- 最近项目 / 目录选择 ----
   listRecentProjects: () => Promise<ProjectsListResult>;
   pickDirectory: () => Promise<string | null>;
+
+  // ---- 供应商校验 ----
+  verifyProvider: (baseUrl: string, apiKey: string) => Promise<ProviderVerifyResult>;
 
   // ---- git ----
   gitListBranches: (cwd: string) => Promise<GitListResult>;

@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { DEEPSEEK_PRESET } from '@dscode/shared';
 import { useSettingsStore } from '../stores/settings';
-import { isFrameless, isMac } from '../host';
+import { host, isFrameless, isMac } from '../host';
 
 /**
- * 首次启动引导页：输入 DeepSeek API key（baseURL 与模型用预置默认值）。
- * 开始使用/稍后再说都会置 onboardingDone，避免每次启动重复弹出；
- * 之后可在设置页「引导」版块修改。
+ * 首次启动引导页：输入 DeepSeek API key，验证通过后进入工作区。
+ * 校验请求由主进程发起（渲染端 CSP 不允许直连外部 API）；
+ * 完成后置 onboardingDone，避免每次启动重复弹出。
  */
+
+const DEEPSEEK_KEYS_URL = 'https://platform.deepseek.com/api_keys';
 
 const { t } = useI18n();
 const router = useRouter();
 const settingsStore = useSettingsStore();
 
 const showKey = ref(false);
+const verifying = ref(false);
+// 校验失败原因：'invalid' = key 无效，'network' = 网络/服务异常
+const verifyError = ref<'' | 'invalid' | 'network'>('');
 // 预填已保存的 key（重访引导页时不丢失）
 const apiKey = ref('');
 
@@ -25,19 +30,41 @@ onMounted(async () => {
   apiKey.value = settingsStore.settings.providers.find(p => p.id === 'deepseek')?.apiKey ?? '';
 });
 
-const canStart = computed(() => apiKey.value.trim().length > 0);
+const canSubmit = computed(() => !verifying.value && apiKey.value.trim().length > 0);
+
+const errorMessages = computed(() =>
+  verifyError.value
+    ? [verifyError.value === 'invalid' ? t('onboarding.verifyInvalid') : t('onboarding.verifyFailed')]
+    : []
+);
+
+// 编辑 key 时清除上一次的校验错误
+watch(apiKey, () => {
+  verifyError.value = '';
+});
 
 async function finish() {
-  await settingsStore.save({
-    providers: [{ ...DEEPSEEK_PRESET, models: [...DEEPSEEK_PRESET.models], apiKey: apiKey.value.trim() }],
-    onboardingDone: true
-  });
-  await router.replace('/');
-}
-
-async function skip() {
-  await settingsStore.save({ onboardingDone: true });
-  await router.replace('/');
+  const key = apiKey.value.trim();
+  if (!canSubmit.value) return;
+  verifying.value = true;
+  verifyError.value = '';
+  try {
+    if (host) {
+      const result = await host.verifyProvider(DEEPSEEK_PRESET.baseUrl, key);
+      if (!result.ok) {
+        verifyError.value = result.reason === 'unauthorized' ? 'invalid' : 'network';
+        return;
+      }
+    }
+    // 纯浏览器环境无法校验，直接保存进入
+    await settingsStore.save({
+      providers: [{ ...DEEPSEEK_PRESET, models: [...DEEPSEEK_PRESET.models], apiKey: key }],
+      onboardingDone: true
+    });
+    await router.replace('/');
+  } finally {
+    verifying.value = false;
+  }
 }
 </script>
 
@@ -51,7 +78,7 @@ async function skip() {
         <!-- Logo + 标题 -->
         <div class="mb-8 flex flex-col items-center gap-4 text-center select-none">
           <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-elevated text-primary">
-            <span class="i-lucide:sparkles text-5" />
+            <span class="i-lucide:key-round text-5" />
           </div>
           <div>
             <h1 class="text-2xl font-semibold">{{ t('onboarding.title') }}</h1>
@@ -66,18 +93,42 @@ async function skip() {
             variant="outlined"
             rounded="lg"
             :type="showKey ? 'text' : 'password'"
-            :label="t('onboarding.apiKey')"
             :placeholder="t('onboarding.apiKeyPlaceholder')"
             :append-inner-icon="showKey ? 'i-lucide:eye-off' : 'i-lucide:eye'"
+            :error-messages="errorMessages"
             density="compact"
-            hide-details
+            @keydown.enter="finish"
             @click:append-inner="showKey = !showKey"
           />
         </div>
 
-        <div class="mt-6 flex items-center justify-center gap-3">
-          <VBtn color="primary" :disabled="!canStart" @click="finish">{{ t('onboarding.start') }}</VBtn>
-          <VBtn variant="text" @click="skip">{{ t('onboarding.skip') }}</VBtn>
+        <VBtn
+          color="primary"
+          size="large"
+          class="mt-6 w-full"
+          prepend-icon="i-lucide:lock-open"
+          :loading="verifying"
+          :disabled="!canSubmit"
+          @click="finish"
+        >
+          {{ t('onboarding.start') }}
+        </VBtn>
+
+        <!-- 页脚：帮助链接 + 本地存储说明 -->
+        <div class="mt-6 flex flex-col items-center gap-1.5">
+          <a
+            :href="DEEPSEEK_KEYS_URL"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-1 text-xs text-muted hover:underline"
+          >
+            <span class="i-lucide:book-open text-sm" />
+            {{ t('onboarding.howTo') }}
+          </a>
+          <p class="flex items-center gap-1 text-xs text-faint">
+            <span class="i-lucide:lock text-sm" />
+            {{ t('onboarding.localOnly') }}
+          </p>
         </div>
       </div>
     </div>

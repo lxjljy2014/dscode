@@ -152,12 +152,15 @@
     }
   },
   "onboarding": {
-    "title": "连接 DeepSeek",
-    "subtitle": "你的 API Key 仅保存在本机",
+    "title": "欢迎使用 DSCode",
+    "subtitle": "配置 API Key 以开启 AI 编码功能",
     "deepseekApiKey": "DeepSeek API Key",
     "apiKey": "API Key",
     "apiKeyPlaceholder": "sk-…",
-    "start": "开始使用",
-    "skip": "稍后再说"
+    "start": "验证并开始使用",
+    "howTo": "如何获取 API Key？",
+    "localOnly": "Key 仅保存在本地，不会上传",
+    "verifyInvalid": "API Key 无效，请检查后重试",
+    "verifyFailed": "验证失败，请检查网络后重试"
   }
 }

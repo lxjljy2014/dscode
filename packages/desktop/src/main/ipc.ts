@@ -3,6 +3,7 @@ import type { SettingsPatch } from '@dscode/shared';
 import { loadSettings, saveSettings } from './config';
 import { checkout, createBranch, graph, listBranches } from './git';
 import { initProjects, listProjectsWithHome, touchProject } from './projects';
+import { verifyProvider } from './provider';
 import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './terminal';
 
 /**
@@ -76,6 +77,9 @@ export function registerIpcHandlers(): void {
       return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
     })
   );
+
+  // ---- 供应商校验 ----
+  ipcMain.handle('provider:verify', withMainWindow((_win, baseUrl: unknown, apiKey: unknown) => verifyProvider(baseUrl, apiKey)));
 
   // ---- git ----
   ipcMain.handle(

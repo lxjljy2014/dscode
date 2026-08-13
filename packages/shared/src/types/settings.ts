@@ -42,4 +42,12 @@ export const DEEPSEEK_PRESET: ProviderConfig = {
   models: ['deepseek-chat', 'deepseek-reasoner']
 };
 
+/**
+ * API key 校验结果（校验请求由主进程发起：渲染端 CSP default-src 'self' 不允许直连外部 API）。
+ * unauthorized = key 无效；network = 网络/服务异常；invalid-args = 参数不合法。
+ */
+export type ProviderVerifyResult =
+  | { ok: true }
+  | { ok: false; reason: 'unauthorized' | 'network' | 'invalid-args' };
+
 export type SettingsPatch = Partial<AppSettings>;
