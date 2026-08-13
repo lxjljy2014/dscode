@@ -59,18 +59,21 @@ async function skip() {
           </div>
         </div>
 
-        <VTextField
-          v-model="apiKey"
-          variant="outlined"
-          rounded="lg"
-          :type="showKey ? 'text' : 'password'"
-          :label="t('onboarding.apiKey')"
-          :placeholder="t('onboarding.apiKeyPlaceholder')"
-          :append-inner-icon="showKey ? 'i-lucide:eye-off' : 'i-lucide:eye'"
-          density="compact"
-          hide-details
-          @click:append-inner="showKey = !showKey"
-        />
+        <!-- 普通 div 包裹：避免 .v-input 的 flex:1 在居中 flex 列中被拉伸 -->
+        <div>
+          <VTextField
+            v-model="apiKey"
+            variant="outlined"
+            rounded="lg"
+            :type="showKey ? 'text' : 'password'"
+            :label="t('onboarding.apiKey')"
+            :placeholder="t('onboarding.apiKeyPlaceholder')"
+            :append-inner-icon="showKey ? 'i-lucide:eye-off' : 'i-lucide:eye'"
+            density="compact"
+            hide-details
+            @click:append-inner="showKey = !showKey"
+          />
+        </div>
 
         <div class="mt-6 flex items-center justify-center gap-3">
           <VBtn color="primary" :disabled="!canStart" @click="finish">{{ t('onboarding.start') }}</VBtn>
