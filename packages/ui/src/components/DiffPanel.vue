@@ -32,6 +32,13 @@ const tab = defineModel<'changes' | 'files'>({ default: 'changes' });
             <div class="sticky top-0 z-1 flex items-center gap-2 border-b border-line bg-elevated px-3 py-1.5">
               <span class="i-lucide:file-diff shrink-0 text-3.5 text-muted" />
               <span class="truncate font-mono text-xs text-fg">{{ f.path }}</span>
+              <span
+                v-if="f.status"
+                class="shrink-0 rounded px-1 text-[10px]"
+                :class="f.status === 'new' ? 'bg-diff-add/12 text-diff-add' : 'bg-diff-del/12 text-diff-del'"
+              >
+                {{ f.status === 'new' ? t('diff.newFile') : t('diff.deletedFile') }}
+              </span>
               <span class="ml-auto shrink-0 font-mono text-xs text-diff-add">
                 {{ t('diff.additions', { n: f.additions }) }}
               </span>

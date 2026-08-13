@@ -5,12 +5,23 @@ import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '../stores/session';
 import ChatInput from './ChatInput.vue';
 import MessageItem from './MessageItem.vue';
+import ToolEventCard from './ToolEventCard.vue';
 
 const { t } = useI18n();
 const store = useSessionStore();
 const { activeSession, generating } = storeToRefs(store);
 
 const messages = computed(() => activeSession.value?.messages ?? []);
+
+/** 消息与工具事件按 createdAt 交错合并（工具卡插入在其触发时刻的消息流位置） */
+const items = computed(() => {
+  const session = activeSession.value;
+  if (!session) return [];
+  const msgs = session.messages.map(m => ({ kind: 'message' as const, at: m.createdAt, data: m }));
+  const tools = session.toolEvents.map(e => ({ kind: 'tool' as const, at: e.createdAt, data: e }));
+  return [...msgs, ...tools].sort((a, b) => a.at - b.at);
+});
+
 const listRef = ref<HTMLElement>();
 
 // 按时段的问候语（空状态展示）
@@ -30,9 +41,11 @@ function scrollToBottom() {
   });
 }
 
-watch(() => [messages.value.length, messages.value[messages.value.length - 1]?.content], scrollToBottom, {
-  flush: 'post'
-});
+watch(
+  () => [messages.value.length, messages.value[messages.value.length - 1]?.content, activeSession.value?.toolEvents.length],
+  scrollToBottom,
+  { flush: 'post' }
+);
 
 watch(activeSession, scrollToBottom, { flush: 'post' });
 </script>
@@ -42,7 +55,10 @@ watch(activeSession, scrollToBottom, { flush: 'post' });
     <template v-if="messages.length">
       <div ref="listRef" class="min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto max-w-200 px-6 py-6">
-          <MessageItem v-for="m in messages" :key="m.id" :message="m" />
+          <template v-for="item in items" :key="item.kind + item.data.id">
+            <MessageItem v-if="item.kind === 'message'" :message="item.data" />
+            <ToolEventCard v-else :event="item.data" />
+          </template>
           <div class="h-2" />
         </div>
       </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { PermissionMode } from '@dscode/shared';
 import { host } from '../host';
@@ -9,7 +9,7 @@ import GitBranchMenu from './GitBranchMenu.vue';
 
 const props = defineProps<{ generating: boolean }>();
 const emit = defineEmits<{
-  send: [content: string];
+  send: [content: string, model: string];
   stop: [];
 }>();
 
@@ -18,8 +18,17 @@ const sessionStore = useSessionStore();
 const settingsStore = useSettingsStore();
 const input = ref('');
 
-const model = ref('deepseek/deepseek-v4-flash');
-const models = ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4-pro'];
+// 模型列表来自 settings.providers[0].models（设置加载后同步；当前选中值失效时回退列表第一项）
+const model = ref('');
+const models = computed(() => settingsStore.settings.providers[0]?.models ?? []);
+watch(
+  () => settingsStore.settings.providers,
+  providers => {
+    const list = providers[0]?.models ?? [];
+    if (list.length && !list.includes(model.value)) model.value = list[0];
+  },
+  { immediate: true, deep: true }
+);
 
 const effort = ref<'close' | 'high' | 'max'>('max');
 const efforts = ['close', 'high', 'max'] as const;
@@ -27,7 +36,7 @@ const efforts = ['close', 'high', 'max'] as const;
 function submit() {
   const content = input.value.trim();
   if (!content || props.generating) return;
-  emit('send', content);
+  emit('send', content, model.value);
   input.value = '';
 }
 

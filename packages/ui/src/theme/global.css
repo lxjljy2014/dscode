@@ -82,6 +82,20 @@ html {
   animation: ds-blink 0.9s ease-in-out infinite;
 }
 
+/* ---- 工具执行中旋转 ---- */
+@keyframes ds-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ds-spin {
+  animation: ds-spin 1s linear infinite;
+}
+
 /* ---- 面板抽屉：关闭尺寸过渡 ----
    Vuetify 默认给 .v-navigation-drawer 加了 width/height/top/left/right/bottom 的 0.2s 过渡，
    拖拽 resize 时尺寸会追着指针慢半拍、显得卡顿；这里只保留 transform/visibility 的滑入滑出动画。 */
