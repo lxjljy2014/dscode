@@ -140,7 +140,7 @@ function alphaAt(x, y, w, h, r) {
   return Math.round((hit / 16) * 255);
 }
 
-// 双线性采样源图（中心对齐映射，边缘 clamp）
+// 双线性采样（RGBA 四通道，边缘 clamp）
 function sampleBilinear(src, sw, sh, channels, fx, fy) {
   const sx = Math.min(Math.max(fx, 0), sw - 1.001);
   const sy = Math.min(Math.max(fy, 0), sh - 1.001);
@@ -167,36 +167,50 @@ function main() {
   const src = decodePng(readFileSync(input));
   const size = Math.min(src.width, src.height);
   const r = Math.round(size * cornerRatio);
+
+  // 第一步：满幅内容 + 圆角透明遮罩（圆角画在可见内容上，而非透明边距上）
+  const full = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = (y * size + x) * 4;
+      const c = sampleBilinear(src.pixels, src.width, src.height, src.channels, x, y);
+      full[d] = c[0];
+      full[d + 1] = c[1];
+      full[d + 2] = c[2];
+      full[d + 3] = alphaAt(x, y, size, size, r);
+    }
+  }
+
+  // 第二步：整体（含圆角）缩放到 contentScale 并居中，四周透明留白
   const content = Math.round(size * contentScale);
   const offset = Math.round((size - content) / 2);
-
   const rgba = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dst = (y * size + x) * 4;
       const inContent = x >= offset && x < offset + content && y >= offset && y < offset + content;
       if (inContent) {
-        // 内容区：源图中心对齐双线性采样，映射到内容框内
-        const fx = ((x - offset + 0.5) * src.width) / content - 0.5;
-        const fy = ((y - offset + 0.5) * src.height) / content - 0.5;
-        const c = sampleBilinear(src.pixels, src.width, src.height, src.channels, fx, fy);
+        const fx = ((x - offset + 0.5) * size) / content - 0.5;
+        const fy = ((y - offset + 0.5) * size) / content - 0.5;
+        const c = sampleBilinear(full, size, size, 4, fx, fy);
         rgba[dst] = c[0];
         rgba[dst + 1] = c[1];
         rgba[dst + 2] = c[2];
-        rgba[dst + 3] = alphaAt(x, y, size, size, r);
+        rgba[dst + 3] = c[3];
       } else {
-        // 边距区：透明
         rgba[dst + 3] = 0;
       }
     }
   }
   writeFileSync(output, encodePng(size, size, rgba));
-  // 自校验：回读生成的 PNG，打印四角/中心/内容边缘 alpha
+  // 自校验：回读生成的 PNG，打印四角/中心/内容角 alpha（内容角应接近 0，中心 255）
   const back = decodePng(readFileSync(output));
   const a = (x, y) => back.pixels[(y * back.width + x) * back.channels + 3];
-  console.log(`已生成 ${output}: ${size}x${size} RGBA，圆角半径 ${r}px（${cornerRatio}），内容 ${content}px（${contentScale}，四周留白 ${offset}px）`);
   console.log(
-    `alpha 校验: 四角 [${a(0, 0)}, ${a(size - 1, 0)}, ${a(0, size - 1)}, ${a(size - 1, size - 1)}] 中心 ${a(size >> 1, size >> 1)} 内容边缘 ${a(offset, size >> 1)}`
+    `已生成 ${output}: ${size}x${size} RGBA，圆角半径 ${r}px（${cornerRatio}），内容 ${content}px（${contentScale}，四周留白 ${offset}px）`
+  );
+  console.log(
+    `alpha 校验: 四角 [${a(0, 0)}, ${a(size - 1, 0)}, ${a(0, size - 1)}, ${a(size - 1, size - 1)}] 内容角 ${a(offset, offset)} 内容边缘中点 ${a(offset, size >> 1)} 中心 ${a(size >> 1, size >> 1)}`
   );
 }
 
