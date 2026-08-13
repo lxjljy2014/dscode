@@ -72,6 +72,8 @@ export interface DiffFile {
   additions: number;
   deletions: number;
   lines: DiffLine[];
+  /** 相对快照为新增/已删除的文件（渲染端显示标记） */
+  status?: 'new' | 'deleted';
 }
 
 export interface FileNode {
