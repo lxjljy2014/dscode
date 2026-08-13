@@ -10,7 +10,10 @@ const isWindows = process.platform === 'win32';
 const TITLEBAR_HEIGHT = 48;
 
 // 应用图标：resources/ 与 out/ 同级（dev/构建产物布局一致；打包配置未引入前暂按此路径兜底）
-const APP_ICON = join(__dirname, '../../resources/icon.png');
+// macOS Dock 用透明圆角版（scripts/make-icon-rounded.mjs 预处理，Dock 不会自动加圆角）；
+// Windows/Linux 任务栏/标题栏用方形满幅版（任务栏为方形槽位，留白会显得偏小）
+const MAC_DOCK_ICON = join(__dirname, '../../resources/icon.png');
+const WINDOW_ICON = join(__dirname, '../../resources/icon-win.png');
 
 // 允许交给系统浏览器打开的协议白名单
 const ALLOWED_OPEN_PROTOCOLS = ['https:', 'http:'];
@@ -36,7 +39,7 @@ function createWindow(): void {
     backgroundColor: '#0d0d0d',
     autoHideMenuBar: true,
     // 窗口图标（Windows/Linux 任务栏与标题栏；macOS 的 Dock 图标见 whenReady）
-    icon: APP_ICON,
+    icon: WINDOW_ICON,
     // 隐藏系统标题栏，使用 Electron 原生悬浮控件：
     // macOS 红绿灯 / Windows 系统绘制的最小化、最大化、关闭按钮
     titleBarStyle: 'hidden',
@@ -88,7 +91,7 @@ app.whenReady().then(() => {
   registerIpcHandlers();
 
   // macOS Dock 图标
-  if (isMac) app.dock?.setIcon(APP_ICON);
+  if (isMac) app.dock?.setIcon(MAC_DOCK_ICON);
 
   // 渲染端主题切换后同步悬浮按钮符号色（仅 Windows 生效；背景色固定透明）
   ipcMain.on('win:set-titlebar-overlay', (e, options: unknown) => {
