@@ -1,16 +1,42 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
+  AgentConfirmRequest,
+  AgentErrorEvent,
   AppSettings,
+  ChatMessagePayload,
+  DiffFile,
+  FileNode,
   GitGraphResult,
   GitListResult,
   GitOpResult,
+  Message,
   ProjectsListResult,
   ProviderVerifyResult,
+  Session,
   SettingsPatch,
   TerminalDataEvent,
   TerminalEnsureResult,
   TerminalExitInfo
 } from '@dscode/shared';
+
+/** 通用事件订阅包装：字段校验 + 返回取消订阅函数 */
+function subscribe<T extends { sessionId: string }>(
+  channel: string,
+  cb: (ev: T) => void,
+  validate: (raw: Record<string, unknown>) => boolean
+): () => void {
+  const listener = (_e: Electron.IpcRendererEvent, ev: unknown): void => {
+    if (typeof ev === 'object' && ev !== null && validate(ev as Record<string, unknown>)) {
+      cb(ev as T);
+    }
+  };
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
+function hasSessionId(raw: Record<string, unknown>): boolean {
+  return typeof raw['sessionId'] === 'string';
+}
 
 const api = {
   platform: process.platform,
@@ -33,6 +59,42 @@ const api = {
   // ---- 供应商校验 ----
   verifyProvider: (baseUrl: string, apiKey: string): Promise<ProviderVerifyResult> =>
     ipcRenderer.invoke('provider:verify', baseUrl, apiKey),
+
+  // ---- agent ----
+  agentStart: (sessionId: string, model: string, messages: ChatMessagePayload[]): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('agent:start', sessionId, model, messages),
+  agentStop: (sessionId: string): Promise<void> => ipcRenderer.invoke('agent:stop', sessionId),
+  agentConfirmResponse: (toolEventId: string, approve: boolean): Promise<void> =>
+    ipcRenderer.invoke('agent:confirm-response', toolEventId, approve),
+  /** 订阅 agent 文本增量 */
+  onAgentDelta: (cb: (ev: { sessionId: string; content: string }) => void): (() => void) =>
+    subscribe('agent:delta', cb, raw => hasSessionId(raw) && typeof raw['content'] === 'string'),
+  /** 订阅 agent 工具事件（状态流转） */
+  onAgentTool: (cb: (ev: { sessionId: string; event: import('@dscode/shared').AgentToolEvent }) => void): (() => void) =>
+    subscribe('agent:tool', cb, raw => hasSessionId(raw) && typeof raw['event'] === 'object' && raw['event'] !== null),
+  /** 订阅写/执行工具确认请求 */
+  onAgentConfirm: (cb: (ev: AgentConfirmRequest) => void): (() => void) =>
+    subscribe('agent:confirm', cb, raw => hasSessionId(raw) && typeof raw['toolEventId'] === 'string'),
+  /** 订阅 agent 完成事件 */
+  onAgentDone: (cb: (ev: { sessionId: string }) => void): (() => void) =>
+    subscribe('agent:done', cb, hasSessionId),
+  /** 订阅 agent 错误事件 */
+  onAgentError: (cb: (ev: AgentErrorEvent) => void): (() => void) =>
+    subscribe('agent:error', cb, raw => hasSessionId(raw) && typeof raw['code'] === 'string'),
+  /** 订阅工作区 diff 更新（写/执行工具后主进程推送） */
+  onWorkspaceDiff: (cb: (ev: { sessionId: string; files: DiffFile[] }) => void): (() => void) =>
+    subscribe('workspace:diff', cb, raw => hasSessionId(raw) && Array.isArray(raw['files'])),
+
+  // ---- 工作区 ----
+  workspaceTree: (): Promise<FileNode[]> => ipcRenderer.invoke('workspace:tree'),
+  workspaceReadFile: (relPath: string): Promise<{ ok: true; content: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('workspace:read-file', relPath),
+
+  // ---- 会话持久化 ----
+  sessionsList: (): Promise<Session[]> => ipcRenderer.invoke('sessions:list'),
+  sessionsCreate: (session: Session): Promise<{ ok: boolean }> => ipcRenderer.invoke('sessions:create', session),
+  sessionsAppend: (sessionId: string, message: Message): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('sessions:append', sessionId, message),
 
   // ---- git ----
   gitListBranches: (cwd: string): Promise<GitListResult> => ipcRenderer.invoke('git:list-branches', cwd),

@@ -1,10 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
-import type { SettingsPatch } from '@dscode/shared';
+import type { Message, Session, SettingsPatch } from '@dscode/shared';
 import { loadSettings, saveSettings } from './config';
 import { checkout, createBranch, graph, listBranches } from './git';
 import { initProjects, listProjectsWithHome, touchProject } from './projects';
 import { verifyProvider } from './provider';
 import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './terminal';
+import { resolveConfirm, startAgent, stopAgent } from './agent';
+import { readWorkspaceFile, scanTree } from './workspace';
+import { initSessions, listSessions, upsertMessage, upsertSession } from './sessions';
 
 /**
  * 业务 IPC 注册（ipcMain.handle / ipcRenderer.invoke；终端输入/尺寸为 ipcMain.on 单向通道）。
@@ -37,8 +40,10 @@ function parseTerminalSize(cols: unknown, rows: unknown): [number, number] | nul
 export function registerIpcHandlers(): void {
   const settingsFile = app.getPath('userData') + '/settings.json';
   const projectsFile = app.getPath('userData') + '/projects.db';
+  const sessionsFile = app.getPath('userData') + '/sessions.db';
   const homeDir = app.getPath('home');
   initProjects(projectsFile);
+  initSessions(sessionsFile);
 
   // ---- settings ----
   ipcMain.handle(
@@ -80,6 +85,62 @@ export function registerIpcHandlers(): void {
 
   // ---- 供应商校验 ----
   ipcMain.handle('provider:verify', withMainWindow((_win, baseUrl: unknown, apiKey: unknown) => verifyProvider(baseUrl, apiKey)));
+
+  // ---- agent ----
+  ipcMain.handle(
+    'agent:start',
+    withMainWindow((win, sessionId: unknown, model: unknown, messages: unknown) =>
+      isString(sessionId) ? startAgent(win, sessionId, model, messages) : { ok: false, error: 'invalid sessionId' }
+    )
+  );
+  ipcMain.handle(
+    'agent:stop',
+    withMainWindow((win, sessionId: unknown) => {
+      if (isString(sessionId)) stopAgent(win, sessionId);
+    })
+  );
+  ipcMain.handle(
+    'agent:confirm-response',
+    withMainWindow((_win, toolEventId: unknown, approve: unknown) => resolveConfirm(toolEventId, approve))
+  );
+
+  // ---- 工作区 ----
+  ipcMain.handle(
+    'workspace:tree',
+    withMainWindow(() => scanTree(loadSettings(settingsFile, homeDir).workingDirectory))
+  );
+  ipcMain.handle(
+    'workspace:read-file',
+    withMainWindow((_win, relPath: unknown) => {
+      const cwd = loadSettings(settingsFile, homeDir).workingDirectory;
+      return isString(relPath) ? readWorkspaceFile(cwd, relPath) : { ok: false, error: 'invalid path' };
+    })
+  );
+
+  // ---- 会话持久化 ----
+  ipcMain.handle('sessions:list', withMainWindow(() => listSessions(sessionsFile)));
+  ipcMain.handle(
+    'sessions:create',
+    withMainWindow((_win, session: unknown) => {
+      if (typeof session !== 'object' || session === null) return { ok: false, error: 'invalid session' };
+      const s = session as Session;
+      if (typeof s.id !== 'string' || typeof s.title !== 'string') return { ok: false, error: 'invalid session' };
+      upsertSession(sessionsFile, s);
+      return { ok: true };
+    })
+  );
+  ipcMain.handle(
+    'sessions:append',
+    withMainWindow((_win, sessionId: unknown, message: unknown) => {
+      if (!isString(sessionId) || typeof message !== 'object' || message === null) {
+        return { ok: false, error: 'invalid args' };
+      }
+      const m = message as Message;
+      if (typeof m.id !== 'string' || typeof m.content !== 'string') return { ok: false, error: 'invalid message' };
+      upsertMessage(sessionsFile, sessionId, m);
+      return { ok: true };
+    })
+  );
 
   // ---- git ----
   ipcMain.handle(

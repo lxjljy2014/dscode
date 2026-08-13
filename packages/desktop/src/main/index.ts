@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { registerIpcHandlers } from './ipc';
+import { disposeAgents } from './agent';
 import { disposeTerminals, killWindowTerminals } from './terminal';
 
 const isMac = process.platform === 'darwin';
@@ -125,5 +126,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// 退出前回收全部终端会话
-app.on('will-quit', () => disposeTerminals());
+// 退出前回收全部终端会话与 agent 运行
+app.on('will-quit', () => {
+  disposeTerminals();
+  disposeAgents();
+});

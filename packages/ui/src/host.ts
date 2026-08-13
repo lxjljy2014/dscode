@@ -1,10 +1,18 @@
 import type {
+  AgentConfirmRequest,
+  AgentErrorEvent,
+  AgentToolEvent,
   AppSettings,
+  ChatMessagePayload,
+  DiffFile,
+  FileNode,
   GitGraphResult,
   GitListResult,
   GitOpResult,
+  Message,
   ProjectsListResult,
   ProviderVerifyResult,
+  Session,
   SettingsPatch,
   TerminalDataEvent,
   TerminalEnsureResult,
@@ -36,6 +44,27 @@ export interface HostApi {
 
   // ---- 供应商校验 ----
   verifyProvider: (baseUrl: string, apiKey: string) => Promise<ProviderVerifyResult>;
+
+  // ---- agent ----
+  agentStart: (sessionId: string, model: string, messages: ChatMessagePayload[]) => Promise<{ ok: boolean }>;
+  agentStop: (sessionId: string) => Promise<void>;
+  agentConfirmResponse: (toolEventId: string, approve: boolean) => Promise<void>;
+  /** 订阅 agent 事件（按 sessionId 分发），均返回取消订阅函数 */
+  onAgentDelta: (cb: (ev: { sessionId: string; content: string }) => void) => () => void;
+  onAgentTool: (cb: (ev: { sessionId: string; event: AgentToolEvent }) => void) => () => void;
+  onAgentConfirm: (cb: (ev: AgentConfirmRequest) => void) => () => void;
+  onAgentDone: (cb: (ev: { sessionId: string }) => void) => () => void;
+  onAgentError: (cb: (ev: AgentErrorEvent) => void) => () => void;
+  onWorkspaceDiff: (cb: (ev: { sessionId: string; files: DiffFile[] }) => void) => () => void;
+
+  // ---- 工作区 ----
+  workspaceTree: () => Promise<FileNode[]>;
+  workspaceReadFile: (relPath: string) => Promise<{ ok: true; content: string } | { ok: false; error: string }>;
+
+  // ---- 会话持久化 ----
+  sessionsList: () => Promise<Session[]>;
+  sessionsCreate: (session: Session) => Promise<{ ok: boolean }>;
+  sessionsAppend: (sessionId: string, message: Message) => Promise<{ ok: boolean }>;
 
   // ---- git ----
   gitListBranches: (cwd: string) => Promise<GitListResult>;
