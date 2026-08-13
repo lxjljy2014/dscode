@@ -27,3 +27,4 @@ export { default as ChatInput } from './components/ChatInput.vue';
 export { default as GitBranchMenu } from './components/GitBranchMenu.vue';
 export { default as DiffPanel } from './components/DiffPanel.vue';
 export { default as FileTree } from './components/FileTree.vue';
+export { default as ResizeHandle } from './components/ResizeHandle.vue';

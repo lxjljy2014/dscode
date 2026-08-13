@@ -6,11 +6,169 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; worker-src 'self' blob:"
     />
+    <!-- 启动占位页样式：颜色与 packages/ui/src/theme/tokens.ts 的 neutral 色阶对齐。
+         深浅色默认跟随系统（媒体查询），boot.ts 会依据应用持久化主题（localStorage dscode.ui）
+         在 html 上打 ds-theme-dark / ds-theme-light 类覆盖，避免占位页闪错配色 -->
+    <style>
+      :root {
+        --splash-bg: #ffffff;
+        --splash-ambient: rgba(23, 23, 23, 0.03);
+        --splash-halo: rgba(23, 23, 23, 0.06);
+        --splash-mark-bg: #171717;
+        --splash-mark-fg: #ffffff;
+        --splash-mark-border: rgba(23, 23, 23, 0);
+        --splash-glow: rgba(23, 23, 23, 0.1);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --splash-bg: #0d0d0d;
+          /* 暗色：白色加透明——徽标半透明白玻璃质感 */
+          --splash-ambient: rgba(236, 236, 236, 0.04);
+          --splash-halo: rgba(236, 236, 236, 0.08);
+          --splash-mark-bg: rgba(236, 236, 236, 0.14);
+          --splash-mark-fg: rgba(236, 236, 236, 0.92);
+          --splash-mark-border: rgba(236, 236, 236, 0.18);
+          --splash-glow: rgba(236, 236, 236, 0.16);
+        }
+      }
+
+      html.ds-theme-light {
+        --splash-bg: #ffffff;
+        --splash-ambient: rgba(23, 23, 23, 0.03);
+        --splash-halo: rgba(23, 23, 23, 0.06);
+        --splash-mark-bg: #171717;
+        --splash-mark-fg: #ffffff;
+        --splash-mark-border: rgba(23, 23, 23, 0);
+        --splash-glow: rgba(23, 23, 23, 0.1);
+      }
+
+      html.ds-theme-dark {
+        --splash-bg: #0d0d0d;
+        --splash-ambient: rgba(236, 236, 236, 0.04);
+        --splash-halo: rgba(236, 236, 236, 0.08);
+        --splash-mark-bg: rgba(236, 236, 236, 0.14);
+        --splash-mark-fg: rgba(236, 236, 236, 0.92);
+        --splash-mark-border: rgba(236, 236, 236, 0.18);
+        --splash-glow: rgba(236, 236, 236, 0.16);
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      #app {
+        height: 100%;
+      }
+
+      .app-splash {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        /* 环境光：页面中心一束极淡的椭圆光，避免纯色死板 */
+        background:
+          radial-gradient(ellipse 90% 60% at 50% 42%, var(--splash-ambient), transparent 70%),
+          var(--splash-bg);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        animation: app-splash-in 0.5s ease-out;
+      }
+
+      /* 徽标 + 呼吸光晕的包装层（光晕以徽标为中心） */
+      .app-splash__hero {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .app-splash__halo {
+        position: absolute;
+        inset: -64px;
+        border-radius: 50%;
+        background: radial-gradient(circle, var(--splash-halo), transparent 65%);
+        pointer-events: none;
+        /* 与徽标同周期的轻微明暗起伏 */
+        animation: app-splash-halo 5s ease-in-out infinite;
+      }
+
+      .app-splash__mark {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        width: 64px;
+        height: 64px;
+        border: 1px solid var(--splash-mark-border);
+        border-radius: 18px;
+        background: var(--splash-mark-bg);
+        color: var(--splash-mark-fg);
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        /* 呼吸动效：幅度收小、周期放慢，只保留「活物」的轻微起伏 */
+        animation: app-splash-breathe 5s ease-in-out infinite;
+      }
+
+      @keyframes app-splash-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes app-splash-breathe {
+        0%,
+        100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 var(--splash-glow);
+        }
+        50% {
+          transform: scale(1.012);
+          box-shadow: 0 0 14px 2px var(--splash-glow);
+        }
+      }
+
+      @keyframes app-splash-halo {
+        0%,
+        100% {
+          opacity: 0.75;
+          transform: scale(0.985);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.01);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .app-splash__mark,
+        .app-splash__halo {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- 启动占位页：Vue 挂载时会清空 #app 内容并替换，无需手动移除 -->
+      <div class="app-splash">
+        <div class="app-splash__hero">
+          <div class="app-splash__halo"></div>
+          <div class="app-splash__mark">DS</div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/boot.ts"></script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

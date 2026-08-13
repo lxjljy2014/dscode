@@ -10,10 +10,15 @@ import { host } from '../host';
 import { useUiStore } from '@dscode/ui';
 import { useSettingsStore } from '@dscode/ui';
 import { darkTheme, fontFamilyMono, lightTheme, neutral, terminalAnsi } from '../theme/tokens';
+import ResizeHandle from './ResizeHandle.vue';
 
 const { t } = useI18n();
 const uiStore = useUiStore();
 const settingsStore = useSettingsStore();
+
+/** 面板高度限制（px） */
+const TERMINAL_MIN_HEIGHT = 200;
+const TERMINAL_MAX_HEIGHT = 500;
 
 /** 终端标签页状态（会话由主进程按 sessionId 管理） */
 interface TabState {
@@ -240,16 +245,33 @@ onBeforeUnmount(() => {
     :permanent="uiStore.terminalVisible"
     color="background"
     location="bottom"
-    width="280"
+    :width="uiStore.terminalHeight"
   >
     <!-- v-show 常驻渲染：隐藏面板不杀会话，标签页状态保留 -->
+    <!-- 不加 relative：句柄定位上下文直接是抽屉根元素，细线贴到顶缘与边框重合 -->
     <div v-show="uiStore.terminalVisible" class="flex h-full flex-col">
+      <!-- 顶部拖拽条：调整面板高度 -->
+      <ResizeHandle
+        axis="y"
+        :size="uiStore.terminalHeight"
+        :min="TERMINAL_MIN_HEIGHT"
+        :max="TERMINAL_MAX_HEIGHT"
+        @resize="uiStore.setTerminalHeight"
+      />
       <!-- 标签栏：VToolbar（图标/新增按钮/状态）+ VTabs 可关闭标签 -->
       <VToolbar density="compact" color="transparent" class="border-b border-line">
         <template #prepend>
           <VIcon icon="i-lucide:square-terminal" size="14" class="text-muted" />
         </template>
-        <VTabs :model-value="activeId" density="compact" class="min-w-0 flex-1" @update:model-value="onTabChange">
+        <!-- 关闭滚动到激活标签：标签通常不溢出，且面板隐藏/尺寸变化会中断滚动动画 -->
+        <!-- （避免 Vuetify 报 "Scroll target is not reachable" 刷屏） -->
+        <VTabs
+          :model-value="activeId"
+          :scroll-to-active="false"
+          density="compact"
+          class="min-w-0 flex-1"
+          @update:model-value="onTabChange"
+        >
           <VTab v-for="tab in tabs" :key="tab.id" :value="tab.id" class="text-muted">
             {{ tab.title }}
           </VTab>

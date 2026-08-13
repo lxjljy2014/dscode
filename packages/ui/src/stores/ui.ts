@@ -38,6 +38,9 @@ export const useUiStore = defineStore('ui', () => {
   const leftVisible = ref(true);
   const rightVisible = ref(false);
   const terminalVisible = ref(false);
+  // 面板尺寸同样不持久化：每次启动恢复默认（终端 280 / 右侧 440），范围限制在各面板组件
+  const terminalHeight = ref(280);
+  const rightPanelWidth = ref(440);
 
   /** 实际生效的语言（system 时按操作系统解析） */
   const resolvedLocale = computed<AppLocale>(() => (locale.value === 'system' ? systemLocale() : locale.value));
@@ -74,6 +77,14 @@ export const useUiStore = defineStore('ui', () => {
     terminalVisible.value = !terminalVisible.value;
   }
 
+  function setTerminalHeight(value: number) {
+    terminalHeight.value = value;
+  }
+
+  function setRightPanelWidth(value: number) {
+    rightPanelWidth.value = value;
+  }
+
   return {
     theme,
     locale,
@@ -85,6 +96,10 @@ export const useUiStore = defineStore('ui', () => {
     toggleLeft,
     toggleRight,
     terminalVisible,
-    toggleTerminal
+    toggleTerminal,
+    terminalHeight,
+    setTerminalHeight,
+    rightPanelWidth,
+    setRightPanelWidth
   };
 });

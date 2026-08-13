@@ -29,8 +29,8 @@ packages/
 │       └── locales/  # zh-CN.json / en-US.json
 └── ui/               # @dscode/ui —— 全部 UI：组件、Pinia stores、插件、主题
     └── src/
-        ├── components/  # 18 个 Vue SFC（WorkspaceView、ChatView、DiffPanel、GitGraphDialog 等）
-        ├── stores/      # ui.ts（主题/语言/侧栏显隐）、session.ts（会话/流式回复模拟）、settings.ts（工作目录/权限模式，主进程持久化）
+        ├── components/  # 19 个 Vue SFC（WorkspaceView、ChatView、DiffPanel、ResizeHandle、GitGraphDialog 等）
+        ├── stores/      # ui.ts（主题/语言/侧栏显隐/面板尺寸）、session.ts（会话/流式回复模拟）、settings.ts（工作目录/权限模式，主进程持久化）
         ├── plugins/     # vuetify.ts、i18n.ts（createXxxPlugin 工厂函数）
         ├── theme/       # tokens.ts（主题色唯一事实源）、global.css（滚动条/选区/拖拽区）
         └── host.ts      # window.dscode 桥接 API 的类型封装
@@ -76,6 +76,11 @@ Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror �
 
 node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行位（644），导致 pty 启动报 `posix_spawnp failed`；根 `postinstall`（`scripts/fix-node-pty-exec.mjs`，pnpm 会执行 root 项目的 postinstall）负责修复，不要删。
 
+开发模式两个配置陷阱（`renderer/index.html` / `src/boot.ts`）：
+
+- dev 冷启动时 vite-plugin-vuetify 的虚拟样式模块（`virtual:plugin-vuetify:*`）偶发 404、应用无法挂载（刷新后服务器已暖、正常）。`index.html` 里的 `.app-splash` 启动占位页（仅一枚玻璃质 Logo + 同步光晕 + 环境光背景，5s 周期轻微呼吸、无任何文字，颜色对齐 tokens 的 neutral 色阶，深浅色由 boot.ts 按持久化主题打 `ds-theme-dark`/`ds-theme-light` 类、回退系统偏好）盖住加载期黑屏；`src/boot.ts`（先于 main.ts 加载）在 dev 下 10 秒未挂载时自动刷新一次（sessionStorage 防循环），让失败自愈。两者都别删。
+- CSP 里 `worker-src 'self' blob:` 必须保留：Vite 7 dev client 会创建 blob worker，被 `script-src 'self'` 拦截会在控制台报错。
+
 ## 代码约定
 
 - **注释与文档使用中文**（项目现有注释均为中文，git commit 也是中文）。标识符用英文。
@@ -84,6 +89,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 - 文案一律走 i18n：key 加到 `packages/shared/src/locales/zh-CN.json` 和 `en-US.json` 两个文件，组件里 `t('xxx')`。
 - 可复用 UI 放 `packages/ui`（并在 `src/index.ts` 导出），Electron 宿主相关的薄壳代码放 `packages/desktop`。`TerminalPanel` 是个例外：它未被 `index.ts` 导出，由 `WorkspaceView` 相对路径直接引用。
 - 集成终端由 `ui/components/TerminalPanel.vue`（xterm.js + FitAddon，多标签页会话：面板内容 v-show 常驻、新增/关闭标签驱动会话创建/回收）与 `desktop/src/main/terminal.ts`（node-pty 多会话管理）配合实现；终端配色（含 ANSI 16 色 `terminalAnsi`）在 `theme/tokens.ts` 定义，不在组件里写死。
+- 面板尺寸拖拽用 `ui/components/ResizeHandle.vue`（Pointer Events 遮罩式拖拽条，定位上下文是抽屉根元素、高亮细线与抽屉外缘边框重合）：`axis="y"` 调终端高度、`axis="x"` 调右侧栏宽度；范围限制写在各面板组件的 `*_MIN_*` / `*_MAX_*` 常量，尺寸状态存 `ui.ts` store（不持久化，每次启动恢复默认）。
 - 跨包引用用包名（`@dscode/shared`、`@dscode/ui`、`@dscode/ui/tokens`），TS 路径别名在根 `tsconfig.base.json` 配置；渲染进程内部还有 `@renderer` 别名指向 `packages/desktop/src/renderer/src`。
 
 ## 主题系统（改动前必读）
