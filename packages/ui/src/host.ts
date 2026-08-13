@@ -1,4 +1,14 @@
-import type { AppSettings, GitGraphResult, GitListResult, GitOpResult, ProjectsListResult, SettingsPatch } from '@dscode/shared';
+import type {
+  AppSettings,
+  GitGraphResult,
+  GitListResult,
+  GitOpResult,
+  ProjectsListResult,
+  SettingsPatch,
+  TerminalDataEvent,
+  TerminalEnsureResult,
+  TerminalExitInfo
+} from '@dscode/shared';
 
 /**
  * 宿主（Electron preload）注入到 window.dscode 的桥接 API。
@@ -28,6 +38,15 @@ export interface HostApi {
   gitCheckout: (cwd: string, branch: string) => Promise<GitOpResult>;
   gitCreateBranch: (cwd: string, name: string) => Promise<GitOpResult>;
   gitGraph: (cwd: string) => Promise<GitGraphResult>;
+
+  // ---- 终端 ----
+  terminalEnsure: (sessionId: string, cwd: string) => Promise<TerminalEnsureResult>;
+  terminalWrite: (sessionId: string, data: string) => void;
+  terminalResize: (sessionId: string, cols: number, rows: number) => void;
+  terminalKill: (sessionId: string) => Promise<void>;
+  /** 订阅终端数据/退出事件（按 sessionId 分发），均返回取消订阅函数 */
+  onTerminalData: (cb: (ev: TerminalDataEvent) => void) => () => void;
+  onTerminalExit: (cb: (info: TerminalExitInfo) => void) => () => void;
 }
 
 declare global {

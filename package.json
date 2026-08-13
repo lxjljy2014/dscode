@@ -10,6 +10,7 @@
     "lint:eslint": "eslint .",
     "lint:fast": "oxlint .",
     "lint:fix": "eslint . --fix && oxlint . --fix",
+    "postinstall": "node scripts/fix-node-pty-exec.mjs",
     "start": "pnpm --filter @dscode/desktop start",
     "typecheck": "pnpm --filter @dscode/desktop typecheck"
   },

@@ -52,10 +52,10 @@ export function createVuetifyPlugin() {
         border: true,
         rounded: 'lg'
       },
-      VTextField: {
-        density: 'compact',
-        hideDetails: true
-      },
+      // VTextField: {
+      //   density: 'compact',
+      //   hideDetails: true
+      // },
       VTextarea: {
         variant: 'outlined',
         rounded: 'lg',

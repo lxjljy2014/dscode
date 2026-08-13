@@ -19,7 +19,7 @@ packages/
 │   ├── electron.vite.config.ts
 │   ├── uno.config.ts
 │   └── src/
-│       ├── main/     # Electron 主进程（index.ts 窗口/IPC；git.ts git CLI 封装；projects.ts 最近项目 SQLite；config.ts settings 持久化；ipc.ts 业务 handler）
+│       ├── main/     # Electron 主进程（index.ts 窗口/IPC；git.ts git CLI 封装；projects.ts 最近项目 SQLite；config.ts settings 持久化；terminal.ts 集成终端 node-pty 会话；ipc.ts 业务 handler）
 │       ├── preload/  # contextBridge 暴露 window.dscode
 │       └── renderer/ # Vue 应用入口（App.vue / router.ts / main.ts）
 ├── shared/           # @dscode/shared —— 纯 TS：类型定义、mock 数据、i18n 语言包
@@ -72,7 +72,9 @@ pnpm fmt            # oxfmt 格式化
 
 Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror 镜像）下载；`.npmrc` 的 `electron_mirror` 对 pnpm 无效（pnpm 不会把 `.npmrc` 配置转成 `npm_config_*` 环境变量传给 postinstall），不要回退到那种写法。注意 `.pnpmfile.cjs` 内容变化会使 lockfile 的 `pnpmfileChecksum` 失效，需执行一次 `pnpm install --no-frozen-lockfile` 更新。
 
-`pnpm-workspace.yaml` 里的 `allowBuilds` 是 pnpm 11 的依赖构建白名单：**新增带 postinstall 的原生依赖必须在此登记，否则其 build scripts 不会执行**；`minimumReleaseAgeExclude` 用于绕过 electron 的发布年龄检查（目前登记了 `electron@43.4.0`）。
+`pnpm-workspace.yaml` 里的 `allowBuilds` 是 pnpm 11 的依赖构建白名单（当前已登记：`electron`、`esbuild`、`sass-embedded`、`@parcel/watcher`、`node-pty`）：**新增带 postinstall 的原生依赖必须在此登记，否则其 build scripts 不会执行**；`minimumReleaseAgeExclude` 用于绕过 electron 的发布年龄检查（目前登记了 `electron@43.4.0`）。
+
+node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行位（644），导致 pty 启动报 `posix_spawnp failed`；根 `postinstall`（`scripts/fix-node-pty-exec.mjs`，pnpm 会执行 root 项目的 postinstall）负责修复，不要删。
 
 ## 代码约定
 
@@ -81,6 +83,7 @@ Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror �
 - 图标用 UnoCSS 图标语法：`i-lucide:xxx`（已按 Vuetify 官方文档集成 Lucide iconset）。
 - 文案一律走 i18n：key 加到 `packages/shared/src/locales/zh-CN.json` 和 `en-US.json` 两个文件，组件里 `t('xxx')`。
 - 可复用 UI 放 `packages/ui`（并在 `src/index.ts` 导出），Electron 宿主相关的薄壳代码放 `packages/desktop`。`TerminalPanel` 是个例外：它未被 `index.ts` 导出，由 `WorkspaceView` 相对路径直接引用。
+- 集成终端由 `ui/components/TerminalPanel.vue`（xterm.js + FitAddon，多标签页会话：面板内容 v-show 常驻、新增/关闭标签驱动会话创建/回收）与 `desktop/src/main/terminal.ts`（node-pty 多会话管理）配合实现；终端配色（含 ANSI 16 色 `terminalAnsi`）在 `theme/tokens.ts` 定义，不在组件里写死。
 - 跨包引用用包名（`@dscode/shared`、`@dscode/ui`、`@dscode/ui/tokens`），TS 路径别名在根 `tsconfig.base.json` 配置；渲染进程内部还有 `@renderer` 别名指向 `packages/desktop/src/renderer/src`。
 
 ## 主题系统（改动前必读）
@@ -102,6 +105,7 @@ Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror �
   - `projects:list` —— 最近项目（`node:sqlite`，`userData/projects.db`，无原生依赖）
   - `dialog:pick-directory` —— 选择工作目录（取消返回 null）
   - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` —— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合
+  - `terminal:ensure` / `terminal:write` / `terminal:resize` / `terminal:kill` —— 集成终端（主进程 node-pty，多会话按渲染端生成的 sessionId 管理、按窗口归属统一回收，见 `main/terminal.ts`）；pty 输出经 `terminal:data` / `terminal:exit` 事件（带 sessionId）推给渲染端，write/resize 为高频单向 `on` 通道
   - 每个 handler 校验 sender 属于主窗口 + 参数类型；新增业务 IPC 沿用此模式
 
 ## 测试与质量

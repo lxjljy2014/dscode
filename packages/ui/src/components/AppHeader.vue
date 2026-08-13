@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import { isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from '../host';
 import { useUiStore } from '../stores/ui';
 import { useSessionStore } from '../stores/session';
+import GitBranchMenu from './GitBranchMenu.vue';
 
 const { t } = useI18n();
 const uiStore = useUiStore();
@@ -70,31 +71,8 @@ const hasOverlayControls = isFrameless && !isMac;
           </VListItem>
         </VList>
       </VMenu>
-      <!--      git 分支-->
-      <VMenu location="top start" :offset="4">
-        <template #activator="{ props: menuProps }">
-          <VBtn
-            v-bind="menuProps"
-            :variant="sessionStore.hasMessage ? 'tonal' : 'text'"
-            :base-color="sessionStore.hasMessage ? 'surface' : ''"
-            rounded="pill"
-            size="small"
-            class="text-muted"
-            prepend-icon="i-lucide:git-branch"
-            append-icon="i-lucide:chevron-down"
-          >
-            {{ t('input.gitBranch') }}
-          </VBtn>
-        </template>
-        <VList min-width="200" nav>
-          <VListItem active prepend-icon="i-lucide:folder">
-            <VListItemTitle class="text-sm">dscode</VListItemTitle>
-            <template #append>
-              <VIcon icon="i-lucide:check" size="16" />
-            </template>
-          </VListItem>
-        </VList>
-      </VMenu>
+      <!-- git 分支：与输入卡片共用 GitBranchMenu（tonal 样式贴合 header） -->
+      <GitBranchMenu tonal />
     </div>
     <VSpacer />
     <div class="flex items-center gap-1">

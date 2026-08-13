@@ -44,3 +44,4 @@ export interface FileNode {
 export * from './git';
 export * from './projects';
 export * from './settings';
+export * from './terminal';

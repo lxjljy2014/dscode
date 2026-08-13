@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { registerIpcHandlers } from './ipc';
+import { disposeTerminals, killWindowTerminals } from './terminal';
 
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
@@ -52,6 +53,9 @@ function createWindow(): void {
   win.on('ready-to-show', () => {
     win.show();
   });
+
+  // 窗口关闭时回收其全部终端会话
+  win.on('closed', () => killWindowTerminals(win));
 
   // 新窗口一律拒绝，仅 http(s) 链接交给系统浏览器
   win.webContents.setWindowOpenHandler(details => {
@@ -109,3 +113,6 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+// 退出前回收全部终端会话
+app.on('will-quit', () => disposeTerminals());

@@ -93,7 +93,12 @@
     "deletions": "{n} deletions"
   },
   "terminal": {
-    "placeholder": "Terminal panel (placeholder)"
+    "placeholder": "Terminal unavailable (non-Electron environment)",
+    "add": "New terminal",
+    "close": "Close terminal",
+    "tabTitle": "Terminal {n}",
+    "running": "Running",
+    "exited": "Exited (code {code})"
   },
   "settings": {
     "toggleLeft": "Toggle chat sidebar",

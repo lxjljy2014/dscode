@@ -20,7 +20,8 @@ export function loadSettings(file: string, homeDir: string): AppSettings {
   try {
     if (!existsSync(file)) return defaults;
     const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
-    const workingDirectory = typeof raw['workingDirectory'] === 'string' ? raw['workingDirectory'] : defaults.workingDirectory;
+    const workingDirectory =
+      typeof raw['workingDirectory'] === 'string' ? raw['workingDirectory'] : defaults.workingDirectory;
     const permissionMode = isPermissionMode(raw['permissionMode']) ? raw['permissionMode'] : defaults.permissionMode;
     return { workingDirectory, permissionMode };
   } catch {

@@ -92,6 +92,50 @@ export const darkTheme: ThemeDefinition = {
 };
 
 /**
+ * 终端 ANSI 16 色（xterm 专用，light/dark 各一套）。
+ * 语义色（红/绿/黄）与上方 lightTheme/darkTheme 保持一致；
+ * 蓝/品红/青等终端才需要的颜色在此补充，组件不得另写死颜色。
+ */
+export const terminalAnsi = {
+  light: [
+    neutral[900], // black
+    '#cf222e', // red
+    '#1a7f37', // green
+    '#9a6700', // yellow
+    '#0969da', // blue
+    '#8250df', // magenta
+    '#1b7c83', // cyan
+    neutral[600], // white
+    neutral[500], // brightBlack
+    '#ff7b72', // brightRed
+    '#2da44e', // brightGreen
+    '#bf8700', // brightYellow
+    '#54aeff', // brightBlue
+    '#bc8cff', // brightMagenta
+    '#39c5cf', // brightCyan
+    '#ffffff' // brightWhite
+  ],
+  dark: [
+    neutral[900], // black
+    '#f47067', // red
+    '#3fb950', // green
+    '#d29922', // yellow
+    '#58a6ff', // blue
+    '#bc8cff', // magenta
+    '#39c5cf', // cyan
+    neutral[200], // white
+    neutral[500], // brightBlack
+    '#ffa198', // brightRed
+    '#56d364', // brightGreen
+    '#e3b341', // brightYellow
+    '#79c0ff', // brightBlue
+    '#d2a8ff', // brightMagenta
+    '#56d4dd', // brightCyan
+    '#ffffff' // brightWhite
+  ]
+} as const;
+
+/**
  * UnoCSS 颜色 → Vuetify CSS 变量。
  * Vuetify 变量值为 `R,G,B` 三元组，可用 `rgb(var(--v-theme-x))` 或带 alpha 使用。
  */

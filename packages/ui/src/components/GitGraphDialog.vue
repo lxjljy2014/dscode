@@ -47,14 +47,7 @@ watch(model, async open => {
       <VCardTitle>{{ t('dialog.graphTitle') }}</VCardTitle>
       <VCardText class="p-0">
         <VProgressCircular v-if="loading" indeterminate class="ma-4" />
-        <VTable
-          v-else-if="rows.length > 0"
-          density="compact"
-          hover
-          fixed-header
-          height="40vh"
-          class="graph-table"
-        >
+        <VTable v-else-if="rows.length > 0" density="compact" hover fixed-header height="40vh" class="graph-table">
           <thead>
             <tr>
               <th class="font-medium whitespace-nowrap text-faint">{{ t('dialog.graphColumns.graph') }}</th>

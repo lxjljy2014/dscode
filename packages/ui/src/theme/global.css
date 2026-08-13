@@ -11,12 +11,6 @@ html {
   text-rendering: optimizeLegibility;
 }
 
-/* ---- 细滚动条 ---- */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
-}
-
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -39,15 +33,15 @@ html {
   background: transparent;
 }
 
+/* ---- 终端滚动条：xterm 6 自绘 DOM（.xterm-scrollable-element > .scrollbar > .slider） ---- */
+/* 滑块圆角（宽度由 Terminal 选项 overviewRuler.width 控制为 8px，颜色由主题 scrollbarSlider* 驱动） */
+.xterm .xterm-scrollable-element > .scrollbar > .slider {
+  border-radius: 4px;
+}
+
 /* ---- 文本选区 ---- */
 ::selection {
   background: rgba(var(--v-theme-on-surface), 0.18);
-}
-
-/* ---- 焦点 ---- */
-:focus-visible {
-  outline: 2px solid rgba(var(--v-theme-on-surface), 0.35);
-  outline-offset: 1px;
 }
 
 /* ---- 消息淡入 ---- */

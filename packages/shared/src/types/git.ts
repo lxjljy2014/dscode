@@ -1,7 +1,5 @@
 /** git 分支列表结果 */
-export type GitListResult =
-  | { ok: true; current: string; branches: string[] }
-  | { ok: false; error: string };
+export type GitListResult = { ok: true; current: string; branches: string[] } | { ok: false; error: string };
 
 /** git 操作结果（checkout / create-branch） */
 export type GitOpResult = { ok: true } | { ok: false; error: string };

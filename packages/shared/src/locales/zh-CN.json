@@ -43,14 +43,14 @@
     }
   },
   "permission": {
-    "confirm": "每次确认",
-    "hintConfirm": "变更前逐项确认",
+    "confirm": "变更前确认",
+    "hintConfirm": "改变文件前先问我",
     "autoEdit": "自动编辑",
-    "hintAutoEdit": "编辑自动执行，执行命令需确认",
+    "hintAutoEdit": "自动编辑文件",
     "plan": "计划模式",
-    "hintPlan": "只读分析，变更需手动批准",
+    "hintPlan": "变更前先出计划",
     "fullAccess": "完全访问",
-    "hintFullAccess": "全部操作直接执行"
+    "hintFullAccess": "减少确认次数"
   },
   "project": {
     "search": "搜索项目",
@@ -93,7 +93,12 @@
     "deletions": "{n} 处删除"
   },
   "terminal": {
-    "placeholder": "终端面板（占位）"
+    "placeholder": "终端不可用（非 Electron 环境）",
+    "add": "新增终端",
+    "close": "关闭终端",
+    "tabTitle": "终端 {n}",
+    "running": "运行中",
+    "exited": "已退出（code {code}）"
   },
   "settings": {
     "toggleLeft": "切换会话侧栏",
