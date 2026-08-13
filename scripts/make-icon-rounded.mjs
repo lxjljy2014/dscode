@@ -2,15 +2,19 @@ import { deflateSync, inflateSync } from 'node:zlib';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 /**
- * 给方形不透明 PNG 生成 macOS 风格的透明圆角版本（供 Dock 图标使用）。
- * macOS Dock 不会自动给自定义图标加圆角，正式 .icns 的圆角都是画进图里的；
- * 这里把圆角外区域处理为透明，达到同样效果。
+ * 生成 macOS 风格的 Dock 图标 PNG：
+ * 1. 内容缩放：Apple 图标网格安全区约为画布的 80%（1024 画布内容 824），四周留白约 10%；
+ *    源图满铺画布时在 Dock 里会显得过大，这里按 contentScale 双线性缩小并居中。
+ * 2. 透明圆角：macOS Dock 不会自动给自定义图标加圆角，正式 .icns 的圆角是画进图里的；
+ *    这里把圆角外区域处理为透明（4x4 超采样抗锯齿）。
  *
- * 用法: node scripts/make-icon-rounded.mjs [输入png] [输出png] [圆角半径比例，默认 0.225]
+ * 用法: node scripts/make-icon-rounded.mjs [输入png] [输出png] [圆角半径比例=0.225] [内容占比=0.8]
  */
 
-const [input = 'packages/desktop/resources/icon.png', output = input, ratioArg = '0.225'] = process.argv.slice(2);
+const [input = 'packages/desktop/resources/icon.png', output = input, ratioArg = '0.225', scaleArg = '0.8'] =
+  process.argv.slice(2);
 const cornerRatio = Number(ratioArg);
+const contentScale = Number(scaleArg);
 
 // ---------- PNG 解码（仅支持 8bit RGB/RGBA 非隔行） ----------
 
@@ -112,46 +116,87 @@ function encodePng(width, height, rgba) {
 
 function insideRoundedRect(x, y, w, h, r) {
   if (x < 0 || x >= w || y < 0 || y >= h) return false;
-  // 四个圆角区域：距对应圆心距离 ≤ r
-  const cx = x < r ? r : x >= w - r ? w - r - 1 : x;
-  const cy = y < r ? r : y >= h - r ? h - r - 1 : y;
-  if (cx !== x && cy !== y) {
-    const dx = x - (cx === r ? r - 0.5 : w - r - 0.5);
-    const dy = y - (cy === r ? r - 0.5 : h - r - 0.5);
-    return dx * dx + dy * dy <= r * r;
+  const inLeft = x < r;
+  const inRight = x >= w - r;
+  const inTop = y < r;
+  const inBottom = y >= h - r;
+  if (!inLeft && !inRight) return true;
+  if (!inTop && !inBottom) return true;
+  // 角区域：距对应圆心的距离 ≤ r
+  const cx = inLeft ? r - 0.5 : w - r - 0.5;
+  const cy = inTop ? r - 0.5 : h - r - 0.5;
+  const dx = x - cx;
+  const dy = y - cy;
+  return dx * dx + dy * dy <= r * r;
+}
+
+function alphaAt(x, y, w, h, r) {
+  let hit = 0;
+  for (let sy = 0; sy < 4; sy++) {
+    for (let sx = 0; sx < 4; sx++) {
+      if (insideRoundedRect(x + (sx + 0.5) / 4, y + (sy + 0.5) / 4, w, h, r)) hit++;
+    }
   }
-  return true;
+  return Math.round((hit / 16) * 255);
+}
+
+// 双线性采样源图（中心对齐映射，边缘 clamp）
+function sampleBilinear(src, sw, sh, channels, fx, fy) {
+  const sx = Math.min(Math.max(fx, 0), sw - 1.001);
+  const sy = Math.min(Math.max(fy, 0), sh - 1.001);
+  const x0 = Math.floor(sx);
+  const y0 = Math.floor(sy);
+  const tx = sx - x0;
+  const ty = sy - y0;
+  const x1 = Math.min(x0 + 1, sw - 1);
+  const y1 = Math.min(y0 + 1, sh - 1);
+  const out = [];
+  for (let c = 0; c < channels; c++) {
+    const p00 = src[(y0 * sw + x0) * channels + c];
+    const p10 = src[(y0 * sw + x1) * channels + c];
+    const p01 = src[(y1 * sw + x0) * channels + c];
+    const p11 = src[(y1 * sw + x1) * channels + c];
+    out.push(
+      Math.round(p00 * (1 - tx) * (1 - ty) + p10 * tx * (1 - ty) + p01 * (1 - tx) * ty + p11 * tx * ty)
+    );
+  }
+  return out;
 }
 
 function main() {
-  const { width, height, channels, pixels } = decodePng(readFileSync(input));
-  const r = Math.round(Math.min(width, height) * cornerRatio);
-  const rgba = Buffer.alloc(width * height * 4);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      // 4x4 子像素采样圆角矩形覆盖率作为 alpha
-      let hit = 0;
-      for (let sy = 0; sy < 4; sy++) {
-        for (let sx = 0; sx < 4; sx++) {
-          if (insideRoundedRect(x + (sx + 0.5) / 4, y + (sy + 0.5) / 4, width, height, r)) hit++;
-        }
+  const src = decodePng(readFileSync(input));
+  const size = Math.min(src.width, src.height);
+  const r = Math.round(size * cornerRatio);
+  const content = Math.round(size * contentScale);
+  const offset = Math.round((size - content) / 2);
+
+  const rgba = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dst = (y * size + x) * 4;
+      const inContent = x >= offset && x < offset + content && y >= offset && y < offset + content;
+      if (inContent) {
+        // 内容区：源图中心对齐双线性采样，映射到内容框内
+        const fx = ((x - offset + 0.5) * src.width) / content - 0.5;
+        const fy = ((y - offset + 0.5) * src.height) / content - 0.5;
+        const c = sampleBilinear(src.pixels, src.width, src.height, src.channels, fx, fy);
+        rgba[dst] = c[0];
+        rgba[dst + 1] = c[1];
+        rgba[dst + 2] = c[2];
+        rgba[dst + 3] = alphaAt(x, y, size, size, r);
+      } else {
+        // 边距区：透明
+        rgba[dst + 3] = 0;
       }
-      const alpha = Math.round((hit / 16) * 255);
-      const src = (y * width + x) * channels;
-      const dst = (y * width + x) * 4;
-      rgba[dst] = pixels[src];
-      rgba[dst + 1] = pixels[src + 1];
-      rgba[dst + 2] = pixels[src + 2];
-      rgba[dst + 3] = alpha;
     }
   }
-  writeFileSync(output, encodePng(width, height, rgba));
-  // 自校验：回读生成的 PNG，打印四角与中心 alpha（角应接近 0、中心 255）
+  writeFileSync(output, encodePng(size, size, rgba));
+  // 自校验：回读生成的 PNG，打印四角/中心/内容边缘 alpha
   const back = decodePng(readFileSync(output));
   const a = (x, y) => back.pixels[(y * back.width + x) * back.channels + 3];
-  console.log(`已生成 ${output}: ${width}x${height} RGBA，圆角半径 ${r}px（${cornerRatio}）`);
+  console.log(`已生成 ${output}: ${size}x${size} RGBA，圆角半径 ${r}px（${cornerRatio}），内容 ${content}px（${contentScale}，四周留白 ${offset}px）`);
   console.log(
-    `alpha 校验: 四角 [${a(0, 0)}, ${a(width - 1, 0)}, ${a(0, height - 1)}, ${a(width - 1, height - 1)}] 中心 ${a(width >> 1, height >> 1)}`
+    `alpha 校验: 四角 [${a(0, 0)}, ${a(size - 1, 0)}, ${a(0, size - 1)}, ${a(size - 1, size - 1)}] 中心 ${a(size >> 1, size >> 1)} 内容边缘 ${a(offset, size >> 1)}`
   );
 }
 
