@@ -91,6 +91,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 - 集成终端由 `ui/components/TerminalPanel.vue`（xterm.js + FitAddon，多标签页会话：面板内容 v-show 常驻、新增/关闭标签驱动会话创建/回收）与 `desktop/src/main/terminal.ts`（node-pty 多会话管理）配合实现；终端配色（含 ANSI 16 色 `terminalAnsi`）在 `theme/tokens.ts` 定义，不在组件里写死。
 - 面板尺寸拖拽用 `ui/components/ResizeHandle.vue`（Pointer Events 遮罩式拖拽条，定位上下文是抽屉根元素、高亮细线与抽屉外缘边框重合）：`axis="y"` 调终端高度、`axis="x"` 调右侧栏宽度；范围限制写在各面板组件的 `*_MIN_*` / `*_MAX_*` 常量，尺寸状态存 `ui.ts` store（不持久化，每次启动恢复默认）。
 - 跨包引用用包名（`@dscode/shared`、`@dscode/ui`、`@dscode/ui/tokens`），TS 路径别名在根 `tsconfig.base.json` 配置；渲染进程内部还有 `@renderer` 别名指向 `packages/desktop/src/renderer/src`。
+- tsconfig 项目解析（构建与编辑器分两套，别删）：构建/typecheck 用 `packages/desktop/tsconfig.web.json`（renderer+ui+shared，vue-tsc）与 `tsconfig.node.json`（main/preload，tsc）。部分编辑器只按目录向上找 `tsconfig.json`（会误用 ES5 推断项目报 TS1343/TS2705），为此提供两个垫片：根 `tsconfig.json`（覆盖 ui/shared）与 `packages/desktop/src/renderer/tsconfig.json`（覆盖 renderer，含 vite/client 类型）。`.vue` 模块声明在 `packages/ui/src/env.d.ts`（全包共用），renderer 的 `env.d.ts` 只放 vite/client 引用与 process.env.NODE_ENV 声明。
 
 ## 主题系统（改动前必读）
 
