@@ -1,23 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { AppSettings, ProviderConfig, SettingsPatch } from '@dscode/shared';
+import type { AppSettings, SettingsPatch } from '@dscode/shared';
 import { host } from '../host';
 
 /**
  * 应用设置（工作目录 / 权限模式 / AI 供应商 / 引导状态），主进程 settings.json 持久化。
  * 纯浏览器环境（host undefined）下用内存默认值降级。
  */
-
-/** 规范化供应商列表：trim 字符串字段、去掉空模型名（保存前调用） */
-export function normalizeProviders(providers: ProviderConfig[]): ProviderConfig[] {
-  return providers.map(p => ({
-    ...p,
-    name: p.name.trim(),
-    baseUrl: p.baseUrl.trim(),
-    apiKey: p.apiKey.trim(),
-    models: p.models.map(m => m.trim()).filter(m => m.length > 0)
-  }));
-}
 
 const DEFAULTS: AppSettings = {
   workingDirectory: '',
