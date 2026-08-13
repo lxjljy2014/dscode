@@ -8,6 +8,8 @@ export interface Message {
   streaming?: boolean;
   /** agent 错误码（渲染端映射 i18n 文案） */
   errorCode?: string;
+  /** 推理模型的思维链（reasoning_content 流，仅内存展示，不持久化） */
+  reasoning?: string;
   createdAt: number;
 }
 

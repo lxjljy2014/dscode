@@ -23,7 +23,17 @@ const { t } = useI18n();
         <span class="i-lucide:sparkles text-3.5" />
       </div>
       <div class="min-w-0 flex-1 pt-1 text-sm leading-relaxed text-fg">
-        <div class="whitespace-pre-wrap">{{ message.content }}</div>
+        <!-- 思维链（推理模型）：流式期间展开，完成后可折叠 -->
+        <details v-if="message.reasoning" class="mb-2" :open="message.streaming">
+          <summary class="cursor-pointer select-none text-xs text-faint hover:text-muted">
+            <span class="i-lucide:brain mr-1 align-middle text-3.5" />
+            {{ t('agent.thinking') }}
+          </summary>
+          <div class="mt-1 whitespace-pre-wrap border-l border-line pl-2.5 text-xs leading-relaxed text-muted">
+            {{ message.reasoning }}
+          </div>
+        </details>
+        <div v-if="message.content" class="whitespace-pre-wrap">{{ message.content }}</div>
         <span v-if="message.streaming" class="ds-streaming-cursor" />
         <!-- agent 错误提示（code 映射 i18n 文案） -->
         <div v-if="message.errorCode" class="mt-2 flex items-center gap-1.5 text-xs text-warning">

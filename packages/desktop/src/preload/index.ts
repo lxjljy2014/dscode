@@ -66,9 +66,18 @@ const api = {
   agentStop: (sessionId: string): Promise<void> => ipcRenderer.invoke('agent:stop', sessionId),
   agentConfirmResponse: (toolEventId: string, approve: boolean): Promise<void> =>
     ipcRenderer.invoke('agent:confirm-response', toolEventId, approve),
-  /** 订阅 agent 文本增量 */
-  onAgentDelta: (cb: (ev: { sessionId: string; content: string }) => void): (() => void) =>
-    subscribe('agent:delta', cb, raw => hasSessionId(raw) && typeof raw['content'] === 'string'),
+  /** 订阅 agent 文本增量（kind: content=正文 / reasoning=思维链） */
+  onAgentDelta: (
+    cb: (ev: { sessionId: string; content: string; kind: 'content' | 'reasoning' }) => void
+  ): (() => void) =>
+    subscribe(
+      'agent:delta',
+      cb,
+      raw =>
+        hasSessionId(raw) &&
+        typeof raw['content'] === 'string' &&
+        (raw['kind'] === undefined || raw['kind'] === 'content' || raw['kind'] === 'reasoning')
+    ),
   /** 订阅 agent 工具事件（状态流转） */
   onAgentTool: (cb: (ev: { sessionId: string; event: import('@dscode/shared').AgentToolEvent }) => void): (() => void) =>
     subscribe('agent:tool', cb, raw => hasSessionId(raw) && typeof raw['event'] === 'object' && raw['event'] !== null),

@@ -61,7 +61,8 @@ class ApiError extends Error {
 
 /**
  * POST {baseUrl}/chat/completions（stream），解析 SSE：
- * 文本增量经 onDelta 回调，tool_calls 增量按 index 累积，结束时返回。
+ * 文本增量经 onDelta 回调、思维链增量经 onReasoning 回调（deepseek-v4-pro 等推理模型
+ * 的 reasoning_content 流），tool_calls 增量按 index 累积，结束时返回。
  */
 async function chatStream(
   baseUrl: string,
@@ -69,7 +70,8 @@ async function chatStream(
   model: string,
   messages: unknown[],
   signal: AbortSignal,
-  onDelta: (text: string) => void
+  onDelta: (text: string) => void,
+  onReasoning: (text: string) => void
 ): Promise<AccumulatedToolCall[]> {
   const url = new URL(baseUrl);
   url.pathname = url.pathname.replace(/\/+$/, '') + '/chat/completions';
@@ -108,7 +110,10 @@ async function chatStream(
       }
       const delta = (parsed as { choices?: Array<{ delta?: Record<string, unknown> }> }).choices?.[0]?.delta;
       if (!delta) continue;
-      if (typeof delta['content'] === 'string') onDelta(delta['content']);
+      if (typeof delta['content'] === 'string' && delta['content'].length > 0) onDelta(delta['content']);
+      if (typeof delta['reasoning_content'] === 'string' && delta['reasoning_content'].length > 0) {
+        onReasoning(delta['reasoning_content']);
+      }
       const calls = delta['tool_calls'];
       if (Array.isArray(calls)) {
         for (const raw of calls as Array<Record<string, unknown>>) {
@@ -153,9 +158,15 @@ async function runLoop(
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const combined = AbortSignal.any([signal, AbortSignal.timeout(ROUND_TIMEOUT_MS)]);
-      const toolCalls = await chatStream(provider.baseUrl, provider.apiKey, model, messages, combined, text => {
-        if (text) send(win, 'agent:delta', { sessionId, content: text });
-      });
+      const toolCalls = await chatStream(
+        provider.baseUrl,
+        provider.apiKey,
+        model,
+        messages,
+        combined,
+        text => send(win, 'agent:delta', { sessionId, content: text, kind: 'content' }),
+        text => send(win, 'agent:delta', { sessionId, content: text, kind: 'reasoning' })
+      );
       if (toolCalls.length === 0) {
         send(win, 'agent:done', { sessionId });
         return;

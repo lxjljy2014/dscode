@@ -114,6 +114,7 @@
     "deny": "Deny",
     "args": "Arguments",
     "result": "Result",
+    "thinking": "Thinking",
     "error": {
       "no-api-key": "No API key configured. Please set it on the settings page first.",
       "api": "API call failed. Check your API key and network, then retry.",

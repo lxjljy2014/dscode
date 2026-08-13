@@ -50,7 +50,7 @@ export interface HostApi {
   agentStop: (sessionId: string) => Promise<void>;
   agentConfirmResponse: (toolEventId: string, approve: boolean) => Promise<void>;
   /** 订阅 agent 事件（按 sessionId 分发），均返回取消订阅函数 */
-  onAgentDelta: (cb: (ev: { sessionId: string; content: string }) => void) => () => void;
+  onAgentDelta: (cb: (ev: { sessionId: string; content: string; kind: 'content' | 'reasoning' }) => void) => () => void;
   onAgentTool: (cb: (ev: { sessionId: string; event: AgentToolEvent }) => void) => () => void;
   onAgentConfirm: (cb: (ev: AgentConfirmRequest) => void) => () => void;
   onAgentDone: (cb: (ev: { sessionId: string }) => void) => () => void;
