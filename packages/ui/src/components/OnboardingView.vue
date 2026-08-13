@@ -47,17 +47,22 @@ async function skip() {
     <div class="h-12 shrink-0" :class="[isFrameless ? 'ds-drag' : '', isMac ? 'pl-[84px]' : 'pl-2']" />
 
     <div class="min-h-0 flex-1 overflow-y-auto">
-      <div class="mx-auto flex max-w-120 flex-col px-8 pb-10 pt-16">
+      <div class="mx-auto flex min-h-full max-w-120 flex-col justify-center px-8 py-10">
         <!-- Logo + 标题 -->
         <div class="mb-8 flex flex-col items-center gap-4 text-center select-none">
           <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-elevated text-primary">
             <span class="i-lucide:sparkles text-5" />
           </div>
-          <h1 class="text-2xl font-semibold">{{ t('onboarding.title') }}</h1>
+          <div>
+            <h1 class="text-2xl font-semibold">{{ t('onboarding.title') }}</h1>
+            <p class="mt-2 text-sm text-muted">{{ t('onboarding.subtitle') }}</p>
+          </div>
         </div>
 
         <VTextField
           v-model="apiKey"
+          variant="outlined"
+          rounded="lg"
           :type="showKey ? 'text' : 'password'"
           :label="t('onboarding.apiKey')"
           :placeholder="t('onboarding.apiKeyPlaceholder')"

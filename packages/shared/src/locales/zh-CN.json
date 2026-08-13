@@ -153,6 +153,7 @@
   },
   "onboarding": {
     "title": "连接 DeepSeek",
+    "subtitle": "你的 API Key 仅保存在本机",
     "deepseekApiKey": "DeepSeek API Key",
     "apiKey": "API Key",
     "apiKeyPlaceholder": "sk-…",
