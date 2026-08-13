@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '../stores/session';
+import { useSettingsStore } from '../stores/settings';
 
 const { t } = useI18n();
 const store = useSessionStore();
 const { filteredSessions, activeSessionId, keyword } = storeToRefs(store);
+const settingsStore = useSettingsStore();
 
-// 当前项目（占位，接入真实工作区后从项目状态读取）
-const projectName = 'dscode';
+/** 当前项目名：工作目录 basename（未选择时显示占位文案） */
+const projectName = computed(() => {
+  const wd = settingsStore.settings.workingDirectory;
+  if (!wd) return t('input.selectProject');
+  return wd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || wd;
+});
 // 项目区折叠状态
 const projectOpen = ref(true);
 // v-list-group 展开的分组（默认展开当前项目）
