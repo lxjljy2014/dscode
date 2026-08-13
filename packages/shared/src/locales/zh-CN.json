@@ -90,7 +90,37 @@
     "emptyChanges": "暂无变更",
     "selectFile": "选择一个文件查看内容",
     "additions": "{n} 处新增",
-    "deletions": "{n} 处删除"
+    "deletions": "{n} 处删除",
+    "newFile": "新增",
+    "deletedFile": "已删除"
+  },
+  "agent": {
+    "tool": {
+      "read_file": "读取文件",
+      "list_dir": "列出目录",
+      "search": "搜索",
+      "run_command": "执行命令",
+      "write_file": "写入文件",
+      "edit_file": "编辑文件"
+    },
+    "status": {
+      "running": "执行中",
+      "done": "已完成",
+      "error": "失败",
+      "confirming": "等待确认",
+      "denied": "已拒绝"
+    },
+    "allow": "允许",
+    "deny": "拒绝",
+    "args": "参数",
+    "result": "结果",
+    "error": {
+      "no-api-key": "未配置 API key，请到设置页填写后再试",
+      "api": "接口调用出错，请检查 API key 与网络后重试",
+      "network": "网络异常或请求超时，请稍后重试",
+      "aborted": "已停止",
+      "unknown": "发生未知错误"
+    }
   },
   "terminal": {
     "placeholder": "终端不可用（非 Electron 环境）",

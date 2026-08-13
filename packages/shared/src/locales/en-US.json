@@ -90,7 +90,37 @@
     "emptyChanges": "No changes yet",
     "selectFile": "Select a file to view its content",
     "additions": "{n} additions",
-    "deletions": "{n} deletions"
+    "deletions": "{n} deletions",
+    "newFile": "New",
+    "deletedFile": "Deleted"
+  },
+  "agent": {
+    "tool": {
+      "read_file": "Read file",
+      "list_dir": "List directory",
+      "search": "Search",
+      "run_command": "Run command",
+      "write_file": "Write file",
+      "edit_file": "Edit file"
+    },
+    "status": {
+      "running": "Running",
+      "done": "Done",
+      "error": "Failed",
+      "confirming": "Awaiting approval",
+      "denied": "Denied"
+    },
+    "allow": "Allow",
+    "deny": "Deny",
+    "args": "Arguments",
+    "result": "Result",
+    "error": {
+      "no-api-key": "No API key configured. Please set it on the settings page first.",
+      "api": "API call failed. Check your API key and network, then retry.",
+      "network": "Network error or request timeout. Please try again later.",
+      "aborted": "Stopped",
+      "unknown": "An unknown error occurred"
+    }
   },
   "terminal": {
     "placeholder": "Terminal unavailable (non-Electron environment)",
