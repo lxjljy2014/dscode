@@ -120,6 +120,13 @@ html {
   -webkit-app-region: no-drag;
 }
 
+/* 弹层（菜单/对话框）盖在标题栏拖拽区上方时，其区域同样不能拖动窗口——
+   Electron 拖拽区按 app-region 矩形生效，浮层盖上去不会自动取消底层拖拽 */
+.v-overlay,
+.v-overlay__content {
+  -webkit-app-region: no-drag;
+}
+
 /* ---- Markdown 排版（assistant 正文 .ds-md） ----
    颜色全部引用 --v-theme-* 变量（tokens.ts 唯一事实源），不写死色值；
    等宽字体栈与 tokens.fontFamilyMono 保持一致。 */
