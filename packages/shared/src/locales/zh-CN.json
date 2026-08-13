@@ -158,6 +158,7 @@
     "apiKey": "API Key",
     "apiKeyPlaceholder": "sk-…",
     "start": "验证并开始使用",
+    "later": "稍后配置",
     "howTo": "如何获取 API Key？",
     "localOnly": "Key 仅保存在本地，不会上传",
     "verifyInvalid": "API Key 无效，请检查后重试",

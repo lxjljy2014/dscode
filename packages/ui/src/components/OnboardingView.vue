@@ -66,6 +66,12 @@ async function finish() {
     verifying.value = false;
   }
 }
+
+async function skip() {
+  // 稍后配置：只置引导完成，不保存半填写的 key
+  await settingsStore.save({ onboardingDone: true });
+  await router.replace('/');
+}
 </script>
 
 <template>
@@ -112,6 +118,11 @@ async function finish() {
           @click="finish"
         >
           {{ t('onboarding.start') }}
+        </VBtn>
+
+        <!-- 稍后配置 -->
+        <VBtn variant="text" class="mt-2 self-center text-muted" :disabled="verifying" @click="skip">
+          {{ t('onboarding.later') }}
         </VBtn>
 
         <!-- 页脚：帮助链接 + 本地存储说明 -->

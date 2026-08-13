@@ -6,7 +6,7 @@
 
 DSCode 目前是纯 mock 骨架，尚无任何 API key 相关代码。本次新增**首次启动引导页**，引导用户配置 DeepSeek API key：
 
-- 极简交互：Logo + 标题「欢迎使用 DSCode」+ 一个 API Key 输入框（outlined 圆角、无 label、eye 切换）+ 一个全宽按钮「验证并开始使用」；页脚两行：如何获取 API Key（外链）与「Key 仅保存在本地，不会上传」。无跳过按钮。
+- 极简交互：Logo + 标题「欢迎使用 DSCode」+ 一个 API Key 输入框（outlined 圆角、无 label、eye 切换）+ 全宽按钮「验证并开始使用」+ 次要按钮「稍后配置」（只置 onboardingDone，不保存半填写 key）；页脚两行：如何获取 API Key（外链）与「Key 仅保存在本地，不会上传」。
 - **真实校验**：点击按钮时经主进程 `GET https://api.deepseek.com/models`（Bearer）校验 key——401/403 视为无效，其余失败视为网络异常；校验通过才保存并进入工作区。
 - 时机：未完成引导时启动进入引导页；完成后不再出现；设置页「引导」版块可随时修改 key。
 - 存储：沿用 `settings.json` 明文持久化。
@@ -54,7 +54,7 @@ UI 只暴露单个 DeepSeek key 输入；`providers` 保持数组结构，为后
 
 - `stores/settings.ts`：DEFAULTS 同步新字段；`load()` in-flight 去重；纯浏览器环境置 `onboardingDone=true`（跳过引导）。
 - `router.ts`：`/onboarding` 路由 + settings 子路由 `:section(onboarding)`（自定义参数正则，标题/高亮无需特判）+ `beforeEach` 守卫（未完成引导一律重定向 onboarding）。
-- `OnboardingView.vue`：居中列 `max-w-120`（`.ds-drag` 拖拽区）；VTextField 用普通 div 包裹防 flex 拉伸；按钮 `:loading` 校验中、空 key 禁用；错误经 VTextField `error-messages` 展示；「如何获取 API Key？」走 `<a target="_blank">` → `setWindowOpenHandler` → `shell.openExternal` 既有外链链路。
+- `OnboardingView.vue`：居中列 `max-w-120`（`.ds-drag` 拖拽区）；VTextField 用普通 div 包裹防 flex 拉伸；按钮 `:loading` 校验中、空 key 禁用；错误经 VTextField `error-messages` 展示，编辑 key 时清除旧错误；「稍后配置」只置 onboardingDone；「如何获取 API Key？」走 `<a target="_blank">` → `setWindowOpenHandler` → `shell.openExternal` 既有外链链路。
 - `SettingsProviders.vue`：设置页「引导」版块（单 key 表单 + 保存，无校验）。
 
 ## i18n / 验证

@@ -158,6 +158,7 @@
     "apiKey": "API Key",
     "apiKeyPlaceholder": "sk-…",
     "start": "Verify & get started",
+    "later": "Configure later",
     "howTo": "How to get an API key?",
     "localOnly": "Your key is stored locally and never uploaded",
     "verifyInvalid": "Invalid API key. Check it and try again",
