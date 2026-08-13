@@ -38,7 +38,7 @@ const groups = computed(() => [
     items: [
       { key: 'index', icon: 'i-lucide:shield-check' },
       { key: 'usage', icon: 'i-lucide:chart-column' },
-      { key: 'onboarding', icon: 'i-lucide:rocket', dashed: true }
+      { key: 'onboarding', icon: 'i-lucide:rocket' }
     ]
   }
 ]);
@@ -74,7 +74,6 @@ const groups = computed(() => [
             :key="item.key"
             :prepend-icon="item.icon"
             :active="activeSection === item.key"
-            :class="item.dashed ? 'border border-dashed border-line-strong' : ''"
             class="mb-0.5"
             @click="router.push(`/settings/${item.key}`)"
           >

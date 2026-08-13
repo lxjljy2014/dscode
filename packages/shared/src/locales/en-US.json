@@ -150,5 +150,22 @@
       "proxyExceptionsDesc": "Requests to matching hosts connect directly, bypassing the HTTP proxy. Separate multiple rules with commas. Restart required after changes.",
       "proxyExceptionsPlaceholder": "e.g. localhost, 127.0.0.1, *.internal"
     }
+  },
+  "onboarding": {
+    "title": "Connect your AI providers",
+    "subtitle": "Enter an API key to get started. You can add multiple providers; DeepSeek is the primary one.",
+    "securityNote": "API keys are stored only in local settings.json and used to connect to AI services.",
+    "providers": "Providers",
+    "providerName": "Provider name",
+    "providerNamePlaceholder": "e.g. DeepSeek",
+    "baseUrl": "API base URL",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "sk-…",
+    "models": "Models",
+    "modelPlaceholder": "Model name, press Enter to add",
+    "addProvider": "Add provider",
+    "deleteProvider": "Delete provider",
+    "start": "Get started",
+    "skip": "Later"
   }
 }
