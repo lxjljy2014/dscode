@@ -14,6 +14,10 @@ import { host, isFrameless, isMac } from '../host';
 
 const DEEPSEEK_KEYS_URL = 'https://platform.deepseek.com/api_keys';
 
+// 应用图标：renderer/public/icon.png（与 resources/icon.png 同图）。
+// 用绑定表达式而非静态 src，避免 vue transformAssetUrls 把它当组件相对路径的静态资源解析。
+const logoUrl = './icon.png';
+
 const { t } = useI18n();
 const router = useRouter();
 const settingsStore = useSettingsStore();
@@ -83,9 +87,7 @@ async function skip() {
       <div class="mx-auto flex min-h-full max-w-120 flex-col justify-center px-8 py-10">
         <!-- Logo + 标题 -->
         <div class="mb-8 flex flex-col items-center gap-4 text-center select-none">
-          <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-elevated text-primary">
-            <span class="i-lucide:key-round text-5" />
-          </div>
+          <img :src="logoUrl" alt="DSCode" class="h-14 w-14 rounded-lg" />
           <div>
             <h1 class="text-2xl font-semibold">{{ t('onboarding.title') }}</h1>
             <p class="mt-2 text-sm text-muted">{{ t('onboarding.subtitle') }}</p>

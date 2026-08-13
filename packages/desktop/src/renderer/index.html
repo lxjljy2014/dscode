@@ -16,21 +16,14 @@
         --splash-bg: #ffffff;
         --splash-ambient: rgba(23, 23, 23, 0.03);
         --splash-halo: rgba(23, 23, 23, 0.06);
-        --splash-mark-bg: #171717;
-        --splash-mark-fg: #ffffff;
-        --splash-mark-border: rgba(23, 23, 23, 0);
         --splash-glow: rgba(23, 23, 23, 0.1);
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
           --splash-bg: #0d0d0d;
-          /* 暗色：白色加透明——徽标半透明白玻璃质感 */
           --splash-ambient: rgba(236, 236, 236, 0.04);
           --splash-halo: rgba(236, 236, 236, 0.08);
-          --splash-mark-bg: rgba(236, 236, 236, 0.14);
-          --splash-mark-fg: rgba(236, 236, 236, 0.92);
-          --splash-mark-border: rgba(236, 236, 236, 0.18);
           --splash-glow: rgba(236, 236, 236, 0.16);
         }
       }
@@ -39,9 +32,6 @@
         --splash-bg: #ffffff;
         --splash-ambient: rgba(23, 23, 23, 0.03);
         --splash-halo: rgba(23, 23, 23, 0.06);
-        --splash-mark-bg: #171717;
-        --splash-mark-fg: #ffffff;
-        --splash-mark-border: rgba(23, 23, 23, 0);
         --splash-glow: rgba(23, 23, 23, 0.1);
       }
 
@@ -49,9 +39,6 @@
         --splash-bg: #0d0d0d;
         --splash-ambient: rgba(236, 236, 236, 0.04);
         --splash-halo: rgba(236, 236, 236, 0.08);
-        --splash-mark-bg: rgba(236, 236, 236, 0.14);
-        --splash-mark-fg: rgba(236, 236, 236, 0.92);
-        --splash-mark-border: rgba(236, 236, 236, 0.18);
         --splash-glow: rgba(236, 236, 236, 0.16);
       }
 
@@ -100,19 +87,9 @@
       }
 
       .app-splash__mark {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-sizing: border-box;
         width: 64px;
         height: 64px;
-        border: 1px solid var(--splash-mark-border);
         border-radius: 18px;
-        background: var(--splash-mark-bg);
-        color: var(--splash-mark-fg);
-        font-size: 26px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
         /* 呼吸动效：幅度收小、周期放慢，只保留「活物」的轻微起伏 */
         animation: app-splash-breathe 5s ease-in-out infinite;
       }
@@ -164,7 +141,7 @@
       <div class="app-splash">
         <div class="app-splash__hero">
           <div class="app-splash__halo"></div>
-          <div class="app-splash__mark">DS</div>
+          <img class="app-splash__mark" src="./icon.png" alt="DSCode" />
         </div>
       </div>
     </div>

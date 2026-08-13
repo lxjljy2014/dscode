@@ -9,6 +9,9 @@ const isWindows = process.platform === 'win32';
 // 标题栏高 48px，与渲染端 header 对齐
 const TITLEBAR_HEIGHT = 48;
 
+// 应用图标：resources/ 与 out/ 同级（dev/构建产物布局一致；打包配置未引入前暂按此路径兜底）
+const APP_ICON = join(__dirname, '../../resources/icon.png');
+
 // 允许交给系统浏览器打开的协议白名单
 const ALLOWED_OPEN_PROTOCOLS = ['https:', 'http:'];
 
@@ -32,6 +35,8 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#0d0d0d',
     autoHideMenuBar: true,
+    // 窗口图标（Windows/Linux 任务栏与标题栏；macOS 的 Dock 图标见 whenReady）
+    icon: APP_ICON,
     // 隐藏系统标题栏，使用 Electron 原生悬浮控件：
     // macOS 红绿灯 / Windows 系统绘制的最小化、最大化、关闭按钮
     titleBarStyle: 'hidden',
@@ -81,6 +86,9 @@ function createWindow(): void {
 app.whenReady().then(() => {
   // 业务 IPC（settings / 最近项目 / 目录选择 / git）
   registerIpcHandlers();
+
+  // macOS Dock 图标
+  if (isMac) app.dock?.setIcon(APP_ICON);
 
   // 渲染端主题切换后同步悬浮按钮符号色（仅 Windows 生效；背景色固定透明）
   ipcMain.on('win:set-titlebar-overlay', (e, options: unknown) => {
