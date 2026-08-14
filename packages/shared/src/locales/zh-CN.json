@@ -38,8 +38,11 @@
     "stats": {
       "time": "时间",
       "duration": "用时",
-      "firstToken": "首token",
-      "tokensPerSec": "token/s"
+      "firstToken": "首 token",
+      "tokensPerSec": "tok/s",
+      "minute": "分",
+      "second": "秒",
+      "millisecond": "毫秒"
     },
     "greeting": {
       "morning": "早上好，有什么可以帮你？",

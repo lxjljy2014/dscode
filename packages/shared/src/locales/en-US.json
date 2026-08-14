@@ -39,7 +39,10 @@
       "time": "Time",
       "duration": "Duration",
       "firstToken": "First token",
-      "tokensPerSec": "tok/s"
+      "tokensPerSec": "tok/s",
+      "minute": "m",
+      "second": "s",
+      "millisecond": "ms"
     },
     "greeting": {
       "morning": "Good morning. How can I help?",

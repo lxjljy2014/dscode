@@ -84,29 +84,29 @@ function fork(): void {
   if (props.session) sessionStore.forkSession(props.session, props.message.id);
 }
 
-// ---- 运行统计格式化（时间 / 用时 / 首token / token 速率） ----
+// ---- 运行统计格式化（时间 / 用时 / 首 token / token 速率） ----
 
-/** 毫秒时间戳 → HH:mm:ss（本地时区） */
-function formatTime(ts: number): string {
+/** 毫秒时间戳 → HH:mm（本地时区，如 01:44） */
+function formatClock(ts: number): string {
   const d = new Date(ts);
   const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/** 毫秒 → 人类可读用时（<1s 显示 ms，<1m 显示秒，否则 m:ss） */
+/** 毫秒 → 人类可读时长（<1s 用毫秒，<1m 用秒，否则 13分05秒 / 13m05s） */
 function formatDuration(ms: number): string {
   const v = Math.max(0, ms);
-  if (v < 1000) return `${v}ms`;
-  if (v < 60000) return `${(v / 1000).toFixed(1)}s`;
-  const m = Math.floor(v / 60000);
-  const s = Math.round((v % 60000) / 1000);
-  return `${m}m${String(s).padStart(2, '0')}s`;
+  const unit = (m: number, s: number) =>
+    `${m}${t('chat.stats.minute')}${String(s).padStart(2, '0')}${t('chat.stats.second')}`;
+  if (v < 1000) return `${Math.round(v)}${t('chat.stats.millisecond')}`;
+  if (v < 60000) return `${(v / 1000).toFixed(1)}${t('chat.stats.second')}`;
+  return unit(Math.floor(v / 60000), Math.round((v % 60000) / 1000));
 }
 
-/** token/s（无 token 数据或时长为 0 时显示 —） */
+/** token 速率：整数 tok/s（无 token 数据或时长为 0 时显示 —） */
 function formatTokensPerSec(tokens: number | undefined, durationMs: number): string {
   if (!tokens || durationMs <= 0) return '—';
-  return `${(tokens / (durationMs / 1000)).toFixed(1)}/s`;
+  return `${Math.round(tokens / (durationMs / 1000))} ${t('chat.stats.tokensPerSec')}`;
 }
 </script>
 
@@ -166,42 +166,9 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
           {{ message.errorDetail }}
         </div>
 
-        <!-- 回复结束后底部操作行：复制 / 点赞 / 踩 / fork；悬停整行显示运行统计 -->
-        <div v-if="!message.streaming" class="group/stats relative mt-1.5 flex items-center">
-          <!-- 悬停统计浮层（纯 CSS group-hover，不产生 VOverlay，不影响拖拽区） -->
-          <div
-            v-if="message.stats"
-            class="pointer-events-none invisible absolute bottom-full left-0 z-10 mb-1.5 flex items-center gap-3 whitespace-nowrap rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-muted opacity-0 shadow-lg transition-opacity duration-150 group-hover/stats:visible group-hover/stats:opacity-100"
-          >
-            <span class="flex items-center gap-1">
-              <span class="i-lucide:clock text-3" />
-              {{ t('chat.stats.time') }}
-              <span class="tabular-nums text-fg">{{ formatTime(message.stats.endAt) }}</span>
-            </span>
-            <span class="flex items-center gap-1">
-              <span class="i-lucide:timer text-3" />
-              {{ t('chat.stats.duration') }}
-              <span class="tabular-nums text-fg">
-                {{ formatDuration(message.stats.endAt - message.stats.startAt) }}
-              </span>
-            </span>
-            <span class="flex items-center gap-1">
-              <span class="i-lucide:zap text-3" />
-              {{ t('chat.stats.firstToken') }}
-              <span class="tabular-nums text-fg">
-                {{ message.stats.firstTokenMs !== undefined ? formatDuration(message.stats.firstTokenMs) : '—' }}
-              </span>
-            </span>
-            <span class="flex items-center gap-1">
-              <span class="i-lucide:gauge text-3" />
-              {{ t('chat.stats.tokensPerSec') }}
-              <span class="tabular-nums text-fg">
-                {{ formatTokensPerSec(message.stats.completionTokens, message.stats.endAt - message.stats.startAt) }}
-              </span>
-            </span>
-          </div>
-
-          <div class="flex items-center gap-0.5 rounded-lg px-1 py-0.5 text-muted">
+        <!-- 回复结束后底部操作行：复制 / 点赞 / 踩 / fork + 内联运行统计（时间 · 用时 · 首 token · token 速率） -->
+        <div v-if="!message.streaming" class="mt-1.5 flex flex-wrap items-center gap-x-1 text-xs text-muted">
+          <div class="flex items-center gap-0.5 rounded-lg px-1 py-0.5">
             <VTooltip :text="copied ? t('chat.copied') : t('chat.copy')" location="top">
               <template #activator="{ props: tip }">
                 <VIconBtn
@@ -255,6 +222,28 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
               </template>
             </VTooltip>
           </div>
+
+          <!-- 内联运行统计：01:44 · 用时 13分05秒 · 首 token 1.1秒 · 139 tok/s -->
+          <template v-if="message.stats">
+            <span class="mx-0.5 select-none text-faint">·</span>
+            <span class="tabular-nums">{{ formatClock(message.stats.endAt) }}</span>
+            <span class="mx-0.5 select-none text-faint">·</span>
+            <span>
+              {{ t('chat.stats.duration') }}
+              <span class="tabular-nums">{{ formatDuration(message.stats.endAt - message.stats.startAt) }}</span>
+            </span>
+            <span class="mx-0.5 select-none text-faint">·</span>
+            <span>
+              {{ t('chat.stats.firstToken') }}
+              <span class="tabular-nums">
+                {{ message.stats.firstTokenMs !== undefined ? formatDuration(message.stats.firstTokenMs) : '—' }}
+              </span>
+            </span>
+            <span class="mx-0.5 select-none text-faint">·</span>
+            <span class="tabular-nums">
+              {{ formatTokensPerSec(message.stats.completionTokens, message.stats.endAt - message.stats.startAt) }}
+            </span>
+          </template>
         </div>
       </div>
     </div>
