@@ -8,13 +8,24 @@ export interface Message {
   streaming?: boolean;
   /** agent 错误码（渲染端映射 i18n 文案） */
   errorCode?: string;
+  /** 错误详情（主进程附带的具体原因，仅内存展示，不持久化） */
+  errorDetail?: string;
   /** 推理模型的思维链（reasoning_content 流，仅内存展示，不持久化） */
   reasoning?: string;
+  /** assistant 输出的有序步骤（正文与工具交错；随消息落库，恢复历史消息时按此重建） */
+  steps?: AssistantStep[];
   createdAt: number;
 }
 
 /** agent 可调用的工具名 */
-export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file';
+export type AgentToolName =
+  | 'read_file'
+  | 'list_dir'
+  | 'search'
+  | 'run_command'
+  | 'write_file'
+  | 'edit_file'
+  | 'browse';
 
 /** 工具事件（聊天流中与消息交错展示） */
 export interface AgentToolEvent {
@@ -29,6 +40,12 @@ export interface AgentToolEvent {
   createdAt: number;
 }
 
+/** assistant 输出的有序步骤：正文片段与工具调用交错（随消息 JSON 落库） */
+export type AssistantStep =
+  | { kind: 'reasoning'; content: string }
+  | { kind: 'text'; content: string }
+  | { kind: 'tool'; event: AgentToolEvent };
+
 /** agent:start 传入的消息历史（渲染端 → 主进程） */
 export interface ChatMessagePayload {
   role: 'user' | 'assistant';
@@ -38,7 +55,7 @@ export interface ChatMessagePayload {
 /** agent:error 事件负载 */
 export interface AgentErrorEvent {
   sessionId: string;
-  code: 'no-api-key' | 'api' | 'network' | 'aborted' | 'unknown';
+  code: 'no-api-key' | 'api' | 'network' | 'aborted' | 'running' | 'unknown';
   detail?: string;
 }
 
@@ -88,7 +105,10 @@ export interface FileNode {
   content?: string;
 }
 
+export * from './code-index';
 export * from './git';
+export * from './mcp';
 export * from './projects';
 export * from './settings';
 export * from './terminal';
+export * from './usage';

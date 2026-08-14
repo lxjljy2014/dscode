@@ -1,18 +1,40 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
-import type { Message, Session, SettingsPatch } from '@dscode/shared';
-import { loadSettings, saveSettings } from './config';
-import { checkout, createBranch, graph, listBranches } from './git';
-import { initProjects, listProjectsWithHome, touchProject } from './projects';
-import { verifyProvider } from './provider';
-import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './terminal';
-import { resolveConfirm, startAgent, stopAgent } from './agent';
-import { readWorkspaceFile, scanTree } from './workspace';
-import { initSessions, listSessions, backfillSessions, upsertMessage, upsertSession } from './sessions';
+import type { SettingsPatch } from '@dscode/shared';
+import {
+  backfillSessions,
+  buildIndex,
+  checkout,
+  createBranch,
+  fetchWebPage,
+  getPlugins,
+  graph,
+  indexStats,
+  initIndex,
+  initProjects,
+  initSessions,
+  initUsage,
+  listBranches,
+  listMcpTools,
+  listProjectsWithHome,
+  listSessions,
+  listUsage,
+  readWorkspaceFile,
+  scanTree,
+  searchIndex,
+  touchProject,
+  upsertMessage,
+  upsertSession,
+  verifyProvider
+} from '@dscode/core';
+import { resolveConfirm, startAgent, stopAgent } from './agent/agent';
+import { loadAppSettings, saveAppSettings } from './settings';
+import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './shell/terminal';
+import { isMessage, isSession, isString, parseTerminalSize } from './validators';
 
 /**
  * 业务 IPC 注册（ipcMain.handle / ipcRenderer.invoke；终端输入/尺寸为 ipcMain.on 单向通道）。
  * 每个 handler 校验 sender 属于主窗口、参数类型合法后再执行；
- * 结果统一为 { ok } 判别联合或 null（取消选择）。
+ * 参数 schema 统一收窄见 ./validators.ts，结果统一为 { ok } 判别联合或 null（取消选择）。
  */
 
 function withMainWindow<E extends Electron.IpcMainEvent | Electron.IpcMainInvokeEvent>(
@@ -25,40 +47,33 @@ function withMainWindow<E extends Electron.IpcMainEvent | Electron.IpcMainInvoke
   };
 }
 
-function isString(v: unknown): v is string {
-  return typeof v === 'string';
-}
-
-/** 终端尺寸校验并收窄：cols 2..500 / rows 1..200 的整数 */
-function parseTerminalSize(cols: unknown, rows: unknown): [number, number] | null {
-  if (typeof cols !== 'number' || typeof rows !== 'number') return null;
-  if (!Number.isInteger(cols) || !Number.isInteger(rows)) return null;
-  if (cols < 2 || cols > 500 || rows < 1 || rows > 200) return null;
-  return [cols, rows];
-}
-
 export function registerIpcHandlers(): void {
   const settingsFile = app.getPath('userData') + '/settings.json';
   const projectsFile = app.getPath('userData') + '/projects.db';
   const sessionsFile = app.getPath('userData') + '/sessions.db';
+  const usageFile = app.getPath('userData') + '/usage.db';
+  const pluginsDir = app.getPath('userData') + '/plugins';
+  const indexFile = app.getPath('userData') + '/index.db';
   const homeDir = app.getPath('home');
   initProjects(projectsFile);
   initSessions(sessionsFile);
+  initUsage(usageFile);
+  initIndex(indexFile);
   // 旧数据迁移：无工作空间归属的会话回填到当前工作目录
-  backfillSessions(sessionsFile, loadSettings(settingsFile, homeDir).workingDirectory);
+  backfillSessions(sessionsFile, loadAppSettings(settingsFile, homeDir).workingDirectory);
 
   // ---- settings ----
   ipcMain.handle(
     'settings:get',
-    withMainWindow(() => loadSettings(settingsFile, homeDir))
+    withMainWindow(() => loadAppSettings(settingsFile, homeDir))
   );
 
   ipcMain.handle(
     'settings:set',
     withMainWindow((_win, patch: unknown) => {
-      if (typeof patch !== 'object' || patch === null) return loadSettings(settingsFile, homeDir);
+      if (typeof patch !== 'object' || patch === null) return loadAppSettings(settingsFile, homeDir);
       const record = patch as Record<string, unknown>;
-      const next = saveSettings(settingsFile, homeDir, record as SettingsPatch);
+      const next = saveAppSettings(settingsFile, homeDir, record as SettingsPatch);
       // 工作目录变化且不是家目录 → 记入最近项目
       if (typeof record['workingDirectory'] === 'string' && record['workingDirectory'] !== homeDir) {
         touchProject(projectsFile, record['workingDirectory'] as string);
@@ -86,13 +101,70 @@ export function registerIpcHandlers(): void {
   );
 
   // ---- 供应商校验 ----
-  ipcMain.handle('provider:verify', withMainWindow((_win, baseUrl: unknown, apiKey: unknown) => verifyProvider(baseUrl, apiKey)));
+  ipcMain.handle(
+    'provider:verify',
+    withMainWindow((_win, baseUrl: unknown, apiKey: unknown) => verifyProvider(baseUrl, apiKey))
+  );
+
+  // ---- 使用统计 ----
+  ipcMain.handle(
+    'usage:list',
+    withMainWindow(() => listUsage(usageFile))
+  );
+
+  // ---- MCP ----
+  ipcMain.handle(
+    'mcp:list-tools',
+    withMainWindow(async (_win, command: unknown, args: unknown) => {
+      if (!isString(command) || !Array.isArray(args) || !args.every(isString)) {
+        return { ok: false as const, error: 'invalid args' };
+      }
+      try {
+        const tools = await listMcpTools({ command, args: args as string[] });
+        return { ok: true as const, tools };
+      } catch (e) {
+        return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+      }
+    })
+  );
+
+  // ---- 插件 ----
+  ipcMain.handle(
+    'plugins:list',
+    withMainWindow(() => getPlugins(pluginsDir))
+  );
+
+  // ---- 代码索引 ----
+  ipcMain.handle('index:stats', withMainWindow(() => indexStats(indexFile)));
+  ipcMain.handle(
+    'index:build',
+    withMainWindow(() => buildIndex(loadAppSettings(settingsFile, homeDir).workingDirectory, indexFile))
+  );
+  ipcMain.handle(
+    'index:search',
+    withMainWindow((_win, query: unknown) => (isString(query) ? searchIndex(indexFile, query) : []))
+  );
+
+  // ---- 浏览器（测试抓取） ----
+  ipcMain.handle(
+    'browser:fetch',
+    withMainWindow(async (_win, url: unknown) => {
+      if (!isString(url)) return { ok: false as const, error: 'invalid url' };
+      try {
+        return { ok: true as const, content: await fetchWebPage(url) };
+      } catch (e) {
+        return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+      }
+    })
+  );
 
   // ---- agent ----
   ipcMain.handle(
     'agent:start',
-    withMainWindow((win, sessionId: unknown, model: unknown, messages: unknown) =>
-      isString(sessionId) ? startAgent(win, sessionId, model, messages) : { ok: false, error: 'invalid sessionId' }
+    withMainWindow((win, sessionId: unknown, model: unknown, messages: unknown, subagentId: unknown) =>
+      isString(sessionId)
+        ? startAgent(win, sessionId, model, messages, subagentId)
+        : { ok: false, error: 'invalid-args' as const }
     )
   );
   ipcMain.handle(
@@ -106,41 +178,37 @@ export function registerIpcHandlers(): void {
     withMainWindow((_win, toolEventId: unknown, approve: unknown) => resolveConfirm(toolEventId, approve))
   );
 
-  // ---- 工作区 ----
+  // ---- 工作区（异步扫描/读取，避免阻塞主进程） ----
   ipcMain.handle(
     'workspace:tree',
-    withMainWindow(() => scanTree(loadSettings(settingsFile, homeDir).workingDirectory))
+    withMainWindow(async () => scanTree(loadAppSettings(settingsFile, homeDir).workingDirectory))
   );
   ipcMain.handle(
     'workspace:read-file',
-    withMainWindow((_win, relPath: unknown) => {
-      const cwd = loadSettings(settingsFile, homeDir).workingDirectory;
+    withMainWindow(async (_win, relPath: unknown) => {
+      const cwd = loadAppSettings(settingsFile, homeDir).workingDirectory;
       return isString(relPath) ? readWorkspaceFile(cwd, relPath) : { ok: false, error: 'invalid path' };
     })
   );
 
   // ---- 会话持久化 ----
-  ipcMain.handle('sessions:list', withMainWindow(() => listSessions(sessionsFile)));
+  ipcMain.handle(
+    'sessions:list',
+    withMainWindow(() => listSessions(sessionsFile))
+  );
   ipcMain.handle(
     'sessions:create',
     withMainWindow((_win, session: unknown) => {
-      if (typeof session !== 'object' || session === null) return { ok: false, error: 'invalid session' };
-      const s = session as Session;
-      if (typeof s.id !== 'string' || typeof s.title !== 'string') return { ok: false, error: 'invalid session' };
-      // workingDirectory 缺省按空字符串处理（正常来自渲染端 createSession）
-      upsertSession(sessionsFile, { ...s, workingDirectory: typeof s.workingDirectory === 'string' ? s.workingDirectory : '' });
+      if (!isSession(session)) return { ok: false, error: 'invalid session' };
+      upsertSession(sessionsFile, session);
       return { ok: true };
     })
   );
   ipcMain.handle(
     'sessions:append',
     withMainWindow((_win, sessionId: unknown, message: unknown) => {
-      if (!isString(sessionId) || typeof message !== 'object' || message === null) {
-        return { ok: false, error: 'invalid args' };
-      }
-      const m = message as Message;
-      if (typeof m.id !== 'string' || typeof m.content !== 'string') return { ok: false, error: 'invalid message' };
-      upsertMessage(sessionsFile, sessionId, m);
+      if (!isString(sessionId) || !isMessage(message)) return { ok: false, error: 'invalid args' };
+      upsertMessage(sessionsFile, sessionId, message);
       return { ok: true };
     })
   );

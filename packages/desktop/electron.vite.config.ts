@@ -7,8 +7,10 @@ import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify';
 export default defineConfig({
   main: {
     build: {
-      // electron-vite 5：externalizeDepsPlugin 已弃用，改用 build.externalizeDeps 配置
-      externalizeDeps: true
+      // electron-vite 5：externalizeDepsPlugin 已弃用，改用 build.externalizeDeps 配置。
+      // exclude 掉 workspace 包（core/shared）打进产物：若外部化，Node 运行时直接加载其
+      // TS 源码，目录 re-export 会报 ERR_UNSUPPORTED_DIR_IMPORT，交给 rollup 打包规避。
+      externalizeDeps: { exclude: ['@dscode/core', '@dscode/shared'] }
     }
   },
   preload: {

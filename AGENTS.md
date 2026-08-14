@@ -4,39 +4,52 @@
 
 ## 项目概览
 
-**DSCode** 是一个 AI 编程助手的桌面端应用（类似 coding agent 的 GUI 客户端），基于 **Electron + Vue 3 + TypeScript**。已接入真实 agent 能力：主进程 agent 运行时（DeepSeek/OpenAI 兼容 API 流式对话 + 工具循环），聊天/文件树/diff 均为真实数据（`packages/shared/src/mock` 仅作为纯浏览器降级与历史 mock 数据保留）。
+**DSCode** 是一个 AI 编程助手的桌面端应用（类似 coding agent 的 GUI 客户端），基于 **Electron + Vue 3 + TypeScript**。已接入真实 agent 能力：主进程 agent 运行时（DeepSeek/OpenAI 兼容 API 流式对话 + 工具循环），聊天/文件树/diff 均为真实数据。前端层（`@dscode/ui`）通过 `bridge/host.ts` 的 HostApi 桥接与宿主解耦，为将来 web 端 / TUI 端复用预留（应用仅在宿主内运行，无纯浏览器降级）。
 
 主要界面：
 
 - 工作区（`/` 路由）：左侧会话栏 + 顶栏 + 聊天区 + 右侧 diff/文件面板 + 底部终端面板
-- 设置页（`/settings/:section`）：设置导航 + 各设置版块（仅 general 已实现，其余为占位页）
+- 设置页（`/settings/:section`）：设置导航 + 全部版块（常规/外观/模型/浏览器/记忆/技能/子智能体/MCP/命令/钩子/索引库/使用统计/引导，均为真实功能与持久化）
 
 ## 仓库结构（pnpm monorepo）
 
 ```
 packages/
-├── desktop/          # @dscode/desktop —— Electron 应用壳（主进程 / preload / 渲染入口）
+├── desktop/          # @dscode/desktop —— Electron 客户端壳（主进程 / preload / 渲染入口组装）
 │   ├── electron.vite.config.ts
 │   ├── uno.config.ts
 │   └── src/
-│       ├── main/     # Electron 主进程（index.ts 窗口/IPC；agent.ts agent 循环（SSE 流式+工具调用）；agent-tools.ts 工具集（读/列/搜/命令/写/编辑）；agent-gate.ts 权限门控；workspace.ts 文件树/读文件；diff.ts 快照行级 diff；sessions.ts 会话 SQLite；git.ts git CLI 封装；projects.ts 最近项目 SQLite；config.ts settings 持久化；terminal.ts 集成终端 node-pty 会话；ipc.ts 业务 handler）
-│       ├── preload/  # contextBridge 暴露 window.dscode
-│       └── renderer/ # Vue 应用入口（App.vue / router.ts / main.ts）
-├── shared/           # @dscode/shared —— 纯 TS：类型定义、mock 数据（仅浏览器降级用）、i18n 语言包
+│       ├── main/     # Electron 主进程（index.ts 窗口；ipc.ts 业务 handler 枢纽 + agent EventSink 的 IPC 实现；agent/ agent 的 Electron 薄壳；shell/terminal.ts 集成终端 node-pty 会话）
+│       ├── preload/  # contextBridge 暴露 window.dscode（实现 HostApi 桥接）
+│       └── renderer/ # Vue 应用组装入口（App.vue / router.ts / main.ts / boot.ts）
+├── core/             # @dscode/core —— 纯 TS 核心逻辑（无 Electron/DOM 依赖，Node 内建可用；desktop 与将来 TUI 直接复用）
+│   └── src/
+│       ├── agent/    # 运行时编排：runtime.ts（SSE 流式+工具循环+30 轮上限）、types.ts（AgentEventSink 事件抽象，宿主各自实现）
+│       ├── tools/    # 工具注册表：Tool 接口（描述+实现一体）+ 每工具一文件 ×6，注册表 Record<AgentToolName, Tool> 编译期保证完整
+│       ├── gate/     # 权限门控（只读放行/四权限模式/确认 120s 超时拒绝）
+│       ├── adapters/ # 模型适配：ModelAdapter 接口（请求构造 + SSE 增量归一化）+ openai-compatible/deepseek + 通用 streamChat
+│       ├── workspace/# 文件树扫描/读文件、paths.ts（SKIP_DIRS+resolveSafePath）、diff.ts（快照 + LCS 行级 diff）
+│       ├── git/      # git CLI 封装（execFile 参数数组）
+│       └── persist/  # 会话/最近项目（node:sqlite）、settings（JSON 归一化）、供应商校验
+├── shared/           # @dscode/shared —— 纯契约层（浏览器安全）：类型定义 + i18n 语言包 + DEEPSEEK_PRESET 预置
 │   └── src/
 │       ├── types/    # Session / Message / DiffFile / FileNode / AgentToolEvent 等类型
-│       ├── mock/     # mockSessions / mockDiffFiles / mockFileTree（纯浏览器环境降级）
 │       └── locales/  # zh-CN.json / en-US.json
-└── ui/               # @dscode/ui —— 全部 UI：组件、Pinia stores、插件、主题
+└── ui/               # @dscode/ui —— 客户端无关的前端层（将来 web 端整体复用）
     └── src/
-        ├── components/  # 20 个 Vue SFC（WorkspaceView、ChatView、DiffPanel、ToolEventCard、ResizeHandle、GitGraphDialog 等）
-        ├── stores/      # ui.ts（主题/语言/侧栏显隐/面板尺寸）、session.ts（会话/agent 事件分发/持久化）、settings.ts（工作目录/权限模式，主进程持久化）
+        ├── pages/       # 页面级：OnboardingView、WorkspaceView、settings/ 设置页组件 ×6
+        ├── components/  # 业务组件按域分：chat/（聊天流）、workspace/（工作区布局/diff/文件树/终端）、git/（分支/图谱）、common/（通用）
+        ├── stores/      # ui.ts（主题/语言/侧栏显隐/面板尺寸）、session.ts（会话/最近工作空间/持久化）、agent.ts（agent 编排/事件分发/diff）、workspace.ts（文件树/文件内容）、settings.ts（工作目录/权限模式，主进程持久化）
+        ├── bridge/      # host.ts：宿主桥接 API 抽象（HostApi 类型 + window.dscode 封装）
         ├── plugins/     # vuetify.ts、i18n.ts（createXxxPlugin 工厂函数）
-        ├── theme/       # tokens.ts（主题色唯一事实源）、global.css（滚动条/选区/拖拽区）
-        └── host.ts      # window.dscode 桥接 API 的类型封装
+        └── theme/       # tokens.ts（主题色唯一事实源）、global.css（滚动条/选区/拖拽区）
 ```
 
-包间依赖：`desktop` → `ui` → `shared`。workspace 包直接以 TS 源码导出（`exports` 指向 `src/*.ts`），无需预先构建，由 electron-vite 一并编译。
+包间依赖：`desktop` → `core` + `ui` + `shared`；`core` → `shared`；`ui` → `shared`。workspace 包直接以 TS 源码导出（`exports` 指向 `src/*.ts`），无需预先构建，由 electron-vite 一并编译。
+
+**包职责边界（多客户端预留）**：`shared` 只放跨进程/跨客户端的类型与 i18n 文案（纯契约层，ui 永远碰不到 Node 代码）；`core` 是纯 TS 领域逻辑——agent 运行时（事件经 `AgentEventSink` 上抛，宿主各自实现）、工具/门控/模型适配/工作区/diff/git/持久化，其中 **纯逻辑层**（agent 编排、gate、adapters、diff-LCS，无 Node 依赖）将来浏览器 worker 亦可复用，**Node 服务层**（tools、workspace 扫描、persist、git）由 desktop/TUI 复用；`ui` 是客户端无关的前端层——页面/组件/stores/`bridge/host.ts`（HostApi 桥接抽象），Electron 由 preload 实现 HostApi，将来 web 端（HTTP 宿主）复用 ui 全部，TUI 端（进程内实现 AgentEventSink + 复用 core 全部与 shared 文案）各实现一份；`desktop` 只是 Electron 客户端壳。mock 数据已删除，无纯浏览器降级路径。
+
+**core 构建要点**：main/preload 构建的 `build.externalizeDeps` 使用 `{ exclude: ['@dscode/core', '@dscode/shared'] }`，core/shared 打进 main 产物——若外部化，Node 运行时直接加载其 TS 源码，目录 re-export 会报 `ERR_UNSUPPORTED_DIR_IMPORT`。core 的新增模块经 `core/src/index.ts` 统一出口。
 
 ## 技术栈
 
@@ -60,15 +73,16 @@ pnpm install        # 安装依赖（首次必须，electron 需要 postinstall 
 pnpm dev            # 启动 electron-vite 开发模式（HMR）
 pnpm build          # 构建到 packages/desktop/out/
 pnpm start          # 预览构建产物（electron-vite preview）
-pnpm typecheck      # vue-tsc（renderer+ui+shared）+ tsc（main/preload）
+pnpm typecheck      # vue-tsc（renderer+ui+shared）+ tsc（main/preload）+ tsc（core）
 pnpm lint           # ESLint + oxlint 全量
 pnpm lint:fast      # 仅 oxlint（毫秒级快速反馈）
 pnpm lint:eslint    # 仅 ESLint
 pnpm lint:fix       # 两个 linter 自动修复
 pnpm fmt            # oxfmt 格式化
+pnpm test           # 运行 @dscode/core 与 @dscode/desktop 的 vitest 单测
 ```
 
-注意：**当前没有测试框架、没有 CI**。改动后至少跑 `pnpm typecheck` + `pnpm lint` 验证。
+CI 已配置（`.github/workflows/ci.yml`，GitHub Actions：`pnpm install --frozen-lockfile` + typecheck + lint + test + build）。**注意仓库托管在 gitee，GitHub Actions 不会在 gitee 上运行**——需镜像到 GitHub 或改用 Gitee Go 才能生效；本地提交前仍至少跑 `pnpm typecheck` + `pnpm lint` + `pnpm test` 验证。
 
 Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror 镜像）下载；`.npmrc` 的 `electron_mirror` 对 pnpm 无效（pnpm 不会把 `.npmrc` 配置转成 `npm_config_*` 环境变量传给 postinstall），不要回退到那种写法。注意 `.pnpmfile.cjs` 内容变化会使 lockfile 的 `pnpmfileChecksum` 失效，需执行一次 `pnpm install --no-frozen-lockfile` 更新。
 
@@ -87,11 +101,10 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 - Vue 组件一律 `<script setup lang="ts">`；样式优先用 UnoCSS 工具类写在 `class` 里，配合 Vuetify 组件 props，基本不写 `<style>` 块。
 - 图标用 UnoCSS 图标语法：`i-lucide:xxx`（已按 Vuetify 官方文档集成 Lucide iconset）。
 - 文案一律走 i18n：key 加到 `packages/shared/src/locales/zh-CN.json` 和 `en-US.json` 两个文件，组件里 `t('xxx')`。
-- 可复用 UI 放 `packages/ui`（并在 `src/index.ts` 导出），Electron 宿主相关的薄壳代码放 `packages/desktop`。`TerminalPanel` 是个例外：它未被 `index.ts` 导出，由 `WorkspaceView` 相对路径直接引用。
-- 集成终端由 `ui/components/TerminalPanel.vue`（xterm.js + FitAddon，多标签页会话：面板内容 v-show 常驻、新增/关闭标签驱动会话创建/回收）与 `desktop/src/main/terminal.ts`（node-pty 多会话管理）配合实现；终端配色（含 ANSI 16 色 `terminalAnsi`）在 `theme/tokens.ts` 定义，不在组件里写死。
-- 面板尺寸拖拽用 `ui/components/ResizeHandle.vue`（Pointer Events 遮罩式拖拽条，定位上下文是抽屉根元素、高亮细线与抽屉外缘边框重合）：`axis="y"` 调终端高度、`axis="x"` 调右侧栏宽度；范围限制写在各面板组件的 `*_MIN_*` / `*_MAX_*` 常量，尺寸状态存 `ui.ts` store（不持久化，每次启动恢复默认）。
-- 跨包引用用包名（`@dscode/shared`、`@dscode/ui`、`@dscode/ui/tokens`），TS 路径别名在根 `tsconfig.base.json` 配置；渲染进程内部还有 `@renderer` 别名指向 `packages/desktop/src/renderer/src`。
-- tsconfig 采用 electron-vite 官方的 solution-style（解决方案式）：根 `tsconfig.json` 只含 `references` 指向两个 composite 子项目——`packages/desktop/tsconfig.web.json`（renderer+ui+shared，vue-tsc）与 `tsconfig.node.json`（main/preload，tsc）。编辑器按解决方案把每个文件归属到正确项目；CLI 类型检查必须带 `--composite false --noEmit`（composite 与 noEmit 互斥，见 desktop 的 typecheck 脚本）。`.vue` 模块声明在 `packages/ui/src/env.d.ts`，renderer 的 `env.d.ts` 放 vite/client 引用与 process.env.NODE_ENV 声明。不要按目录乱放 `tsconfig.json` 垫片。
+- 可复用 UI 放 `packages/ui`（并在 `src/index.ts` 导出），Electron 宿主相关的薄壳代码放 `packages/desktop`。仅包内使用的组件（如 `TerminalPanel`、`ToolEventCard`）不对外导出，由同包组件相对引用。
+- 集成终端由 `ui/components/workspace/TerminalPanel.vue`（xterm.js + FitAddon，多标签页会话：面板内容 v-show 常驻、新增/关闭标签驱动会话创建/回收）与 `desktop/src/main/shell/terminal.ts`（node-pty 多会话管理）配合实现；终端配色（含 ANSI 16 色 `terminalAnsi`）在 `theme/tokens.ts` 定义，不在组件里写死。
+- 面板尺寸拖拽用 `ui/components/common/ResizeHandle.vue`（Pointer Events 遮罩式拖拽条，定位上下文是抽屉根元素、高亮细线与抽屉外缘边框重合）：`axis="y"` 调终端高度、`axis="x"` 调右侧栏宽度；范围限制写在各面板组件的 `*_MIN_*` / `*_MAX_*` 常量，尺寸状态存 `ui.ts` store（不持久化，每次启动恢复默认）。
+- 跨包引用用包名（`@dscode/core`、`@dscode/shared`、`@dscode/ui`、`@dscode/ui/tokens`），TS 路径别名在根 `tsconfig.base.json` 配置；渲染进程内部还有 `@renderer` 别名指向 `packages/desktop/src/renderer/src`。
 
 ## 主题系统（改动前必读）
 
@@ -106,23 +119,22 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 - 无边框窗口（`titleBarStyle: 'hidden'`）：macOS 用 `trafficLightPosition` 悬浮红绿灯，Windows 用 `titleBarOverlay` 原生悬浮按钮（背景色固定透明，渲染端主题切换时经 IPC `win:set-titlebar-overlay` 只同步 `symbolColor` 符号色）。渲染端需为系统控件预留位置，相关常量在 `@dscode/ui` 的 `host.ts`（`TITLEBAR_OVERLAY_WIDTH = 150`，macOS 左侧让位 84px）。
 - 渲染端通过 `.ds-drag` / `.ds-no-drag` CSS 类处理标题栏拖拽区（见 `global.css`）。
 - 安全设置：`contextIsolation: true`、`nodeIntegration: false`、`sandbox: false`；外部链接一律 `shell.openExternal`，`window.open` 被 deny。
-- preload 只暴露 `window.dscode`（platform、versions、setTitleBarOverlay + 业务 IPC 封装）；纯浏览器环境下为 `undefined`，组件须降级处理。
+- preload 只暴露 `window.dscode`（platform、versions、setTitleBarOverlay + 业务 IPC 封装），即 `@dscode/ui` HostApi 桥接的 Electron 实现。
 - **业务 IPC 通道**（全部 `ipcMain.handle` / `ipcRenderer.invoke`，定义在 `desktop/src/main/ipc.ts`，渲染端类型见 `@dscode/ui` 的 `host.ts`）：
   - `settings:get` / `settings:set` —— 工作目录 + 权限模式（`userData/settings.json` 持久化；set 时工作目录变化自动记入最近项目）
   - `projects:list` —— 最近项目（`node:sqlite`，`userData/projects.db`，无原生依赖）
   - `dialog:pick-directory` —— 选择工作目录（取消返回 null）
   - `provider:verify` —— API key 校验（主进程 fetch `GET {baseUrl}/models`）
-  - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（主进程 `agent.ts`：SSE 流式 + 工具循环 + 门控；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求，120s 超时自动拒绝）/ `agent:done` / `agent:error`（code: no-api-key/api/network/aborted/unknown），均带 sessionId
+  - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（运行时在 `@dscode/core`（SSE 流式 + 工具循环 + 门控 + 模型适配，事件经 AgentEventSink 上抛），`desktop/src/main/agent/agent.ts` 实现 sink 映射到 IPC；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求，120s 超时自动拒绝）/ `agent:done` / `agent:error`（code: no-api-key/api/network/aborted/running/unknown；unknown 等携带 detail 真实原因，渲染端随错误气泡展示），均带 sessionId；同会话重复 `agent:start` 会先中止旧运行再启动新运行（窗口重载后重发不报错）；窗口关闭时其发起的运行被回收（见 `stopWindowAgents`）
   - `workspace:tree` / `workspace:read-file` —— 真实文件树扫描与文件读取（路径限定工作目录内）；`workspace:diff` 事件 —— 写/执行工具后主进程按「agent 启动快照 vs 当前内容」LCS 行级 diff 推送
-  - `sessions:list` / `sessions:create` / `sessions:append` —— 会话持久化（`node:sqlite`，`userData/sessions.db`，toolEvents 不落库）
+  - `sessions:list` / `sessions:create` / `sessions:append` —— 会话持久化（`node:sqlite`，`userData/sessions.db`；消息的 steps（思维链/正文/工具调用交错的有序步骤）以 JSON 存 `messages.steps` 列，重启后按此恢复折叠块与工具卡；旧消息无 steps 走正文兜底；会话级 toolEvents 数组仍为瞬态不落库）
   - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` —— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合
-  - `terminal:ensure` / `terminal:write` / `terminal:resize` / `terminal:kill` —— 集成终端（主进程 node-pty，多会话按渲染端生成的 sessionId 管理、按窗口归属统一回收，见 `main/terminal.ts`）；pty 输出经 `terminal:data` / `terminal:exit` 事件（带 sessionId）推给渲染端，write/resize 为高频单向 `on` 通道
+  - `terminal:ensure` / `terminal:write` / `terminal:resize` / `terminal:kill` —— 集成终端（主进程 node-pty，多会话按渲染端生成的 sessionId 管理、按窗口归属统一回收，见 `main/shell/terminal.ts`）；pty 输出经 `terminal:data` / `terminal:exit` 事件（带 sessionId）推给渲染端，write/resize 为高频单向 `on` 通道
   - 每个 handler 校验 sender 属于主窗口 + 参数类型；新增业务 IPC 沿用此模式
 
 ## 测试与质量
 
-- **问题解决原则（最重要）**：先找根本原因，再动手——用日志、数据、复现等证据定位根因后做系统性修复；禁止"哪里报错就改哪里"的局部打补丁（如改一行绕过、加垫片/特判）。修复要符合项目既有的正统/标准做法，并顺手消除同类隐患。
-- 无单元测试 / E2E 测试设施。若引入测试，需自行选型并在本节补充说明。
+- 单测框架 **vitest**，覆盖 `@dscode/core`（纯逻辑层）与 `@dscode/desktop`（主进程纯逻辑）两处：`pnpm test` 依次运行两者（也可 `pnpm --filter <pkg> test` 单独跑）。测试文件位于 `packages/{core,desktop}/test/*.test.ts`，各自 `vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 tsc 的 `src/**/*` 类型检查范围）。当前覆盖：core —— 门控、LCS diff、适配器 delta 归一化、路径防穿越/symlink、persist 落库/加密、usage 用量、MCP 协议、插件加载、代码索引、browse 工具；desktop —— IPC 校验器、safeStorage 加密封装、钩子触发。E2E 测试设施暂无。
 - **lint 双轨并存**（配置都在仓库根）：
   - `oxlint`（`.oxlintrc.json`）：Rust 实现、毫秒级；内置 vue 插件 lint `.vue` 的 `<script>` 块（模板规则暂缺，官方语言插件路线图中）；自动读取 `.gitignore` 排除产物。**负责全部 TS/JS 文件**
   - `eslint`（`eslint.config.js`，flat config，基于 `@soybeanjs/eslint-config-vue`）：**仅覆盖 `.vue` 文件**（soybean 的 defineConfig 硬编码 `files: ['**/*.vue']`），提供模板相关规则；全局 ignores 必须放在数组第一项的无 files config 里（soybean 自带的 ignores 带 files 不生效，会误扫 `out/`）
@@ -131,4 +143,6 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 ## 部署 / 打包
 
-`pnpm build` 只产出 `packages/desktop/out/`（编译产物）。目前**没有配置 electron-builder 等打包工具**，也没有发布流程；需要分发安装包时需先引入打包配置。
+`pnpm build` 产出 `packages/desktop/out/`（编译产物）。**已配置 electron-builder**（`packages/desktop/electron-builder.yml`，mac dmg/zip + win nsis + linux AppImage/deb），`pnpm dist`（或 `dist:mac`/`dist:win`/`dist:linux`）产出安装包到 `release/`（已 gitignore）。`node-pty` 由 electron-builder 对 Electron ABI 重编译；workspace/前端依赖打进 `out/`，故 `dependencies` 只保留 `node-pty`。
+
+**分发策略（已定）**：定位为**发布**——已引入 electron-builder 打包与三平台安装器。代码签名/公证仍需真实证书（当前无 Developer ID，构建时跳过签名）；正式发布前补充 macOS 签名/公证与 Windows 签名配置。

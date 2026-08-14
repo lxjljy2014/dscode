@@ -6,5 +6,7 @@ allowBuilds:
   sass-embedded: true
   '@parcel/watcher': true
   node-pty: true
+  # electron-builder 的 Windows 安装器依赖（postinstall 拉取 Squirrel 二进制；NSIS 用不到，但需放行避免 ERR_PNPM_IGNORED_BUILDS）
+  electron-winstaller: true
 minimumReleaseAgeExclude:
   - electron@43.4.0

@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { registerIpcHandlers } from './ipc';
-import { disposeAgents } from './agent';
-import { disposeTerminals, killWindowTerminals } from './terminal';
+import { disposeAgents, stopWindowAgents } from './agent/agent';
+import { disposeTerminals, killWindowTerminals } from './shell/terminal';
 
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
@@ -63,8 +63,11 @@ function createWindow(): void {
     win.show();
   });
 
-  // 窗口关闭时回收其全部终端会话
-  win.on('closed', () => killWindowTerminals(win));
+  // 窗口关闭时回收其全部终端会话与该窗口发起的 agent 运行
+  win.on('closed', () => {
+    killWindowTerminals(win);
+    stopWindowAgents(win);
+  });
 
   // 新窗口一律拒绝，仅 http(s) 链接交给系统浏览器
   win.webContents.setWindowOpenHandler(details => {

@@ -1,32 +1,53 @@
+// @dscode/ui 统一出口：客户端无关的前端层（页面 / 组件 / stores / 宿主桥接 / 插件）。
+// 桌面端经本出口组装；将来 web 端同样经本出口复用。TerminalPanel 等仅包内使用的组件不在此导出。
+
 export { createVuetifyPlugin } from './plugins/vuetify';
 export { createI18nPlugin, supportedLocales, vuetifyLocaleMap } from './plugins/i18n';
 export type { AppLocale } from './plugins/i18n';
 
-export { host, isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from './host';
-export type { HostApi, TitleBarOverlayOptions } from './host';
+export { host, isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from './bridge/host';
+export type { HostApi, TitleBarOverlayOptions } from './bridge/host';
 
 export { useUiStore } from './stores/ui';
 export type { LocaleSetting, ThemeMode } from './stores/ui';
 export { useSessionStore } from './stores/session';
+export { useAgentStore } from './stores/agent';
+export { useWorkspaceStore } from './stores/workspace';
 export { useSettingsStore } from './stores/settings';
+export { usePluginsStore } from './stores/plugins';
 
-export { default as AppHeader } from './components/AppHeader.vue';
-export { default as SessionSidebar } from './components/SessionSidebar.vue';
-export { default as UserBar } from './components/UserBar.vue';
-export { default as WorkspaceSidebar } from './components/WorkspaceSidebar.vue';
-export { default as WorkspacePanel } from './components/WorkspacePanel.vue';
-export { default as WorkspaceView } from './components/WorkspaceView.vue';
-export { default as SettingsSidebar } from './components/SettingsSidebar.vue';
-export { default as SettingsView } from './components/SettingsView.vue';
-export { default as SettingsHeader } from './components/SettingsHeader.vue';
-export { default as SettingsGeneral } from './components/SettingsGeneral.vue';
-export { default as SettingsProviders } from './components/SettingsProviders.vue';
-export { default as SettingsPlaceholder } from './components/SettingsPlaceholder.vue';
-export { default as OnboardingView } from './components/OnboardingView.vue';
-export { default as ChatView } from './components/ChatView.vue';
-export { default as MessageItem } from './components/MessageItem.vue';
-export { default as ChatInput } from './components/ChatInput.vue';
-export { default as GitBranchMenu } from './components/GitBranchMenu.vue';
-export { default as DiffPanel } from './components/DiffPanel.vue';
-export { default as FileTree } from './components/FileTree.vue';
-export { default as ResizeHandle } from './components/ResizeHandle.vue';
+// 页面
+export { default as WorkspaceView } from './pages/WorkspaceView.vue';
+export { default as OnboardingView } from './pages/OnboardingView.vue';
+export { default as SettingsView } from './pages/settings/SettingsView.vue';
+export { default as SettingsSidebar } from './pages/settings/SettingsSidebar.vue';
+export { default as SettingsHeader } from './pages/settings/SettingsHeader.vue';
+export { default as SettingsAppearance } from './pages/settings/SettingsAppearance.vue';
+export { default as SettingsBrowser } from './pages/settings/SettingsBrowser.vue';
+export { default as SettingsCommands } from './pages/settings/SettingsCommands.vue';
+export { default as SettingsGeneral } from './pages/settings/SettingsGeneral.vue';
+export { default as SettingsHooks } from './pages/settings/SettingsHooks.vue';
+export { default as SettingsIndex } from './pages/settings/SettingsIndex.vue';
+export { default as SettingsMcp } from './pages/settings/SettingsMcp.vue';
+export { default as SettingsMemory } from './pages/settings/SettingsMemory.vue';
+export { default as SettingsSkills } from './pages/settings/SettingsSkills.vue';
+export { default as SettingsSubagents } from './pages/settings/SettingsSubagents.vue';
+export { default as SettingsUsage } from './pages/settings/SettingsUsage.vue';
+export { default as SettingsModel } from './pages/settings/SettingsModel.vue';
+export { default as SettingsPlugins } from './pages/settings/SettingsPlugins.vue';
+export { default as SettingsProviders } from './pages/settings/SettingsProviders.vue';
+export { default as SettingsPlaceholder } from './pages/settings/SettingsPlaceholder.vue';
+
+// 按域组件
+export { default as ChatView } from './components/chat/ChatView.vue';
+export { default as MessageItem } from './components/chat/MessageItem.vue';
+export { default as ChatInput } from './components/chat/ChatInput.vue';
+export { default as AppHeader } from './components/workspace/AppHeader.vue';
+export { default as SessionSidebar } from './components/workspace/SessionSidebar.vue';
+export { default as WorkspaceSidebar } from './components/workspace/WorkspaceSidebar.vue';
+export { default as WorkspacePanel } from './components/workspace/WorkspacePanel.vue';
+export { default as DiffPanel } from './components/workspace/DiffPanel.vue';
+export { default as FileTree } from './components/workspace/FileTree.vue';
+export { default as GitBranchMenu } from './components/git/GitBranchMenu.vue';
+export { default as UserBar } from './components/common/UserBar.vue';
+export { default as ResizeHandle } from './components/common/ResizeHandle.vue';

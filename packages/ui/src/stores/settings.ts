@@ -1,19 +1,33 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type { AppSettings, SettingsPatch } from '@dscode/shared';
-import { host } from '../host';
+import { host } from '../bridge/host';
+import type { HostApi } from '../bridge/host';
 
 /**
  * 应用设置（工作目录 / 权限模式 / AI 供应商 / 引导状态），主进程 settings.json 持久化。
- * 纯浏览器环境（host undefined）下用内存默认值降级。
+ * 依赖宿主桥接（host），仅在宿主环境内运行。
  */
 
 const DEFAULTS: AppSettings = {
   workingDirectory: '',
   permissionMode: 'confirm',
   providers: [],
-  onboardingDone: false
+  onboardingDone: false,
+  commands: [],
+  memory: [],
+  skills: [],
+  hooks: [],
+  subagents: [],
+  mcpServers: [],
+  browsingEnabled: true
 };
+
+/** 应用只在宿主内运行，桥接缺失视为环境错误 */
+function requireHost(): HostApi {
+  if (!host) throw new Error('DSCode 宿主桥接不可用');
+  return host;
+}
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<AppSettings>({ ...DEFAULTS });
@@ -26,24 +40,20 @@ export const useSettingsStore = defineStore('settings', () => {
     if (loaded.value) return;
     if (!loadPromise) {
       loadPromise = (async () => {
-        if (!host) {
-          // 纯浏览器环境无持久化，按已引导处理，跳过引导页
-          settings.value = { ...DEFAULTS, onboardingDone: true };
-        } else {
-          settings.value = await host.getSettings();
-        }
+        settings.value = await requireHost().getSettings();
         loaded.value = true;
       })();
     }
     await loadPromise;
   }
 
-  async function save(patch: SettingsPatch): Promise<void> {
-    if (!host) {
-      settings.value = { ...settings.value, ...patch };
-      return;
-    }
-    settings.value = await host.setSettings(patch);
+  // save 串行化：快速连续切换权限模式/工作目录时按提交顺序落盘，避免响应乱序覆盖 settings.value
+  let saveChain: Promise<void> = Promise.resolve();
+  function save(patch: SettingsPatch): Promise<void> {
+    saveChain = saveChain.then(async () => {
+      settings.value = await requireHost().setSettings(patch);
+    });
+    return saveChain;
   }
 
   return { settings, loaded, load, save };

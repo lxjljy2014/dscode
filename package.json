@@ -5,6 +5,7 @@
   "scripts": {
     "build": "pnpm --filter @dscode/desktop build",
     "dev": "pnpm --filter @dscode/desktop dev",
+    "dist": "pnpm --filter @dscode/desktop dist",
     "fmt": "oxfmt",
     "lint": "eslint . && oxlint .",
     "lint:eslint": "eslint .",
@@ -12,7 +13,8 @@
     "lint:fix": "eslint . --fix && oxlint . --fix",
     "postinstall": "node scripts/fix-node-pty-exec.mjs",
     "start": "pnpm --filter @dscode/desktop start",
-    "typecheck": "pnpm --filter @dscode/desktop typecheck"
+    "test": "pnpm --filter @dscode/core test && pnpm --filter @dscode/desktop test",
+    "typecheck": "pnpm --filter @dscode/desktop typecheck && pnpm --filter @dscode/core typecheck"
   },
   "devDependencies": {
     "@soybeanjs/eslint-config-vue": "^0.1.1",

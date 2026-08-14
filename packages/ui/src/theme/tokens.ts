@@ -57,10 +57,38 @@ export const syntaxPalette = {
   }
 } as const;
 
+/**
+ * 工具强调色板（工具调用卡片的点缀色，light/dark 各一套）。
+ * 7 个工具各一个可辨识色相：读=蓝、列目录=青、搜索=橙、执行=紫、写=绿、编辑=黄、浏览=玫红。
+ * 当前用途：文件扩展名徽章按类型取色（TS=蓝、JS=橙、Vue=绿等，见 ToolEventCard 的 EXT_COLORS）。
+ * 色值与 syntaxPalette 同族（GitHub 明暗配色），挂进主题 colors 后生成 --v-theme-tool-*。
+ */
+export const toolAccent = {
+  light: {
+    'tool-read': '#0969da',
+    'tool-list': '#1b7c83',
+    'tool-search': '#bf8700',
+    'tool-run': '#8250df',
+    'tool-write': '#1a7f37',
+    'tool-edit': '#9a6700',
+    'tool-browse': '#c93c75'
+  },
+  dark: {
+    'tool-read': '#58a6ff',
+    'tool-list': '#39c5cf',
+    'tool-search': '#e3b341',
+    'tool-run': '#bc8cff',
+    'tool-write': '#3fb950',
+    'tool-edit': '#d29922',
+    'tool-browse': '#f778ba'
+  }
+} as const;
+
 export const lightTheme: ThemeDefinition = {
   dark: false,
   colors: {
     ...syntaxPalette.light,
+    ...toolAccent.light,
     background: '#ffffff',
     'on-background': neutral[900],
     surface: neutral[100],
@@ -97,6 +125,7 @@ export const darkTheme: ThemeDefinition = {
   dark: true,
   colors: {
     ...syntaxPalette.dark,
+    ...toolAccent.dark,
     background: neutral[950],
     'on-background': '#ececec',
     surface: neutral[900],

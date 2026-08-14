@@ -36,6 +36,7 @@
     "planMode": "计划模式",
     "agentMode": "代理模式",
     "addContext": "添加上下文",
+    "subagentDefault": "默认",
     "effort": {
       "close": "关闭",
       "high": "高",
@@ -102,7 +103,17 @@
       "search": "搜索",
       "run_command": "执行命令",
       "write_file": "写入文件",
-      "edit_file": "编辑文件"
+      "edit_file": "编辑文件",
+      "browse": "浏览网页"
+    },
+    "verb": {
+      "read_file": "读取",
+      "list_dir": "列出",
+      "search": "搜索",
+      "run_command": "执行",
+      "write_file": "写入",
+      "edit_file": "编辑",
+      "browse": "浏览"
     },
     "status": {
       "running": "执行中",
@@ -115,12 +126,20 @@
     "deny": "拒绝",
     "args": "参数",
     "result": "结果",
-    "thinking": "思考过程",
+    "action": {
+      "writing": "写入中",
+      "written": "已写入",
+      "editing": "编辑中",
+      "edited": "已编辑"
+    },
+    "thinking": "思考",
+    "thinkinging": "思考中",
     "error": {
       "no-api-key": "未配置 API key，请到设置页填写后再试",
       "api": "接口调用出错，请检查 API key 与网络后重试",
       "network": "网络异常或请求超时，请稍后重试",
       "aborted": "已停止",
+      "running": "上一条消息还在处理中，请稍候或先停止",
       "unknown": "发生未知错误"
     }
   },
@@ -181,6 +200,117 @@
       "proxyExceptions": "代理例外",
       "proxyExceptionsDesc": "匹配这些主机的请求将直连，不经过 HTTP 代理。多个规则用英文逗号分隔。修改后需重启应用生效。",
       "proxyExceptionsPlaceholder": "例如 localhost, 127.0.0.1, *.internal"
+    },
+    "appearance": {
+      "theme": "主题外观",
+      "themeDesc": "选择应用界面的明暗主题。",
+      "light": "浅色",
+      "dark": "深色"
+    },
+    "model": {
+      "empty": "尚未配置 AI 供应商",
+      "apiKey": "API Key",
+      "models": "模型列表",
+      "addModel": "添加模型",
+      "modelPlaceholder": "模型标识，如 deepseek-reasoner"
+    },
+    "commands": {
+      "desc": "自定义斜杠命令：在输入框输入 /名称 可展开为提示词。",
+      "add": "添加命令",
+      "edit": "编辑命令",
+      "empty": "尚未自定义命令",
+      "name": "命令名（不含 /）",
+      "namePlaceholder": "例如 explain",
+      "description": "说明",
+      "prompt": "提示词模板",
+      "promptPlaceholder": "展开后填入输入框的内容"
+    },
+    "memory": {
+      "title": "长期记忆",
+      "desc": "记录用户偏好、项目约定等长期信息，注入到每次对话的系统提示词。",
+      "add": "添加记忆",
+      "empty": "尚无长期记忆",
+      "placeholder": "例如：本项目使用 pnpm，提交信息用中文"
+    },
+    "skills": {
+      "desc": "技能是注入系统提示词的能力说明，agent 会按需调用其指令。",
+      "add": "添加技能",
+      "edit": "编辑技能",
+      "empty": "尚无技能",
+      "name": "技能名",
+      "namePlaceholder": "例如 code-review",
+      "description": "一句话说明",
+      "instructions": "指令内容"
+    },
+    "hooks": {
+      "desc": "在会话开始/结束或工具完成后执行 shell 命令（工作目录为当前项目）。",
+      "add": "添加钩子",
+      "edit": "编辑钩子",
+      "empty": "尚无钩子",
+      "name": "钩子名",
+      "command": "命令",
+      "commandPlaceholder": "例如 npm run format",
+      "triggerLabel": "触发时机",
+      "trigger": {
+        "session_start": "会话开始",
+        "session_end": "会话结束",
+        "tool_done": "工具完成后"
+      }
+    },
+    "usage": {
+      "promptTokens": "输入 Tokens",
+      "completionTokens": "输出 Tokens",
+      "total": "总计",
+      "recent": "最近记录",
+      "refresh": "刷新",
+      "empty": "暂无用量记录",
+      "model": "模型",
+      "time": "时间"
+    },
+    "subagents": {
+      "desc": "定义可切换的专用 agent 人设，选定后对话以其系统提示词运行。",
+      "add": "添加子智能体",
+      "edit": "编辑子智能体",
+      "empty": "尚无子智能体",
+      "name": "名称",
+      "namePlaceholder": "例如 code-reviewer",
+      "description": "一句话说明",
+      "systemPrompt": "系统提示词"
+    },
+    "mcp": {
+      "desc": "配置 MCP（Model Context Protocol）服务器，可列出其提供的工具。",
+      "add": "添加服务器",
+      "edit": "编辑服务器",
+      "empty": "尚未配置 MCP 服务器",
+      "name": "名称",
+      "command": "启动命令",
+      "commandPlaceholder": "例如 npx",
+      "args": "参数（空格分隔）",
+      "argsPlaceholder": "例如 -y @modelcontextprotocol/server-filesystem /path",
+      "listTools": "列出工具",
+      "loading": "连接中…",
+      "noTools": "点击「列出工具」查看"
+    },
+    "plugins": {
+      "desc": "将 .mjs 插件放到 userData/plugins 目录，重启后即可贡献斜杠命令。",
+      "empty": "尚未安装插件"
+    },
+    "index": {
+      "files": "已索引文件",
+      "terms": "词条数",
+      "builtAt": "最后构建",
+      "never": "尚未构建",
+      "rebuild": "重建索引",
+      "search": "检索",
+      "searchPlaceholder": "输入关键词（多词 AND）",
+      "searchBtn": "搜索"
+    },
+    "browser": {
+      "enable": "启用网页浏览",
+      "enableDesc": "开启后 agent 可调用 browse 工具抓取网页内容（查阅文档/资料）。",
+      "test": "测试抓取",
+      "placeholder": "例如 https://example.com",
+      "fetch": "抓取"
     }
   },
   "onboarding": {
