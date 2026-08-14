@@ -14,7 +14,29 @@ export interface Message {
   reasoning?: string;
   /** assistant 输出的有序步骤（正文与工具交错；随消息落库，恢复历史消息时按此重建） */
   steps?: AssistantStep[];
+  /** agent 回复的运行统计（仅内存展示，不持久化；旧消息无此字段） */
+  stats?: MessageStats;
   createdAt: number;
+}
+
+/** 一次 agent 回复的运行统计（仅内存展示，不持久化） */
+export interface MessageStats {
+  /** 回复开始时间（毫秒时间戳） */
+  startAt: number;
+  /** 回复结束时间（毫秒时间戳） */
+  endAt: number;
+  /** 首 token 到达耗时（相对开始，毫秒；无正文输出时缺失） */
+  firstTokenMs?: number;
+  /** 输入 token 数（运行中断/报错时可能缺失） */
+  promptTokens?: number;
+  /** 输出 token 数（运行中断/报错时可能缺失） */
+  completionTokens?: number;
+}
+
+/** agent:usage 事件负载（token 用量，主进程推送） */
+export interface AgentUsageEvent {
+  sessionId: string;
+  usage: { promptTokens: number; completionTokens: number };
 }
 
 /** agent 可调用的工具名 */

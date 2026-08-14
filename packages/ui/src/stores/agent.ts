@@ -22,6 +22,29 @@ export const useAgentStore = defineStore('agent', () => {
   /** 工具首次展示时间戳（用于最短展示时长计算） */
   const toolShownAt = new Map<string, number>();
 
+  /** 各回复的运行统计中间态（keyed by 回复消息 id；结束时收敛为 Message.stats 附到消息上） */
+  interface RunningStats {
+    startAt: number;
+    firstTokenMs?: number;
+    promptTokens?: number;
+    completionTokens?: number;
+  }
+  const runningStats = new Map<string, RunningStats>();
+
+  /** 收敛一次回复的运行统计：结束时间 + 用时 + 首token + token 速率所需数据 */
+  function finalizeStats(reply: Message) {
+    const s = runningStats.get(reply.id);
+    runningStats.delete(reply.id);
+    if (!s) return;
+    reply.stats = {
+      startAt: s.startAt,
+      endAt: Date.now(),
+      ...(s.firstTokenMs !== undefined ? { firstTokenMs: s.firstTokenMs } : {}),
+      ...(s.promptTokens !== undefined ? { promptTokens: s.promptTokens } : {}),
+      ...(s.completionTokens !== undefined ? { completionTokens: s.completionTokens } : {})
+    };
+  }
+
   /** 各会话的 diff 结果（主进程 workspace:diff 推送，按 sessionId 缓存） */
   const diffBySession = new Map<string, DiffFile[]>();
   const diffFiles = computed<DiffFile[]>(() => {
@@ -66,6 +89,8 @@ export const useAgentStore = defineStore('agent', () => {
       streaming: true,
       createdAt: Date.now()
     };
+    // 运行统计起点：从发送时刻开始计时（首token/用时/token 速率）
+    runningStats.set(reply.id, { startAt: Date.now() });
     session.messages.push(reply);
     generating.value = true;
 
@@ -85,6 +110,8 @@ export const useAgentStore = defineStore('agent', () => {
       // 启动失败原因映射为错误码；详情附在气泡下方便于排障
       reply.errorCode = r.error === 'already-running' ? 'running' : 'unknown';
       reply.errorDetail = r.error;
+      // 从未真正开始流式输出：丢弃统计，避免残留
+      runningStats.delete(reply.id);
       generating.value = false;
       void sessionStore.persistMessage(session, reply);
     }
@@ -124,8 +151,25 @@ export const useAgentStore = defineStore('agent', () => {
       } else {
         steps.push({ kind: 'text', content: ev.content });
       }
+      // 首 token 计时：第一个非空正文增量到达时记录
+      const st = runningStats.get(reply.id);
+      if (st && st.firstTokenMs === undefined && ev.content.length > 0) {
+        st.firstTokenMs = Date.now() - st.startAt;
+      }
     }
     reply.steps = steps;
+  }
+
+  /** token 用量事件：记录到运行统计（正常结束前由主进程推送 agent:usage） */
+  function onUsage(ev: { sessionId: string; usage: { promptTokens: number; completionTokens: number } }) {
+    const session = sessionStore.sessions.find(s => s.id === ev.sessionId);
+    const reply = session ? streamingReply(session) : null;
+    if (!reply) return;
+    const st = runningStats.get(reply.id);
+    if (st) {
+      st.promptTokens = ev.usage.promptTokens;
+      st.completionTokens = ev.usage.completionTokens;
+    }
   }
 
   function onTool(ev: { sessionId: string; event: AgentToolEvent }) {
@@ -179,6 +223,8 @@ export const useAgentStore = defineStore('agent', () => {
     const reply = streamingReply(session);
     if (reply) {
       reply.streaming = false;
+      // 收敛运行统计（用时/首token/token 速率），随消息展示但不落库
+      finalizeStats(reply);
       session.updatedAt = Date.now();
       void sessionStore.persistMessage(session, reply);
     }
@@ -194,6 +240,8 @@ export const useAgentStore = defineStore('agent', () => {
       reply.errorCode = ev.code;
       // 错误详情（主进程附带的真实原因）随气泡展示，方便排障
       if (ev.detail) reply.errorDetail = ev.detail;
+      // 错误中断也收敛统计（token 用量可能缺失）
+      finalizeStats(reply);
       session.updatedAt = Date.now();
       void sessionStore.persistMessage(session, reply);
     }
@@ -213,6 +261,7 @@ export const useAgentStore = defineStore('agent', () => {
     host.onAgentConfirm(onConfirm);
     host.onAgentDone(onDone);
     host.onAgentError(onError);
+    host.onAgentUsage(onUsage);
     host.onWorkspaceDiff(onWorkspaceDiff);
   }
 

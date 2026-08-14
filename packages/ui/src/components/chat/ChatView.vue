@@ -52,7 +52,7 @@ watch(activeSession, scrollToBottom, { flush: 'post' });
     <template v-if="messages.length">
       <div ref="listRef" class="min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto max-w-200 px-6 py-6">
-          <MessageItem v-for="m in messages" :key="m.id" :message="m" />
+          <MessageItem v-for="m in messages" :key="m.id" :message="m" :session="activeSession" />
           <div class="h-2" />
         </div>
       </div>

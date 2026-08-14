@@ -35,6 +35,8 @@ function createSink(win: BrowserWindow, hooks: Hook[], cwd: string, model: strin
     },
     confirm: (sessionId, toolEventId, name, args) => send('agent:confirm', { sessionId, toolEventId, name, args }),
     usage: (sessionId, usage) => {
+      // 用量同时推给渲染端（回复底部统计：首token/token 速率等），与 usage.db 落库并行
+      send('agent:usage', { sessionId, usage });
       recordUsage(usageFile, {
         sessionId,
         model,

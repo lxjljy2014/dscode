@@ -218,6 +218,38 @@ export const useSessionStore = defineStore('session', () => {
     useUiStore().hideSidePanels();
   }
 
+  /** 从指定消息处派生新任务（fork）：复制该消息及之前的对话为新会话并切换过去，继续追问不污染原任务 */
+  function forkSession(source: Session, upToMessageId: string): Session | null {
+    const idx = source.messages.findIndex(m => m.id === upToMessageId);
+    if (idx < 0) return null;
+    const session: Session = {
+      id: nextId('s'),
+      title: source.title ? `${source.title} (fork)` : '',
+      // 分支任务沿用原工作空间，侧边栏归入同一分组
+      workingDirectory: source.workingDirectory,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      archived: false,
+      messages: [],
+      toolEvents: []
+    };
+    // 复制对话历史（新消息 id；steps 深拷贝避免与原任务共享引用；fork 后继续对话即可分叉）
+    for (const m of source.messages.slice(0, idx + 1)) {
+      session.messages.push({
+        ...m,
+        id: nextId('m'),
+        streaming: false,
+        steps: m.steps && m.steps.length > 0 ? (JSON.parse(JSON.stringify(m.steps)) as Message['steps']) : undefined
+      });
+    }
+    sessions.value.unshift(session);
+    activeSessionId.value = session.id;
+    useUiStore().hideSidePanels();
+    void persistSession(session);
+    for (const msg of session.messages) void persistMessage(session, msg);
+    return session;
+  }
+
   /** 实际生成会话（首条消息发送时调用）：任务随对话出现，侧边栏立即可见 */
   function materializeSession(): Session {
     const session: Session = {
@@ -293,6 +325,7 @@ export const useSessionStore = defineStore('session', () => {
     select,
     createSession,
     materializeSession,
+    forkSession,
     removeWorkspace,
     setArchived,
     persistSession,

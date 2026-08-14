@@ -30,6 +30,17 @@
     "placeholder": "Ask DSCode, use {'@'} to add context, / for commands or skills",
     "send": "Send",
     "stop": "Stop generating",
+    "copy": "Copy",
+    "copied": "Copied",
+    "like": "Like",
+    "dislike": "Dislike",
+    "fork": "Fork conversation",
+    "stats": {
+      "time": "Time",
+      "duration": "Duration",
+      "firstToken": "First token",
+      "tokensPerSec": "tok/s"
+    },
     "greeting": {
       "morning": "Good morning. How can I help?",
       "noon": "Good afternoon. Fancy a break?",

@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Message } from '@dscode/shared';
+import type { Message, Session } from '@dscode/shared';
 import { renderMarkdown } from '../../utils/markdown';
+import { useSessionStore } from '../../stores/session';
 import ToolEventCard from './ToolEventCard.vue';
 
-const props = defineProps<{ message: Message }>();
+const props = defineProps<{ message: Message; session?: Session | null }>();
 
 const { t } = useI18n();
+const sessionStore = useSessionStore();
 
 /** 历史消息兜底：无步骤时直接渲染完整正文的 markdown */
 const renderedContent = computed(() => renderMarkdown(props.message.content));
@@ -31,9 +33,80 @@ function isCurrentReasoning(index: number): boolean {
 /** 思考块标题：思考/思考中 · 首行摘要（40 字内） */
 function reasoningLabel(content: string, streaming: boolean): string {
   const base = streaming ? t('agent.thinkinging') : t('agent.thinking');
-  const line = content.split('\n').map(l => l.trim()).find(l => l.length > 0) ?? '';
+  const line =
+    content
+      .split('\n')
+      .map(l => l.trim())
+      .find(l => l.length > 0) ?? '';
   const title = line.length > 40 ? line.slice(0, 40) + '…' : line;
   return title ? base + ' · ' + title : base;
+}
+
+// ---- 回复底部操作：复制 / 点赞 / 踩 / fork ----
+
+/** 点赞/踩状态（按消息 id，仅内存，不持久化；模块级避免切换任务后丢失） */
+const feedback = reactive(new Map<string, 'like' | 'dislike'>());
+
+/** 复制状态（短暂显示「已复制」反馈） */
+const copied = ref(false);
+let copyTimer: number | undefined;
+
+async function copyContent(): Promise<void> {
+  const text = props.message.content;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // 兜底：隐藏 textarea + execCommand（非安全上下文等环境）
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+  copied.value = true;
+  window.clearTimeout(copyTimer);
+  copyTimer = window.setTimeout(() => {
+    copied.value = false;
+  }, 1500);
+}
+
+function toggleFeedback(kind: 'like' | 'dislike'): void {
+  const cur = feedback.get(props.message.id);
+  if (cur === kind) feedback.delete(props.message.id);
+  else feedback.set(props.message.id, kind);
+}
+
+/** fork：从该回复派生新任务（复制到此为止的对话并切换过去） */
+function fork(): void {
+  if (props.session) sessionStore.forkSession(props.session, props.message.id);
+}
+
+// ---- 运行统计格式化（时间 / 用时 / 首token / token 速率） ----
+
+/** 毫秒时间戳 → HH:mm:ss（本地时区） */
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/** 毫秒 → 人类可读用时（<1s 显示 ms，<1m 显示秒，否则 m:ss） */
+function formatDuration(ms: number): string {
+  const v = Math.max(0, ms);
+  if (v < 1000) return `${v}ms`;
+  if (v < 60000) return `${(v / 1000).toFixed(1)}s`;
+  const m = Math.floor(v / 60000);
+  const s = Math.round((v % 60000) / 1000);
+  return `${m}m${String(s).padStart(2, '0')}s`;
+}
+
+/** token/s（无 token 数据或时长为 0 时显示 —） */
+function formatTokensPerSec(tokens: number | undefined, durationMs: number): string {
+  if (!tokens || durationMs <= 0) return '—';
+  return `${(tokens / (durationMs / 1000)).toFixed(1)}/s`;
 }
 </script>
 
@@ -91,6 +164,97 @@ function reasoningLabel(content: string, streaming: boolean): string {
         </div>
         <div v-if="message.errorDetail" class="mt-1 font-mono text-[11px] leading-relaxed text-faint">
           {{ message.errorDetail }}
+        </div>
+
+        <!-- 回复结束后底部操作行：复制 / 点赞 / 踩 / fork；悬停整行显示运行统计 -->
+        <div v-if="!message.streaming" class="group/stats relative mt-1.5 flex items-center">
+          <!-- 悬停统计浮层（纯 CSS group-hover，不产生 VOverlay，不影响拖拽区） -->
+          <div
+            v-if="message.stats"
+            class="pointer-events-none invisible absolute bottom-full left-0 z-10 mb-1.5 flex items-center gap-3 whitespace-nowrap rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-muted opacity-0 shadow-lg transition-opacity duration-150 group-hover/stats:visible group-hover/stats:opacity-100"
+          >
+            <span class="flex items-center gap-1">
+              <span class="i-lucide:clock text-3" />
+              {{ t('chat.stats.time') }}
+              <span class="tabular-nums text-fg">{{ formatTime(message.stats.endAt) }}</span>
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="i-lucide:timer text-3" />
+              {{ t('chat.stats.duration') }}
+              <span class="tabular-nums text-fg">
+                {{ formatDuration(message.stats.endAt - message.stats.startAt) }}
+              </span>
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="i-lucide:zap text-3" />
+              {{ t('chat.stats.firstToken') }}
+              <span class="tabular-nums text-fg">
+                {{ message.stats.firstTokenMs !== undefined ? formatDuration(message.stats.firstTokenMs) : '—' }}
+              </span>
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="i-lucide:gauge text-3" />
+              {{ t('chat.stats.tokensPerSec') }}
+              <span class="tabular-nums text-fg">
+                {{ formatTokensPerSec(message.stats.completionTokens, message.stats.endAt - message.stats.startAt) }}
+              </span>
+            </span>
+          </div>
+
+          <div class="flex items-center gap-0.5 rounded-lg px-1 py-0.5 text-muted">
+            <VTooltip :text="copied ? t('chat.copied') : t('chat.copy')" location="top">
+              <template #activator="{ props: tip }">
+                <VIconBtn
+                  v-bind="tip"
+                  :icon="copied ? 'i-lucide:check' : 'i-lucide:copy'"
+                  variant="text"
+                  size="small"
+                  rounded="lg"
+                  :class="copied ? 'text-primary' : 'text-muted'"
+                  @click="copyContent"
+                />
+              </template>
+            </VTooltip>
+            <VTooltip :text="t('chat.like')" location="top">
+              <template #activator="{ props: tip }">
+                <VIconBtn
+                  v-bind="tip"
+                  icon="i-lucide:thumbs-up"
+                  variant="text"
+                  size="small"
+                  rounded="lg"
+                  :class="feedback.get(message.id) === 'like' ? 'text-primary' : 'text-muted'"
+                  @click="toggleFeedback('like')"
+                />
+              </template>
+            </VTooltip>
+            <VTooltip :text="t('chat.dislike')" location="top">
+              <template #activator="{ props: tip }">
+                <VIconBtn
+                  v-bind="tip"
+                  icon="i-lucide:thumbs-down"
+                  variant="text"
+                  size="small"
+                  rounded="lg"
+                  :class="feedback.get(message.id) === 'dislike' ? 'text-warning' : 'text-muted'"
+                  @click="toggleFeedback('dislike')"
+                />
+              </template>
+            </VTooltip>
+            <VTooltip :text="t('chat.fork')" location="top">
+              <template #activator="{ props: tip }">
+                <VIconBtn
+                  v-bind="tip"
+                  icon="i-lucide:git-fork"
+                  variant="text"
+                  size="small"
+                  rounded="lg"
+                  class="text-muted"
+                  @click="fork"
+                />
+              </template>
+            </VTooltip>
+          </div>
         </div>
       </div>
     </div>

@@ -97,6 +97,11 @@ const api = {
   /** 订阅 agent 完成事件 */
   onAgentDone: (cb: (ev: { sessionId: string }) => void): (() => void) =>
     subscribe('agent:done', cb, hasSessionId),
+  /** 订阅 agent token 用量事件（回复底部统计；usage 为 { promptTokens, completionTokens }） */
+  onAgentUsage: (
+    cb: (ev: { sessionId: string; usage: { promptTokens: number; completionTokens: number } }) => void
+  ): (() => void) =>
+    subscribe('agent:usage', cb, raw => hasSessionId(raw) && typeof raw['usage'] === 'object' && raw['usage'] !== null),
   /** 订阅 agent 错误事件 */
   onAgentError: (cb: (ev: AgentErrorEvent) => void): (() => void) =>
     subscribe('agent:error', cb, raw => hasSessionId(raw) && typeof raw['code'] === 'string'),

@@ -2,6 +2,7 @@ import type {
   AgentConfirmRequest,
   AgentErrorEvent,
   AgentToolEvent,
+  AgentUsageEvent,
   AppSettings,
   ChatMessagePayload,
   DiffFile,
@@ -61,6 +62,8 @@ export interface HostApi {
   onAgentConfirm: (cb: (ev: AgentConfirmRequest) => void) => () => void;
   onAgentDone: (cb: (ev: { sessionId: string }) => void) => () => void;
   onAgentError: (cb: (ev: AgentErrorEvent) => void) => () => void;
+  /** 订阅 agent token 用量事件（回复底部统计：首token/token 速率） */
+  onAgentUsage: (cb: (ev: AgentUsageEvent) => void) => () => void;
   onWorkspaceDiff: (cb: (ev: { sessionId: string; files: DiffFile[] }) => void) => () => void;
 
   // ---- 工作区 ----
