@@ -19,10 +19,19 @@ packages/
 │   ├── electron.vite.config.ts
 │   ├── uno.config.ts
 │   └── src/
-│       ├── main/     # Electron 主进程（index.ts 窗口；ipc.ts 业务 handler 枢纽；agent/ agent 循环（SSE 流式+工具调用）+工具集（读/列/搜/命令/写/编辑）+权限门控；workspace/ 文件树/读文件 + 快照行级 diff；persist/ 会话/最近项目 SQLite + settings 持久化 + 供应商校验；shell/ git CLI 封装 + 集成终端 node-pty 会话）
+│       ├── main/     # Electron 主进程（index.ts 窗口；ipc.ts 业务 handler 枢纽 + agent EventSink 的 IPC 实现；agent/ agent 的 Electron 薄壳；shell/terminal.ts 集成终端 node-pty 会话）
 │       ├── preload/  # contextBridge 暴露 window.dscode（实现 HostApi 桥接）
 │       └── renderer/ # Vue 应用组装入口（App.vue / router.ts / main.ts / boot.ts）
-├── shared/           # @dscode/shared —— 跨进程/跨客户端：类型定义 + i18n 语言包（TUI 也复用文案）
+├── core/             # @dscode/core —— 纯 TS 核心逻辑（无 Electron/DOM 依赖，Node 内建可用；desktop 与将来 TUI 直接复用）
+│   └── src/
+│       ├── agent/    # 运行时编排：runtime.ts（SSE 流式+工具循环+30 轮上限）、types.ts（AgentEventSink 事件抽象，宿主各自实现）
+│       ├── tools/    # 工具注册表：Tool 接口（描述+实现一体）+ 每工具一文件 ×6，注册表 Record<AgentToolName, Tool> 编译期保证完整
+│       ├── gate/     # 权限门控（只读放行/四权限模式/确认 120s 超时拒绝）
+│       ├── adapters/ # 模型适配：ModelAdapter 接口（请求构造 + SSE 增量归一化）+ openai-compatible/deepseek + 通用 streamChat
+│       ├── workspace/# 文件树扫描/读文件、paths.ts（SKIP_DIRS+resolveSafePath）、diff.ts（快照 + LCS 行级 diff）
+│       ├── git/      # git CLI 封装（execFile 参数数组）
+│       └── persist/  # 会话/最近项目（node:sqlite）、settings（JSON 归一化）、供应商校验
+├── shared/           # @dscode/shared —— 纯契约层（浏览器安全）：类型定义 + i18n 语言包 + DEEPSEEK_PRESET 预置
 │   └── src/
 │       ├── types/    # Session / Message / DiffFile / FileNode / AgentToolEvent 等类型
 │       └── locales/  # zh-CN.json / en-US.json
@@ -36,9 +45,11 @@ packages/
         └── theme/       # tokens.ts（主题色唯一事实源）、global.css（滚动条/选区/拖拽区）
 ```
 
-包间依赖：`desktop` → `ui` → `shared`。workspace 包直接以 TS 源码导出（`exports` 指向 `src/*.ts`），无需预先构建，由 electron-vite 一并编译。
+包间依赖：`desktop` → `core` + `ui` + `shared`；`core` → `shared`；`ui` → `shared`。workspace 包直接以 TS 源码导出（`exports` 指向 `src/*.ts`），无需预先构建，由 electron-vite 一并编译。
 
-**包职责边界（多客户端预留）**：`shared` 只放跨进程/跨客户端的类型与 i18n 文案；`ui` 是客户端无关的前端层——页面/组件/stores/`bridge/host.ts`（HostApi 桥接抽象），Electron 由 preload 实现 HostApi，将来 web 端（HTTP 宿主）与 TUI 端（进程内实现，复用 stores/文案/agent 主进程逻辑）各实现一份；`desktop` 只是 Electron 客户端壳。mock 数据已删除，无纯浏览器降级路径。
+**包职责边界（多客户端预留）**：`shared` 只放跨进程/跨客户端的类型与 i18n 文案（纯契约层，ui 永远碰不到 Node 代码）；`core` 是纯 TS 领域逻辑——agent 运行时（事件经 `AgentEventSink` 上抛，宿主各自实现）、工具/门控/模型适配/工作区/diff/git/持久化，其中 **纯逻辑层**（agent 编排、gate、adapters、diff-LCS，无 Node 依赖）将来浏览器 worker 亦可复用，**Node 服务层**（tools、workspace 扫描、persist、git）由 desktop/TUI 复用；`ui` 是客户端无关的前端层——页面/组件/stores/`bridge/host.ts`（HostApi 桥接抽象），Electron 由 preload 实现 HostApi，将来 web 端（HTTP 宿主）复用 ui 全部，TUI 端（进程内实现 AgentEventSink + 复用 core 全部与 shared 文案）各实现一份；`desktop` 只是 Electron 客户端壳。mock 数据已删除，无纯浏览器降级路径。
+
+**core 构建要点**：main/preload 构建的 `build.externalizeDeps` 使用 `{ exclude: ['@dscode/core', '@dscode/shared'] }`，core/shared 打进 main 产物——若外部化，Node 运行时直接加载其 TS 源码，目录 re-export 会报 `ERR_UNSUPPORTED_DIR_IMPORT`。core 的新增模块经 `core/src/index.ts` 统一出口。
 
 ## 技术栈
 
@@ -62,7 +73,7 @@ pnpm install        # 安装依赖（首次必须，electron 需要 postinstall 
 pnpm dev            # 启动 electron-vite 开发模式（HMR）
 pnpm build          # 构建到 packages/desktop/out/
 pnpm start          # 预览构建产物（electron-vite preview）
-pnpm typecheck      # vue-tsc（renderer+ui+shared）+ tsc（main/preload）
+pnpm typecheck      # vue-tsc（renderer+ui+shared）+ tsc（main/preload）+ tsc（core）
 pnpm lint           # ESLint + oxlint 全量
 pnpm lint:fast      # 仅 oxlint（毫秒级快速反馈）
 pnpm lint:eslint    # 仅 ESLint
@@ -92,7 +103,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 - 可复用 UI 放 `packages/ui`（并在 `src/index.ts` 导出），Electron 宿主相关的薄壳代码放 `packages/desktop`。仅包内使用的组件（如 `TerminalPanel`、`ToolEventCard`）不对外导出，由同包组件相对引用。
 - 集成终端由 `ui/components/workspace/TerminalPanel.vue`（xterm.js + FitAddon，多标签页会话：面板内容 v-show 常驻、新增/关闭标签驱动会话创建/回收）与 `desktop/src/main/shell/terminal.ts`（node-pty 多会话管理）配合实现；终端配色（含 ANSI 16 色 `terminalAnsi`）在 `theme/tokens.ts` 定义，不在组件里写死。
 - 面板尺寸拖拽用 `ui/components/common/ResizeHandle.vue`（Pointer Events 遮罩式拖拽条，定位上下文是抽屉根元素、高亮细线与抽屉外缘边框重合）：`axis="y"` 调终端高度、`axis="x"` 调右侧栏宽度；范围限制写在各面板组件的 `*_MIN_*` / `*_MAX_*` 常量，尺寸状态存 `ui.ts` store（不持久化，每次启动恢复默认）。
-- 跨包引用用包名（`@dscode/shared`、`@dscode/ui`、`@dscode/ui/tokens`），TS 路径别名在根 `tsconfig.base.json` 配置；渲染进程内部还有 `@renderer` 别名指向 `packages/desktop/src/renderer/src`。
+- 跨包引用用包名（`@dscode/core`、`@dscode/shared`、`@dscode/ui`、`@dscode/ui/tokens`），TS 路径别名在根 `tsconfig.base.json` 配置；渲染进程内部还有 `@renderer` 别名指向 `packages/desktop/src/renderer/src`。
 
 ## 主题系统（改动前必读）
 
@@ -113,7 +124,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
   - `projects:list` —— 最近项目（`node:sqlite`，`userData/projects.db`，无原生依赖）
   - `dialog:pick-directory` —— 选择工作目录（取消返回 null）
   - `provider:verify` —— API key 校验（主进程 fetch `GET {baseUrl}/models`）
-  - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（主进程 `agent.ts`：SSE 流式 + 工具循环 + 门控；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求，120s 超时自动拒绝）/ `agent:done` / `agent:error`（code: no-api-key/api/network/aborted/unknown），均带 sessionId
+  - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（运行时在 `@dscode/core`（SSE 流式 + 工具循环 + 门控 + 模型适配，事件经 AgentEventSink 上抛），`desktop/src/main/agent/agent.ts` 实现 sink 映射到 IPC；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求，120s 超时自动拒绝）/ `agent:done` / `agent:error`（code: no-api-key/api/network/aborted/unknown），均带 sessionId
   - `workspace:tree` / `workspace:read-file` —— 真实文件树扫描与文件读取（路径限定工作目录内）；`workspace:diff` 事件 —— 写/执行工具后主进程按「agent 启动快照 vs 当前内容」LCS 行级 diff 推送
   - `sessions:list` / `sessions:create` / `sessions:append` —— 会话持久化（`node:sqlite`，`userData/sessions.db`，toolEvents 不落库）
   - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` —— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合
