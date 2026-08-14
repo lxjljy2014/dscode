@@ -25,6 +25,10 @@ export const SYSTEM_PROMPT = `你是 DSCode 内置的编程助手，在用户的
 
 interface RunState {
   controller: AbortController;
+  /** 已被新运行替换：中止时不再向渲染端推 aborted 事件（渲染端状态已丢失，推了也无接收方） */
+  replacing: boolean;
+  /** runLoop 收尾完成（含 finally 清理），替换时等待旧运行完全退出 */
+  done: Promise<void>;
 }
 
 /** 等待用户确认的工具调用：toolEventId → 归属会话 + resolve */
@@ -51,7 +55,9 @@ export interface AgentStartInput {
   };
 }
 
-export type AgentStartResult = { ok: true } | { ok: false; error: string };
+export type AgentStartResult =
+  | { ok: true }
+  | { ok: false; error: 'already-running' | 'no-models' | 'invalid-args' };
 
 /**
  * 运行时状态封装成实例：runs / pendingConfirms / diff 快照均按实例隔离，
@@ -67,21 +73,30 @@ export class AgentRuntime {
     return `t-${Date.now()}-${this.toolSeq++}`;
   }
 
-  /** 启动一次 agent 运行 */
+  /** 启动一次 agent 运行（同会话已在运行则先中止旧运行再启动，适配渲染端状态丢失后的重发） */
   async start(input: AgentStartInput): Promise<AgentStartResult> {
     const { sessionId, model, rawMessages, sink, config } = input;
-    if (this.runs.has(sessionId)) return { ok: false, error: 'session already running' };
 
+    // 先做输入校验，避免非法输入中止正在进行的运行
     const provider = config.providers[0];
     if (!provider || provider.apiKey.length === 0) {
       sink.error(sessionId, 'no-api-key');
       return { ok: true };
     }
     const resolvedModel = provider.models.includes(model) ? model : (provider.models[0] ?? '');
-    if (resolvedModel.length === 0) return { ok: false, error: 'no models configured' };
+    if (resolvedModel.length === 0) return { ok: false, error: 'no-models' };
+
+    // 同会话重发（窗口重载/重开后渲染端状态丢失）：标记替换、中止并等待旧运行完全退出
+    const existing = this.runs.get(sessionId);
+    if (existing) {
+      existing.replacing = true;
+      existing.controller.abort();
+      await existing.done.catch(() => {});
+    }
 
     const controller = new AbortController();
-    this.runs.set(sessionId, { controller });
+    const run: RunState = { controller, replacing: false, done: Promise.resolve() };
+    this.runs.set(sessionId, run);
     // agent 启动时快照工作目录，作为本次运行 diff 的基线
     await this.snapshots.initSnapshot(sessionId, config.workingDirectory);
 
@@ -90,7 +105,7 @@ export class AgentRuntime {
       ...rawMessages.map(m => ({ role: m.role, content: m.content }))
     ];
 
-    this.runLoop(
+    run.done = this.runLoop(
       sessionId,
       config.workingDirectory,
       config.permissionMode,
@@ -100,7 +115,7 @@ export class AgentRuntime {
       config.browsingEnabled !== false,
       sink
     ).finally(() => {
-      this.runs.delete(sessionId);
+      if (this.runs.get(sessionId) === run) this.runs.delete(sessionId);
       this.snapshots.clearSnapshot(sessionId);
       // 运行结束未处理的确认一律视为拒绝，仅清理本会话，避免误伤其它会话
       for (const [id, c] of this.pendingConfirms) {
@@ -226,7 +241,8 @@ export class AgentRuntime {
       sink.done(sessionId);
     } catch (e) {
       if (signal.aborted) {
-        sink.error(sessionId, 'aborted');
+        // 被新运行替换时静默退出（渲染端已丢失状态，aborted 事件无接收方）
+        if (!run.replacing) sink.error(sessionId, 'aborted');
         return;
       }
       if (e instanceof ApiError) {

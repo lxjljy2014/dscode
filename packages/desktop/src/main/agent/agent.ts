@@ -19,6 +19,9 @@ import { fireHooks } from '../hooks';
  * IPC 边界在此完成 model / messages 的类型收窄（公共边界强类型化，core 不再依赖运行时过滤）。
  */
 
+/** 运行发起窗口归属（事件只推给发起窗口；窗口关闭时回收其运行，避免孤儿运行烧 token） */
+const winBySession = new Map<string, BrowserWindow>();
+
 /** 把 core 的 AgentEventSink 适配到 IPC 通道（通道名是壳的细节，不进 core） */
 function createSink(win: BrowserWindow, hooks: Hook[], cwd: string, model: string, usageFile: string): AgentEventSink {
   const send = (channel: string, payload: unknown): void => {
@@ -60,12 +63,12 @@ export async function startAgent(
   rawMessages: unknown,
   subagentId: unknown
 ): Promise<AgentStartResult> {
-  if (typeof model !== 'string') return { ok: false, error: 'invalid model' };
+  if (typeof model !== 'string') return { ok: false, error: 'invalid-args' };
   if (subagentId !== undefined && typeof subagentId !== 'string') {
-    return { ok: false, error: 'invalid subagent' };
+    return { ok: false, error: 'invalid-args' };
   }
   if (!Array.isArray(rawMessages) || !rawMessages.every(isChatMessagePayload)) {
-    return { ok: false, error: 'invalid messages' };
+    return { ok: false, error: 'invalid-args' };
   }
   const settings = loadAppSettings(app.getPath('userData') + '/settings.json', app.getPath('home'));
   // 子智能体人设：命中则替换默认系统提示词，记忆/技能仍叠加
@@ -84,7 +87,7 @@ export async function startAgent(
       : '';
   // 会话开始钩子
   fireHooks(settings.hooks, 'session_start', settings.workingDirectory);
-  return startAgentCore({
+  const result = await startAgentCore({
     sessionId,
     model,
     rawMessages,
@@ -97,11 +100,23 @@ export async function startAgent(
       browsingEnabled: settings.browsingEnabled
     }
   });
+  if (result.ok) winBySession.set(sessionId, win);
+  return result;
 }
 
 /** 停止会话的 agent 运行 */
 export function stopAgent(_win: BrowserWindow, sessionId: string): void {
   stopAgentCore(sessionId);
+}
+
+/** 窗口关闭时中止其发起的所有运行（事件推给已销毁窗口无意义，且避免孤儿运行继续烧 token） */
+export function stopWindowAgents(win: BrowserWindow): void {
+  for (const [sessionId, owner] of winBySession) {
+    if (owner === win) {
+      stopAgentCore(sessionId);
+      winBySession.delete(sessionId);
+    }
+  }
 }
 
 export { disposeAgents, resolveConfirm };

@@ -106,6 +106,15 @@
       "edit_file": "编辑文件",
       "browse": "浏览网页"
     },
+    "verb": {
+      "read_file": "读取",
+      "list_dir": "列出",
+      "search": "搜索",
+      "run_command": "执行",
+      "write_file": "写入",
+      "edit_file": "编辑",
+      "browse": "浏览"
+    },
     "status": {
       "running": "执行中",
       "done": "已完成",
@@ -117,12 +126,20 @@
     "deny": "拒绝",
     "args": "参数",
     "result": "结果",
-    "thinking": "思考过程",
+    "action": {
+      "writing": "写入中",
+      "written": "已写入",
+      "editing": "编辑中",
+      "edited": "已编辑"
+    },
+    "thinking": "思考",
+    "thinkinging": "思考中",
     "error": {
       "no-api-key": "未配置 API key，请到设置页填写后再试",
       "api": "接口调用出错，请检查 API key 与网络后重试",
       "network": "网络异常或请求超时，请稍后重试",
       "aborted": "已停止",
+      "running": "上一条消息还在处理中，请稍候或先停止",
       "unknown": "发生未知错误"
     }
   },

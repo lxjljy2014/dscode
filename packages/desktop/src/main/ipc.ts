@@ -164,7 +164,7 @@ export function registerIpcHandlers(): void {
     withMainWindow((win, sessionId: unknown, model: unknown, messages: unknown, subagentId: unknown) =>
       isString(sessionId)
         ? startAgent(win, sessionId, model, messages, subagentId)
-        : { ok: false, error: 'invalid sessionId' }
+        : { ok: false, error: 'invalid-args' as const }
     )
   );
   ipcMain.handle(

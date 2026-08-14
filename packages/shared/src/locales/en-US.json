@@ -106,6 +106,15 @@
       "edit_file": "Edit file",
       "browse": "Browse web"
     },
+    "verb": {
+      "read_file": "Read",
+      "list_dir": "List",
+      "search": "Search",
+      "run_command": "Run",
+      "write_file": "Write",
+      "edit_file": "Edit",
+      "browse": "Browse"
+    },
     "status": {
       "running": "Running",
       "done": "Done",
@@ -117,12 +126,20 @@
     "deny": "Deny",
     "args": "Arguments",
     "result": "Result",
+    "action": {
+      "writing": "Writing",
+      "written": "Written",
+      "editing": "Editing",
+      "edited": "Edited"
+    },
     "thinking": "Thinking",
+    "thinkinging": "Thinking",
     "error": {
       "no-api-key": "No API key configured. Please set it on the settings page first.",
       "api": "API call failed. Check your API key and network, then retry.",
       "network": "Network error or request timeout. Please try again later.",
       "aborted": "Stopped",
+      "running": "The previous message is still being processed. Please wait or stop it first.",
       "unknown": "An unknown error occurred"
     }
   },
