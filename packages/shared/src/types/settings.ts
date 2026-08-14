@@ -20,6 +20,8 @@ export interface ProviderConfig {
   apiKey: string;
   /** 模型列表（可增删） */
   models: string[];
+  /** 模型适配器 id（对应 @dscode/core adapters 注册表；缺省回退 openai-compatible） */
+  adapter?: string;
 }
 
 export interface AppSettings {
@@ -39,7 +41,8 @@ export const DEEPSEEK_PRESET: ProviderConfig = {
   name: 'DeepSeek',
   baseUrl: 'https://api.deepseek.com',
   apiKey: '',
-  models: ['deepseek-v4-pro', 'deepseek-v4-flash']
+  models: ['deepseek-v4-pro', 'deepseek-v4-flash'],
+  adapter: 'deepseek'
 };
 
 /**

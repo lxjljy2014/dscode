@@ -23,13 +23,21 @@ function isProviderConfig(v: unknown): v is ProviderConfig {
     typeof p['baseUrl'] === 'string' &&
     typeof p['apiKey'] === 'string' &&
     Array.isArray(p['models']) &&
-    p['models'].every(m => typeof m === 'string')
+    p['models'].every(m => typeof m === 'string') &&
+    (p['adapter'] === undefined || typeof p['adapter'] === 'string')
   );
 }
 
-/** 预置供应商的模型列表强制对齐 DEEPSEEK_PRESET，防旧数据漂移（如已下线的 deepseek-chat 残留） */
+/**
+ * 预置供应商归一化：模型列表与适配器强制对齐 DEEPSEEK_PRESET，
+ * 防旧数据漂移（如已下线的 deepseek-chat 残留、缺失的 adapter 字段）。
+ */
 function normalizeProviders(providers: ProviderConfig[]): ProviderConfig[] {
-  return providers.map(p => (p.id === DEEPSEEK_PRESET.id ? { ...p, models: DEEPSEEK_PRESET.models } : p));
+  return providers.map(p =>
+    p.id === DEEPSEEK_PRESET.id
+      ? { ...p, models: DEEPSEEK_PRESET.models, adapter: p.adapter ?? DEEPSEEK_PRESET.adapter }
+      : p
+  );
 }
 
 export function defaultSettings(homeDir: string): AppSettings {

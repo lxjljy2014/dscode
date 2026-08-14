@@ -1,6 +1,6 @@
 import { app, BrowserWindow } from 'electron';
-import type { AgentToolEvent, AgentToolName, ChatMessagePayload, PermissionMode } from '@dscode/shared';
-import { executeTool, toolPermission, toolSchemas } from '@dscode/core';
+import type { AgentToolEvent, ChatMessagePayload, PermissionMode } from '@dscode/shared';
+import { ApiError, executeTool, resolveAdapter, streamChat, toolPermission, toolSchemas } from '@dscode/core';
 import { gateTool, needsConfirm } from './agent-gate';
 import { clearSnapshot, initSnapshot, recomputeDiff } from '../workspace/diff';
 import { loadSettings } from '../persist/config';
@@ -43,96 +43,7 @@ const SYSTEM_PROMPT =
   '- 回答语言与用户提问一致\n' +
   '- 只做用户要求的事，不擅自扩大改动范围';
 
-// ---- LLM 流式调用 ----
-
-/** 单轮流式请求累积的工具调用 */
-interface AccumulatedToolCall {
-  index: number;
-  id: string;
-  name: AgentToolName;
-  arguments: string;
-}
-
-class ApiError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
-
-/**
- * POST {baseUrl}/chat/completions（stream），解析 SSE：
- * 文本增量经 onDelta 回调、思维链增量经 onReasoning 回调（deepseek-v4-pro 等推理模型
- * 的 reasoning_content 流），tool_calls 增量按 index 累积，结束时返回。
- */
-async function chatStream(
-  baseUrl: string,
-  apiKey: string,
-  model: string,
-  messages: unknown[],
-  signal: AbortSignal,
-  onDelta: (text: string) => void,
-  onReasoning: (text: string) => void
-): Promise<AccumulatedToolCall[]> {
-  const url = new URL(baseUrl);
-  url.pathname = url.pathname.replace(/\/+$/, '') + '/chat/completions';
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages, tools: toolSchemas(), stream: true }),
-    signal
-  });
-  if (!res.ok || !res.body) {
-    const body = await res.text().catch(() => '');
-    throw new ApiError(res.status, body.slice(0, 500));
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  const toolCalls = new Map<number, AccumulatedToolCall>();
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let nl: number;
-    while ((nl = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, nl).trim();
-      buffer = buffer.slice(nl + 1);
-      if (!line.startsWith('data:')) continue;
-      const data = line.slice(5).trim();
-      if (data === '[DONE]') continue;
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(data);
-      } catch {
-        continue;
-      }
-      const delta = (parsed as { choices?: Array<{ delta?: Record<string, unknown> }> }).choices?.[0]?.delta;
-      if (!delta) continue;
-      if (typeof delta['content'] === 'string' && delta['content'].length > 0) onDelta(delta['content']);
-      if (typeof delta['reasoning_content'] === 'string' && delta['reasoning_content'].length > 0) {
-        onReasoning(delta['reasoning_content']);
-      }
-      const calls = delta['tool_calls'];
-      if (Array.isArray(calls)) {
-        for (const raw of calls as Array<Record<string, unknown>>) {
-          const index = typeof raw['index'] === 'number' ? raw['index'] : toolCalls.size;
-          const fn = (raw['function'] ?? {}) as Record<string, unknown>;
-          let acc = toolCalls.get(index);
-          if (!acc) {
-            acc = { index, id: '', name: '' as AgentToolName, arguments: '' };
-            toolCalls.set(index, acc);
-          }
-          if (typeof raw['id'] === 'string') acc.id = raw['id'];
-          if (typeof fn['name'] === 'string') acc.name = fn['name'] as AgentToolName;
-          if (typeof fn['arguments'] === 'string') acc.arguments += fn['arguments'];
-        }
-      }
-    }
-  }
-  return [...toolCalls.values()].sort((a, b) => a.index - b.index);
-}
+// ---- LLM 流式调用（协议适配在 @dscode/core adapters） ----
 
 // ---- 工具事件推送 ----
 
@@ -147,7 +58,7 @@ async function runLoop(
   sessionId: string,
   cwd: string,
   permissionMode: PermissionMode,
-  provider: { baseUrl: string; apiKey: string },
+  provider: { baseUrl: string; apiKey: string; adapter?: string },
   model: string,
   messages: unknown[]
 ): Promise<void> {
@@ -158,11 +69,9 @@ async function runLoop(
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const combined = AbortSignal.any([signal, AbortSignal.timeout(ROUND_TIMEOUT_MS)]);
-      const toolCalls = await chatStream(
-        provider.baseUrl,
-        provider.apiKey,
-        model,
-        messages,
+      const toolCalls = await streamChat(
+        resolveAdapter(provider.adapter),
+        { baseUrl: provider.baseUrl, apiKey: provider.apiKey, model, messages, tools: toolSchemas() },
         combined,
         text => send(win, 'agent:delta', { sessionId, content: text, kind: 'content' }),
         text => send(win, 'agent:delta', { sessionId, content: text, kind: 'reasoning' })
@@ -279,9 +188,8 @@ export function startAgent(
     return { ok: true };
   }
   const requestedModel = typeof model === 'string' ? model : '';
-  const resolvedModel = provider.models.includes(requestedModel)
-    ? requestedModel
-    : provider.models[0] ?? 'deepseek-v4-pro';
+  const resolvedModel = provider.models.includes(requestedModel) ? requestedModel : (provider.models[0] ?? '');
+  if (resolvedModel.length === 0) return { ok: false, error: 'no models configured' };
 
   const controller = new AbortController();
   runs.set(sessionId, { controller });
@@ -298,7 +206,7 @@ export function startAgent(
     sessionId,
     settings.workingDirectory,
     settings.permissionMode,
-    { baseUrl: provider.baseUrl, apiKey: provider.apiKey },
+    { baseUrl: provider.baseUrl, apiKey: provider.apiKey, adapter: provider.adapter },
     resolvedModel,
     context
   ).finally(() => {
