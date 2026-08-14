@@ -2,8 +2,8 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { GitGraphRow } from '@dscode/shared';
-import { host } from '../host';
-import { useSettingsStore } from '../stores/settings';
+import { host } from '../../bridge/host';
+import { useSettingsStore } from '../../stores/settings';
 
 /**
  * git 图谱弹窗：git log --graph 结构化表格（图/描述/日期/作者/提交id）。

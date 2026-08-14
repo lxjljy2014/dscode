@@ -3,10 +3,10 @@ import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import type { PermissionMode } from '@dscode/shared';
-import { host } from '../host';
-import { useSessionStore } from '../stores/session';
-import { useSettingsStore } from '../stores/settings';
-import GitBranchMenu from './GitBranchMenu.vue';
+import { host } from '../../bridge/host';
+import { useSessionStore } from '../../stores/session';
+import { useSettingsStore } from '../../stores/settings';
+import GitBranchMenu from '../git/GitBranchMenu.vue';
 
 const props = defineProps<{ generating: boolean }>();
 const emit = defineEmits<{

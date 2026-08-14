@@ -2,8 +2,8 @@
 import { storeToRefs } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useSessionStore } from '../stores/session';
-import { useSettingsStore } from '../stores/settings';
+import { useSessionStore } from '../../stores/session';
+import { useSettingsStore } from '../../stores/settings';
 
 const { t } = useI18n();
 const store = useSessionStore();

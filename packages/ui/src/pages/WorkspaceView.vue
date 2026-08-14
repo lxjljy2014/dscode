@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { useUiStore } from '../stores/ui';
-import AppHeader from './AppHeader.vue';
-import ChatView from './ChatView.vue';
-import UserBar from './UserBar.vue';
-import WorkspacePanel from './WorkspacePanel.vue';
-import WorkspaceSidebar from './WorkspaceSidebar.vue';
-import TerminalPanel from './TerminalPanel.vue';
+import AppHeader from '../components/workspace/AppHeader.vue';
+import ChatView from '../components/chat/ChatView.vue';
+import UserBar from '../components/common/UserBar.vue';
+import WorkspacePanel from '../components/workspace/WorkspacePanel.vue';
+import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar.vue';
+import TerminalPanel from '../components/workspace/TerminalPanel.vue';
 
 const ui = useUiStore();
 </script>

@@ -2,8 +2,8 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { GitListResult } from '@dscode/shared';
-import { host } from '../host';
-import { useSettingsStore } from '../stores/settings';
+import { host } from '../../bridge/host';
+import { useSettingsStore } from '../../stores/settings';
 import GitGraphDialog from './GitGraphDialog.vue';
 
 /**

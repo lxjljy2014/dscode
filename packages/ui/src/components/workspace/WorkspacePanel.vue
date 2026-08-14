@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useUiStore } from '../stores/ui';
+import { useUiStore } from '../../stores/ui';
 import DiffPanel from './DiffPanel.vue';
-import ResizeHandle from './ResizeHandle.vue';
+import ResizeHandle from '../common/ResizeHandle.vue';
 
 const ui = useUiStore();
 

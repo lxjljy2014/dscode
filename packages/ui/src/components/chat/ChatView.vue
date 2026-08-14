@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import { useSessionStore } from '../stores/session';
+import { useSessionStore } from '../../stores/session';
 import ChatInput from './ChatInput.vue';
 import MessageItem from './MessageItem.vue';
 import ToolEventCard from './ToolEventCard.vue';

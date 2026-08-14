@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
-import { isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from '../host';
-import { useUiStore } from '../stores/ui';
-import { useSessionStore } from '../stores/session';
-import { useSettingsStore } from '../stores/settings';
-import GitBranchMenu from './GitBranchMenu.vue';
+import { isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from '../../bridge/host';
+import { useUiStore } from '../../stores/ui';
+import { useSessionStore } from '../../stores/session';
+import { useSettingsStore } from '../../stores/settings';
+import GitBranchMenu from '../git/GitBranchMenu.vue';
 
 const { t } = useI18n();
 const uiStore = useUiStore();

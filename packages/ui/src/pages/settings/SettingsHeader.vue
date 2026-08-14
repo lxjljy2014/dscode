@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from '../host';
+import { isFrameless, isMac, TITLEBAR_OVERLAY_WIDTH } from '../../bridge/host';
 
 const { t } = useI18n();
 

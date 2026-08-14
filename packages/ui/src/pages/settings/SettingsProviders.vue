@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { DEEPSEEK_PRESET } from '@dscode/shared';
-import { useSettingsStore } from '../stores/settings';
+import { useSettingsStore } from '../../stores/settings';
 
 /**
  * 设置页「引导」版块：修改 DeepSeek API key（引导页的后续入口）。

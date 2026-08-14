@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import type { AgentToolEvent, ChatMessagePayload, DiffFile, FileNode, Message, Session } from '@dscode/shared';
-import { host } from '../host';
+import { host } from '../bridge/host';
 import { useSettingsStore } from './settings';
 import { useUiStore } from './ui';
 

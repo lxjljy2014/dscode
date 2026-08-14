@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import { useSessionStore } from '../stores/session';
+import { useSessionStore } from '../../stores/session';
 import FileTree from './FileTree.vue';
 
 const { t } = useI18n();

@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { DEEPSEEK_PRESET } from '@dscode/shared';
 import { useSettingsStore } from '../stores/settings';
-import { host, isFrameless, isMac } from '../host';
+import { host, isFrameless, isMac } from '../bridge/host';
 
 /**
  * 首次启动引导页：输入 DeepSeek API key，验证通过后进入工作区。

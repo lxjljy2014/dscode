@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { AgentToolEvent } from '@dscode/shared';
-import { useSessionStore } from '../stores/session';
+import { useSessionStore } from '../../stores/session';
 
 /**
  * 工具事件卡：聊天流内的紧凑行（工具图标 + 名称 + 参数摘要 + 状态），可展开查看完整参数与结果；

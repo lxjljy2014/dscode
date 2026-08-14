@@ -6,11 +6,11 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import type { ITheme } from '@xterm/xterm';
 import type { TerminalExitInfo } from '@dscode/shared';
-import { host } from '../host';
-import { useUiStore } from '@dscode/ui';
-import { useSettingsStore } from '@dscode/ui';
-import { darkTheme, fontFamilyMono, lightTheme, neutral, terminalAnsi } from '../theme/tokens';
-import ResizeHandle from './ResizeHandle.vue';
+import { host } from '../../bridge/host';
+import { useUiStore } from '../../stores/ui';
+import { useSettingsStore } from '../../stores/settings';
+import { darkTheme, fontFamilyMono, lightTheme, neutral, terminalAnsi } from '../../theme/tokens';
+import ResizeHandle from '../common/ResizeHandle.vue';
 
 const { t } = useI18n();
 const uiStore = useUiStore();

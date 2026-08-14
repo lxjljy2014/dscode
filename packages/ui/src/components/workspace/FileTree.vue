@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import { useSessionStore } from '../stores/session';
+import { useSessionStore } from '../../stores/session';
 import type { FileNode } from '@dscode/shared';
 
 const { t } = useI18n();

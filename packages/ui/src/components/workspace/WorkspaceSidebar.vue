@@ -2,9 +2,9 @@
 import { storeToRefs } from 'pinia';
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { isFrameless, isMac } from '../host';
-import { useSessionStore } from '../stores/session';
-import { useUiStore } from '../stores/ui';
+import { isFrameless, isMac } from '../../bridge/host';
+import { useSessionStore } from '../../stores/session';
+import { useUiStore } from '../../stores/ui';
 import SessionSidebar from './SessionSidebar.vue';
 
 const { t } = useI18n();

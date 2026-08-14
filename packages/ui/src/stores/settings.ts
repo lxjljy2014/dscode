@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type { AppSettings, SettingsPatch } from '@dscode/shared';
-import { host } from '../host';
-import type { HostApi } from '../host';
+import { host } from '../bridge/host';
+import type { HostApi } from '../bridge/host';
 
 /**
  * 应用设置（工作目录 / 权限模式 / AI 供应商 / 引导状态），主进程 settings.json 持久化。

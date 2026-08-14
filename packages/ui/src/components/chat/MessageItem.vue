@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Message } from '@dscode/shared';
-import { renderMarkdown } from '../utils/markdown';
+import { renderMarkdown } from '../../utils/markdown';
 
 const props = defineProps<{ message: Message }>();
 

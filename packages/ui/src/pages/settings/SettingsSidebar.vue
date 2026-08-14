@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { isFrameless, isMac } from '../host';
+import { isFrameless, isMac } from '../../bridge/host';
 
 const { t } = useI18n();
 const route = useRoute();
