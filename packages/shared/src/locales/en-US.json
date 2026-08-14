@@ -145,8 +145,11 @@
       "denied": "Denied"
     },
     "approveOnce": "Allow once",
+    "approveOnceHint": "Allow this time only, no further prompts",
     "approveSession": "Allow for this session",
+    "approveSessionHint": "Don't ask again for the same action in this session",
     "deny": "Deny",
+    "denyHint": "Stop the current task and don't continue",
     "args": "Arguments",
     "result": "Result",
     "action": {

@@ -145,8 +145,11 @@
       "denied": "已拒绝"
     },
     "approveOnce": "允许一次",
+    "approveOnceHint": "仅本次执行，不再询问",
     "approveSession": "本次会话允许",
+    "approveSessionHint": "本会话内相同操作不再询问",
     "deny": "拒绝",
+    "denyHint": "停止当前任务，不再继续执行",
     "args": "参数",
     "result": "结果",
     "action": {
