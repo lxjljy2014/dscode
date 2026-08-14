@@ -150,6 +150,7 @@
     "approveSessionHint": "Don't ask again for the same action in this session",
     "deny": "Deny",
     "denyHint": "Stop the current task and don't continue",
+    "keyboardHint": "↑/↓ Select · Enter Confirm · Esc Deny",
     "args": "Arguments",
     "result": "Result",
     "action": {

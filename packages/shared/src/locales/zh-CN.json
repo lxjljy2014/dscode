@@ -150,6 +150,7 @@
     "approveSessionHint": "本会话内相同操作不再询问",
     "deny": "拒绝",
     "denyHint": "停止当前任务，不再继续执行",
+    "keyboardHint": "↑/↓ 选择 · Enter 确认 · Esc 拒绝",
     "args": "参数",
     "result": "结果",
     "action": {
