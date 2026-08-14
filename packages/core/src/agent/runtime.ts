@@ -46,6 +46,8 @@ export interface AgentStartInput {
     permissionMode: PermissionMode;
     providers: ProviderConfig[];
     systemPrompt?: string;
+    /** 是否启用网页浏览（browse 工具）；默认启用 */
+    browsingEnabled?: boolean;
   };
 }
 
@@ -95,6 +97,7 @@ export class AgentRuntime {
       { baseUrl: provider.baseUrl, apiKey: provider.apiKey, adapter: provider.adapter },
       resolvedModel,
       context,
+      config.browsingEnabled !== false,
       sink
     ).finally(() => {
       this.runs.delete(sessionId);
@@ -119,6 +122,7 @@ export class AgentRuntime {
     provider: { baseUrl: string; apiKey: string; adapter?: string },
     model: string,
     messages: unknown[],
+    browsingEnabled: boolean,
     sink: AgentEventSink
   ): Promise<void> {
     const run = this.runs.get(sessionId);
@@ -126,16 +130,23 @@ export class AgentRuntime {
     const signal = run.controller.signal;
 
     try {
+      let totalPrompt = 0;
+      let totalCompletion = 0;
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const combined = AbortSignal.any([signal, AbortSignal.timeout(ROUND_TIMEOUT_MS)]);
-        const toolCalls = await streamChat(
+        const { toolCalls, usage } = await streamChat(
           resolveAdapter(provider.adapter),
-          { baseUrl: provider.baseUrl, apiKey: provider.apiKey, model, messages, tools: toolSchemas() },
+          { baseUrl: provider.baseUrl, apiKey: provider.apiKey, model, messages, tools: toolSchemas(browsingEnabled) },
           combined,
           text => sink.delta(sessionId, 'content', text),
           text => sink.delta(sessionId, 'reasoning', text)
         );
+        if (usage) {
+          totalPrompt += usage.promptTokens;
+          totalCompletion += usage.completionTokens;
+        }
         if (toolCalls.length === 0) {
+          sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion });
           sink.done(sessionId);
           return;
         }
@@ -211,6 +222,7 @@ export class AgentRuntime {
           messages.push({ role: 'tool', tool_call_id: t.id, content: toolResultContent });
         }
       }
+      sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion });
       sink.done(sessionId);
     } catch (e) {
       if (signal.aborted) {

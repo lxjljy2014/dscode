@@ -13,7 +13,14 @@ const DEFAULTS: AppSettings = {
   workingDirectory: '',
   permissionMode: 'confirm',
   providers: [],
-  onboardingDone: false
+  onboardingDone: false,
+  commands: [],
+  memory: [],
+  skills: [],
+  hooks: [],
+  subagents: [],
+  mcpServers: [],
+  browsingEnabled: true
 };
 
 /** 应用只在宿主内运行，桥接缺失视为环境错误 */

@@ -2,7 +2,19 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 // 经子路径出口导入运行时值：主进程外部化 @dscode/shared 后由 Node 直接加载，
 // 主入口 index.ts 的目录 re-export（./types）在 Node ESM 下不可解析
 import { DEEPSEEK_PRESET } from '@dscode/shared/settings';
-import type { AppSettings, PermissionMode, ProviderConfig, SettingsPatch } from '@dscode/shared';
+import type {
+  AppSettings,
+  Command,
+  Hook,
+  HookTrigger,
+  McpServer,
+  MemoryEntry,
+  PermissionMode,
+  ProviderConfig,
+  SettingsPatch,
+  Skill,
+  Subagent
+} from '@dscode/shared';
 
 /**
  * 应用设置的 JSON 持久化（userData/settings.json）。
@@ -35,6 +47,78 @@ function isProviderConfig(v: unknown): v is ProviderConfig {
   );
 }
 
+/** 斜杠命令收窄：字段齐全且类型正确才保留 */
+/** 记忆条目收窄 */
+function isMemoryEntry(v: unknown): v is MemoryEntry {
+  if (typeof v !== 'object' || v === null) return false;
+  const e = v as Record<string, unknown>;
+  return typeof e['id'] === 'string' && typeof e['content'] === 'string';
+}
+
+/** 技能收窄 */
+function isSkill(v: unknown): v is Skill {
+  if (typeof v !== 'object' || v === null) return false;
+  const s = v as Record<string, unknown>;
+  return (
+    typeof s['id'] === 'string' &&
+    typeof s['name'] === 'string' &&
+    typeof s['description'] === 'string' &&
+    typeof s['instructions'] === 'string'
+  );
+}
+
+function isHookTrigger(v: unknown): v is HookTrigger {
+  return v === 'session_start' || v === 'session_end' || v === 'tool_done';
+}
+
+/** 钩子收窄 */
+function isHook(v: unknown): v is Hook {
+  if (typeof v !== 'object' || v === null) return false;
+  const h = v as Record<string, unknown>;
+  return (
+    typeof h['id'] === 'string' &&
+    typeof h['name'] === 'string' &&
+    isHookTrigger(h['trigger']) &&
+    typeof h['command'] === 'string'
+  );
+}
+
+/** 子智能体收窄 */
+function isSubagent(v: unknown): v is Subagent {
+  if (typeof v !== 'object' || v === null) return false;
+  const s = v as Record<string, unknown>;
+  return (
+    typeof s['id'] === 'string' &&
+    typeof s['name'] === 'string' &&
+    typeof s['description'] === 'string' &&
+    typeof s['systemPrompt'] === 'string'
+  );
+}
+
+/** MCP 服务器收窄 */
+function isMcpServer(v: unknown): v is McpServer {
+  if (typeof v !== 'object' || v === null) return false;
+  const s = v as Record<string, unknown>;
+  return (
+    typeof s['id'] === 'string' &&
+    typeof s['name'] === 'string' &&
+    typeof s['command'] === 'string' &&
+    Array.isArray(s['args']) &&
+    s['args'].every(a => typeof a === 'string')
+  );
+}
+
+function isCommand(v: unknown): v is Command {
+  if (typeof v !== 'object' || v === null) return false;
+  const c = v as Record<string, unknown>;
+  return (
+    typeof c['id'] === 'string' &&
+    typeof c['name'] === 'string' &&
+    typeof c['description'] === 'string' &&
+    typeof c['prompt'] === 'string'
+  );
+}
+
 /**
  * 预置供应商归一化：模型列表与适配器强制对齐 DEEPSEEK_PRESET，
  * 防旧数据漂移（如已下线的 deepseek-chat 残留、缺失的 adapter 字段）。
@@ -42,7 +126,12 @@ function isProviderConfig(v: unknown): v is ProviderConfig {
 function normalizeProviders(providers: ProviderConfig[]): ProviderConfig[] {
   return providers.map(p =>
     p.id === DEEPSEEK_PRESET.id
-      ? { ...p, models: DEEPSEEK_PRESET.models, adapter: p.adapter ?? DEEPSEEK_PRESET.adapter }
+      ? {
+          ...p,
+          // 模型列表以用户配置为准；仅空列表回退预置（首次创建/旧数据缺省兜底，之后允许自定义）
+          models: p.models.length > 0 ? p.models : DEEPSEEK_PRESET.models,
+          adapter: p.adapter ?? DEEPSEEK_PRESET.adapter
+        }
       : p
   );
 }
@@ -70,7 +159,19 @@ function encryptProviders(providers: ProviderConfig[], crypto?: SettingsCrypto):
 }
 
 export function defaultSettings(homeDir: string): AppSettings {
-  return { workingDirectory: homeDir, permissionMode: 'confirm', providers: [], onboardingDone: false };
+  return {
+    workingDirectory: homeDir,
+    permissionMode: 'confirm',
+    providers: [],
+    onboardingDone: false,
+    commands: [],
+    memory: [],
+    skills: [],
+    hooks: [],
+    subagents: [],
+    mcpServers: [],
+    browsingEnabled: true
+  };
 }
 
 /** 加载 + 归一化 + 解密：非法字段回退默认值 */
@@ -86,7 +187,26 @@ export function loadSettings(file: string, homeDir: string, crypto?: SettingsCry
       Array.isArray(raw['providers']) ? raw['providers'].filter(isProviderConfig) : defaults.providers
     );
     const onboardingDone = typeof raw['onboardingDone'] === 'boolean' ? raw['onboardingDone'] : defaults.onboardingDone;
-    return { workingDirectory, permissionMode, providers: decryptProviders(providers, crypto), onboardingDone };
+    const commands = Array.isArray(raw['commands']) ? raw['commands'].filter(isCommand) : [];
+    const memory = Array.isArray(raw['memory']) ? raw['memory'].filter(isMemoryEntry) : [];
+    const skills = Array.isArray(raw['skills']) ? raw['skills'].filter(isSkill) : [];
+    const hooks = Array.isArray(raw['hooks']) ? raw['hooks'].filter(isHook) : [];
+    const subagents = Array.isArray(raw['subagents']) ? raw['subagents'].filter(isSubagent) : [];
+    const mcpServers = Array.isArray(raw['mcpServers']) ? raw['mcpServers'].filter(isMcpServer) : [];
+    const browsingEnabled = typeof raw['browsingEnabled'] === 'boolean' ? raw['browsingEnabled'] : true;
+    return {
+      workingDirectory,
+      permissionMode,
+      providers: decryptProviders(providers, crypto),
+      onboardingDone,
+      commands,
+      memory,
+      skills,
+      hooks,
+      subagents,
+      mcpServers,
+      browsingEnabled
+    };
   } catch {
     return defaults;
   }
@@ -109,7 +229,14 @@ export function saveSettings(
     providers: normalizeProviders(
       Array.isArray(patch.providers) ? patch.providers.filter(isProviderConfig) : current.providers
     ),
-    onboardingDone: typeof patch.onboardingDone === 'boolean' ? patch.onboardingDone : current.onboardingDone
+    onboardingDone: typeof patch.onboardingDone === 'boolean' ? patch.onboardingDone : current.onboardingDone,
+    commands: Array.isArray(patch.commands) ? patch.commands.filter(isCommand) : current.commands,
+    memory: Array.isArray(patch.memory) ? patch.memory.filter(isMemoryEntry) : current.memory,
+    skills: Array.isArray(patch.skills) ? patch.skills.filter(isSkill) : current.skills,
+    hooks: Array.isArray(patch.hooks) ? patch.hooks.filter(isHook) : current.hooks,
+    subagents: Array.isArray(patch.subagents) ? patch.subagents.filter(isSubagent) : current.subagents,
+    mcpServers: Array.isArray(patch.mcpServers) ? patch.mcpServers.filter(isMcpServer) : current.mcpServers,
+    browsingEnabled: typeof patch.browsingEnabled === 'boolean' ? patch.browsingEnabled : current.browsingEnabled
   };
   const persisted: AppSettings = { ...next, providers: encryptProviders(next.providers, crypto) };
   writeFileSync(file, JSON.stringify(persisted, null, 2), 'utf8');

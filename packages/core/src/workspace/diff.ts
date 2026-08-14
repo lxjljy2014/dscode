@@ -16,7 +16,7 @@ const MAX_LCS_CELLS = 4_000_000;
 const CONTEXT_LINES = 3;
 
 /** 收集工作目录内全部文本文件（≤512KB，跳过 node_modules/.git/out/dist） */
-async function collectTextFiles(cwd: string): Promise<Map<string, string>> {
+export async function collectTextFiles(cwd: string): Promise<Map<string, string>> {
   const files = new Map<string, string>();
   const walk = async (dir: string): Promise<void> => {
     let entries;

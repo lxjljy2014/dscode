@@ -1,5 +1,5 @@
 import type { AgentToolName } from '@dscode/shared';
-import type { AccumulatedToolCall, ChatRequestInput, ModelAdapter } from './types';
+import type { AccumulatedToolCall, ChatRequestInput, ChatUsage, ModelAdapter } from './types';
 
 /** HTTP 非 2xx 错误（携带状态码与响应体片段，供上层映射 agent:error） */
 export class ApiError extends Error {
@@ -19,7 +19,7 @@ export async function streamChat(
   signal: AbortSignal,
   onDelta: (text: string) => void,
   onReasoning: (text: string) => void
-): Promise<AccumulatedToolCall[]> {
+): Promise<{ toolCalls: AccumulatedToolCall[]; usage?: ChatUsage }> {
   const { url, headers, body } = adapter.createChatRequest(input);
   const res = await fetch(url, {
     method: 'POST',
@@ -36,6 +36,7 @@ export async function streamChat(
   const decoder = new TextDecoder();
   let buffer = '';
   const toolCalls = new Map<number, AccumulatedToolCall>();
+  let usage: ChatUsage | undefined;
   let ended = false;
 
   for (;;) {
@@ -57,6 +58,7 @@ export async function streamChat(
       if (!delta) continue;
       if (delta.content) onDelta(delta.content);
       if (delta.reasoning) onReasoning(delta.reasoning);
+      if (delta.usage) usage = delta.usage;
       for (const raw of delta.toolCalls ?? []) {
         const index = raw.index >= 0 ? raw.index : toolCalls.size;
         let acc = toolCalls.get(index);
@@ -70,5 +72,5 @@ export async function streamChat(
       }
     }
   }
-  return [...toolCalls.values()].sort((a, b) => a.index - b.index);
+  return { toolCalls: [...toolCalls.values()].sort((a, b) => a.index - b.index), usage };
 }

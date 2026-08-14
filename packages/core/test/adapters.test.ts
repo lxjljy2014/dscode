@@ -19,6 +19,11 @@ describe('parseOpenAiDelta', () => {
   it('无 choices 返回 undefined', () => {
     expect(parseOpenAiDelta({})).toBeUndefined();
   });
+
+  it('解析流末尾 usage 帧', () => {
+    const d = parseOpenAiDelta({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 50 } });
+    expect(d?.usage).toEqual({ promptTokens: 100, completionTokens: 50 });
+  });
 });
 
 describe('deepseekAdapter', () => {

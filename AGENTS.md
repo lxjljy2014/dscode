@@ -9,7 +9,7 @@
 主要界面：
 
 - 工作区（`/` 路由）：左侧会话栏 + 顶栏 + 聊天区 + 右侧 diff/文件面板 + 底部终端面板
-- 设置页（`/settings/:section`）：设置导航 + 各设置版块（仅 general 已实现，其余为占位页）
+- 设置页（`/settings/:section`）：设置导航 + 全部版块（常规/外观/模型/浏览器/记忆/技能/子智能体/MCP/命令/钩子/索引库/使用统计/引导，均为真实功能与持久化）
 
 ## 仓库结构（pnpm monorepo）
 
@@ -79,10 +79,10 @@ pnpm lint:fast      # 仅 oxlint（毫秒级快速反馈）
 pnpm lint:eslint    # 仅 ESLint
 pnpm lint:fix       # 两个 linter 自动修复
 pnpm fmt            # oxfmt 格式化
-pnpm test           # 运行 @dscode/core 的 vitest 单测
+pnpm test           # 运行 @dscode/core 与 @dscode/desktop 的 vitest 单测
 ```
 
-注意：**当前没有 CI**。改动后至少跑 `pnpm typecheck` + `pnpm lint` + `pnpm test` 验证。
+CI 已配置（`.github/workflows/ci.yml`，GitHub Actions：`pnpm install --frozen-lockfile` + typecheck + lint + test + build）。**注意仓库托管在 gitee，GitHub Actions 不会在 gitee 上运行**——需镜像到 GitHub 或改用 Gitee Go 才能生效；本地提交前仍至少跑 `pnpm typecheck` + `pnpm lint` + `pnpm test` 验证。
 
 Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror 镜像）下载；`.npmrc` 的 `electron_mirror` 对 pnpm 无效（pnpm 不会把 `.npmrc` 配置转成 `npm_config_*` 环境变量传给 postinstall），不要回退到那种写法。注意 `.pnpmfile.cjs` 内容变化会使 lockfile 的 `pnpmfileChecksum` 失效，需执行一次 `pnpm install --no-frozen-lockfile` 更新。
 
@@ -134,7 +134,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 ## 测试与质量
 
-- 单测框架 **vitest**（仅在 `@dscode/core`，覆盖纯逻辑层）：`pnpm test`（或 `pnpm --filter @dscode/core test`）运行；测试文件位于 `packages/core/test/*.test.ts`，配置 `packages/core/vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 core `tsc` 的 `src/**/*` 类型检查范围）。当前覆盖：权限门控（`gate.test.ts`）、LCS 行级 diff（`diff.test.ts`）、模型适配器 delta 归一化（`adapters.test.ts`）、`resolveSafePath` 防目录穿越/symlink（`paths.test.ts`）。E2E 测试设施暂无。
+- 单测框架 **vitest**，覆盖 `@dscode/core`（纯逻辑层）与 `@dscode/desktop`（主进程纯逻辑）两处：`pnpm test` 依次运行两者（也可 `pnpm --filter <pkg> test` 单独跑）。测试文件位于 `packages/{core,desktop}/test/*.test.ts`，各自 `vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 tsc 的 `src/**/*` 类型检查范围）。当前覆盖：core —— 门控、LCS diff、适配器 delta 归一化、路径防穿越/symlink、persist 落库/加密、usage 用量、MCP 协议、插件加载、代码索引、browse 工具；desktop —— IPC 校验器、safeStorage 加密封装、钩子触发。E2E 测试设施暂无。
 - **lint 双轨并存**（配置都在仓库根）：
   - `oxlint`（`.oxlintrc.json`）：Rust 实现、毫秒级；内置 vue 插件 lint `.vue` 的 `<script>` 块（模板规则暂缺，官方语言插件路线图中）；自动读取 `.gitignore` 排除产物。**负责全部 TS/JS 文件**
   - `eslint`（`eslint.config.js`，flat config，基于 `@soybeanjs/eslint-config-vue`）：**仅覆盖 `.vue` 文件**（soybean 的 defineConfig 硬编码 `files: ['**/*.vue']`），提供模板相关规则；全局 ignores 必须放在数组第一项的无 files config 里（soybean 自带的 ignores 带 files 不生效，会误扫 `out/`）
@@ -143,4 +143,6 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 ## 部署 / 打包
 
-`pnpm build` 只产出 `packages/desktop/out/`（编译产物）。目前**没有配置 electron-builder 等打包工具**，也没有发布流程；需要分发安装包时需先引入打包配置。
+`pnpm build` 产出 `packages/desktop/out/`（编译产物）。**已配置 electron-builder**（`packages/desktop/electron-builder.yml`，mac dmg/zip + win nsis + linux AppImage/deb），`pnpm dist`（或 `dist:mac`/`dist:win`/`dist:linux`）产出安装包到 `release/`（已 gitignore）。`node-pty` 由 electron-builder 对 Electron ABI 重编译；workspace/前端依赖打进 `out/`，故 `dependencies` 只保留 `node-pty`。
+
+**分发策略（已定）**：定位为**发布**——已引入 electron-builder 打包与三平台安装器。代码签名/公证仍需真实证书（当前无 Developer ID，构建时跳过签名）；正式发布前补充 macOS 签名/公证与 Windows 签名配置。

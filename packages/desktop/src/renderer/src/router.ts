@@ -1,7 +1,19 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 import {
   OnboardingView,
+  SettingsAppearance,
+  SettingsBrowser,
+  SettingsCommands,
   SettingsGeneral,
+  SettingsHooks,
+  SettingsIndex,
+  SettingsMcp,
+  SettingsMemory,
+  SettingsModel,
+  SettingsPlugins,
+  SettingsSkills,
+  SettingsSubagents,
+  SettingsUsage,
   SettingsPlaceholder,
   SettingsProviders,
   SettingsView,
@@ -26,6 +38,18 @@ export const router = createRouter({
       children: [
         { path: '', redirect: '/settings/general' },
         { path: 'general', name: 'settings-general', component: SettingsGeneral },
+        { path: 'appearance', name: 'settings-appearance', component: SettingsAppearance },
+        { path: 'model', name: 'settings-model', component: SettingsModel },
+        { path: 'commands', name: 'settings-commands', component: SettingsCommands },
+        { path: 'memory', name: 'settings-memory', component: SettingsMemory },
+        { path: 'skills', name: 'settings-skills', component: SettingsSkills },
+        { path: 'hooks', name: 'settings-hooks', component: SettingsHooks },
+        { path: 'usage', name: 'settings-usage', component: SettingsUsage },
+        { path: 'subagents', name: 'settings-subagents', component: SettingsSubagents },
+        { path: 'mcp', name: 'settings-mcp', component: SettingsMcp },
+        { path: 'plugins', name: 'settings-plugins', component: SettingsPlugins },
+        { path: 'index', name: 'settings-index', component: SettingsIndex },
+        { path: 'browser', name: 'settings-browser', component: SettingsBrowser },
         // 自定义参数正则：只匹配字面量 'onboarding'，同时保留 :section 参数，
         // 让 SettingsView 标题与侧栏高亮无需为静态子路由特判
         { path: ':section(onboarding)', name: 'settings-onboarding', component: SettingsProviders },

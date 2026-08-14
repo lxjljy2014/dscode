@@ -1,0 +1,48 @@
+# electron-builder 打包配置（发布用）。
+# 只有 node-pty 是主进程运行时外部化依赖（见 package.json dependencies），其余 workspace/前端依赖
+# 均被 electron-vite 打进 out/ 产物，故不进入 dependencies，避免 electron-builder 尝试解析 workspace:*。
+appId: com.dscode.app
+productName: DSCode
+copyright: Copyright © 2026 DSCode
+
+directories:
+  output: release
+  buildResources: resources
+
+# 打进安装包的内容：编译产物 + 资源；node_modules 仅收集生产依赖（node-pty），package.json 自动包含
+files:
+  - out/**
+  - resources/**
+  - '!**/*.map'
+
+asar: true
+# node-pty 是原生模块，.node/二进制不能从 asar 内加载，需解包到 app.asar.unpacked
+asarUnpack:
+  - '**/node_modules/node-pty/**'
+
+# 用 electron-builder 自带的 rebuild 把 node-pty 对齐 Electron ABI（需要本机有编译工具链）
+npmRebuild: true
+
+mac:
+  icon: icon.png
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+
+win:
+  icon: icon-win.png
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: DSCode
+
+linux:
+  icon: icon-win.png
+  category: Development
+  target:
+    - AppImage
+    - deb

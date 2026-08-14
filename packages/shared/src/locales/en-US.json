@@ -36,6 +36,7 @@
     "planMode": "Plan mode",
     "agentMode": "Agent mode",
     "addContext": "Add context",
+    "subagentDefault": "Default",
     "effort": {
       "close": "Off",
       "high": "High",
@@ -102,7 +103,8 @@
       "search": "Search",
       "run_command": "Run command",
       "write_file": "Write file",
-      "edit_file": "Edit file"
+      "edit_file": "Edit file",
+      "browse": "Browse web"
     },
     "status": {
       "running": "Running",
@@ -181,6 +183,117 @@
       "proxyExceptions": "Proxy exceptions",
       "proxyExceptionsDesc": "Requests to matching hosts connect directly, bypassing the HTTP proxy. Separate multiple rules with commas. Restart required after changes.",
       "proxyExceptionsPlaceholder": "e.g. localhost, 127.0.0.1, *.internal"
+    },
+    "appearance": {
+      "theme": "Theme",
+      "themeDesc": "Choose the light or dark appearance for the app UI.",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "model": {
+      "empty": "No AI provider configured",
+      "apiKey": "API Key",
+      "models": "Models",
+      "addModel": "Add model",
+      "modelPlaceholder": "Model id, e.g. deepseek-reasoner"
+    },
+    "commands": {
+      "desc": "Custom slash commands: typing /name expands into a prompt.",
+      "add": "Add command",
+      "edit": "Edit command",
+      "empty": "No custom commands yet",
+      "name": "Command name (without /)",
+      "namePlaceholder": "e.g. explain",
+      "description": "Description",
+      "prompt": "Prompt template",
+      "promptPlaceholder": "Text that expands into the input"
+    },
+    "memory": {
+      "title": "Memory",
+      "desc": "Long-term facts about user preferences and project conventions, injected into every conversation's system prompt.",
+      "add": "Add memory",
+      "empty": "No memory yet",
+      "placeholder": "e.g. This project uses pnpm, commit messages in Chinese"
+    },
+    "skills": {
+      "desc": "Skills are capability instructions injected into the system prompt; the agent invokes them as needed.",
+      "add": "Add skill",
+      "edit": "Edit skill",
+      "empty": "No skills yet",
+      "name": "Skill name",
+      "namePlaceholder": "e.g. code-review",
+      "description": "One-line description",
+      "instructions": "Instructions"
+    },
+    "hooks": {
+      "desc": "Run a shell command on session start/end or after a tool completes (working directory is the project).",
+      "add": "Add hook",
+      "edit": "Edit hook",
+      "empty": "No hooks yet",
+      "name": "Hook name",
+      "command": "Command",
+      "commandPlaceholder": "e.g. npm run format",
+      "triggerLabel": "Trigger",
+      "trigger": {
+        "session_start": "Session start",
+        "session_end": "Session end",
+        "tool_done": "After tool"
+      }
+    },
+    "usage": {
+      "promptTokens": "Prompt tokens",
+      "completionTokens": "Completion tokens",
+      "total": "Total",
+      "recent": "Recent",
+      "refresh": "Refresh",
+      "empty": "No usage yet",
+      "model": "Model",
+      "time": "Time"
+    },
+    "subagents": {
+      "desc": "Define switchable agent personas; selecting one runs the conversation with its system prompt.",
+      "add": "Add subagent",
+      "edit": "Edit subagent",
+      "empty": "No subagents yet",
+      "name": "Name",
+      "namePlaceholder": "e.g. code-reviewer",
+      "description": "One-line description",
+      "systemPrompt": "System prompt"
+    },
+    "mcp": {
+      "desc": "Configure MCP (Model Context Protocol) servers and list their tools.",
+      "add": "Add server",
+      "edit": "Edit server",
+      "empty": "No MCP servers configured",
+      "name": "Name",
+      "command": "Command",
+      "commandPlaceholder": "e.g. npx",
+      "args": "Args (space-separated)",
+      "argsPlaceholder": "e.g. -y @modelcontextprotocol/server-filesystem /path",
+      "listTools": "List tools",
+      "loading": "Connecting…",
+      "noTools": "Click 'List tools' to inspect"
+    },
+    "plugins": {
+      "desc": "Drop .mjs plugins into the userData/plugins directory; they contribute slash commands after restart.",
+      "empty": "No plugins installed"
+    },
+    "index": {
+      "files": "Indexed files",
+      "terms": "Terms",
+      "builtAt": "Last built",
+      "never": "Never",
+      "rebuild": "Rebuild index",
+      "search": "Search",
+      "searchPlaceholder": "Keywords (multi-word AND)",
+      "searchBtn": "Search"
+    },
+    "browser": {
+      "enable": "Enable web browsing",
+      "enableDesc": "When enabled, the agent can call the browse tool to fetch web pages for reference.",
+      "test": "Test fetch",
+      "placeholder": "e.g. https://example.com",
+      "fetch": "Fetch"
     }
   },
   "onboarding": {

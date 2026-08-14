@@ -1,4 +1,6 @@
 import type { AgentToolName } from '@dscode/shared';
+import { browseTool } from './browse';
+export { fetchWebPage } from './browse';
 import { editFileTool } from './edit-file';
 import { listDirTool } from './list-dir';
 import { readFileTool } from './read-file';
@@ -17,12 +19,15 @@ export const TOOLS: Record<AgentToolName, Tool> = {
   search: searchTool,
   run_command: runCommandTool,
   write_file: writeFileTool,
-  edit_file: editFileTool
+  edit_file: editFileTool,
+  browse: browseTool
 };
 
-/** 返回给模型的工具 schema 数组（OpenAI function calling 格式） */
-export function toolSchemas(): unknown[] {
-  return Object.values(TOOLS).map(t => ({
+/** 返回给模型的工具 schema 数组（OpenAI function calling 格式）；includeBrowse=false 时排除 browse */
+export function toolSchemas(includeBrowse = true): unknown[] {
+  return Object.values(TOOLS)
+    .filter(t => (t.name === 'browse' ? includeBrowse : true))
+    .map(t => ({
     type: 'function',
     function: { name: t.name, description: t.description, parameters: t.parameters }
   }));

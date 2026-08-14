@@ -8,6 +8,12 @@ export interface AccumulatedToolCall {
   arguments: string;
 }
 
+/** 一轮请求的 token 用量（OpenAI 兼容 usage 字段） */
+export interface ChatUsage {
+  promptTokens: number;
+  completionTokens: number;
+}
+
 /** 归一化流增量：各家格式统一映射为通用事件 */
 export interface NormalizedDelta {
   /** 正文增量 */
@@ -19,6 +25,8 @@ export interface NormalizedDelta {
    * 由 stream 层按「当前已累积数量」兜底赋值。
    */
   toolCalls?: Array<{ index: number; id?: string; name?: string; arguments?: string }>;
+  /** 流末尾携带的 usage（仅最后一帧出现） */
+  usage?: ChatUsage;
 }
 
 /** 聊天请求输入（适配器据此构造 HTTP 请求） */

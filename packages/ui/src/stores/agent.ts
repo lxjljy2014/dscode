@@ -33,7 +33,7 @@ export const useAgentStore = defineStore('agent', () => {
     return null;
   }
 
-  async function sendMessage(content: string, model = '') {
+  async function sendMessage(content: string, model = '', subagentId = '') {
     if (generating.value) return;
     if (!host) return;
     // 空会话状态（无激活任务）直接发送：自动新建任务，避免静默吞掉输入
@@ -70,7 +70,7 @@ export const useAgentStore = defineStore('agent', () => {
       .map(m => ({ role: m.role, content: m.content }));
     let r: { ok: boolean };
     try {
-      r = await host.agentStart(session.id, model, history);
+      r = await host.agentStart(session.id, model, history, subagentId);
     } catch {
       // IPC 异常兜底：避免 generating 卡死
       r = { ok: false };

@@ -2,16 +2,25 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import type { SettingsPatch } from '@dscode/shared';
 import {
   backfillSessions,
+  buildIndex,
   checkout,
   createBranch,
+  fetchWebPage,
+  getPlugins,
   graph,
+  indexStats,
+  initIndex,
   initProjects,
   initSessions,
+  initUsage,
   listBranches,
+  listMcpTools,
   listProjectsWithHome,
   listSessions,
+  listUsage,
   readWorkspaceFile,
   scanTree,
+  searchIndex,
   touchProject,
   upsertMessage,
   upsertSession,
@@ -42,9 +51,14 @@ export function registerIpcHandlers(): void {
   const settingsFile = app.getPath('userData') + '/settings.json';
   const projectsFile = app.getPath('userData') + '/projects.db';
   const sessionsFile = app.getPath('userData') + '/sessions.db';
+  const usageFile = app.getPath('userData') + '/usage.db';
+  const pluginsDir = app.getPath('userData') + '/plugins';
+  const indexFile = app.getPath('userData') + '/index.db';
   const homeDir = app.getPath('home');
   initProjects(projectsFile);
   initSessions(sessionsFile);
+  initUsage(usageFile);
+  initIndex(indexFile);
   // 旧数据迁移：无工作空间归属的会话回填到当前工作目录
   backfillSessions(sessionsFile, loadAppSettings(settingsFile, homeDir).workingDirectory);
 
@@ -92,11 +106,65 @@ export function registerIpcHandlers(): void {
     withMainWindow((_win, baseUrl: unknown, apiKey: unknown) => verifyProvider(baseUrl, apiKey))
   );
 
+  // ---- 使用统计 ----
+  ipcMain.handle(
+    'usage:list',
+    withMainWindow(() => listUsage(usageFile))
+  );
+
+  // ---- MCP ----
+  ipcMain.handle(
+    'mcp:list-tools',
+    withMainWindow(async (_win, command: unknown, args: unknown) => {
+      if (!isString(command) || !Array.isArray(args) || !args.every(isString)) {
+        return { ok: false as const, error: 'invalid args' };
+      }
+      try {
+        const tools = await listMcpTools({ command, args: args as string[] });
+        return { ok: true as const, tools };
+      } catch (e) {
+        return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+      }
+    })
+  );
+
+  // ---- 插件 ----
+  ipcMain.handle(
+    'plugins:list',
+    withMainWindow(() => getPlugins(pluginsDir))
+  );
+
+  // ---- 代码索引 ----
+  ipcMain.handle('index:stats', withMainWindow(() => indexStats(indexFile)));
+  ipcMain.handle(
+    'index:build',
+    withMainWindow(() => buildIndex(loadAppSettings(settingsFile, homeDir).workingDirectory, indexFile))
+  );
+  ipcMain.handle(
+    'index:search',
+    withMainWindow((_win, query: unknown) => (isString(query) ? searchIndex(indexFile, query) : []))
+  );
+
+  // ---- 浏览器（测试抓取） ----
+  ipcMain.handle(
+    'browser:fetch',
+    withMainWindow(async (_win, url: unknown) => {
+      if (!isString(url)) return { ok: false as const, error: 'invalid url' };
+      try {
+        return { ok: true as const, content: await fetchWebPage(url) };
+      } catch (e) {
+        return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+      }
+    })
+  );
+
   // ---- agent ----
   ipcMain.handle(
     'agent:start',
-    withMainWindow((win, sessionId: unknown, model: unknown, messages: unknown) =>
-      isString(sessionId) ? startAgent(win, sessionId, model, messages) : { ok: false, error: 'invalid sessionId' }
+    withMainWindow((win, sessionId: unknown, model: unknown, messages: unknown, subagentId: unknown) =>
+      isString(sessionId)
+        ? startAgent(win, sessionId, model, messages, subagentId)
+        : { ok: false, error: 'invalid sessionId' }
     )
   );
   ipcMain.handle(

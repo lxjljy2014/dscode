@@ -9,14 +9,19 @@ import type {
   GitGraphResult,
   GitListResult,
   GitOpResult,
+  IndexSearchHit,
+  IndexStats,
+  McpListToolsResult,
   Message,
+  Plugin,
   ProjectsListResult,
   ProviderVerifyResult,
   Session,
   SettingsPatch,
   TerminalDataEvent,
   TerminalEnsureResult,
-  TerminalExitInfo
+  TerminalExitInfo,
+  UsageRecord
 } from '@dscode/shared';
 
 /** 通用事件订阅包装：字段校验 + 返回取消订阅函数 */
@@ -61,8 +66,12 @@ const api = {
     ipcRenderer.invoke('provider:verify', baseUrl, apiKey),
 
   // ---- agent ----
-  agentStart: (sessionId: string, model: string, messages: ChatMessagePayload[]): Promise<{ ok: boolean }> =>
-    ipcRenderer.invoke('agent:start', sessionId, model, messages),
+  agentStart: (
+    sessionId: string,
+    model: string,
+    messages: ChatMessagePayload[],
+    subagentId: string
+  ): Promise<{ ok: boolean }> => ipcRenderer.invoke('agent:start', sessionId, model, messages, subagentId),
   agentStop: (sessionId: string): Promise<void> => ipcRenderer.invoke('agent:stop', sessionId),
   agentConfirmResponse: (toolEventId: string, approve: boolean): Promise<void> =>
     ipcRenderer.invoke('agent:confirm-response', toolEventId, approve),
@@ -104,6 +113,25 @@ const api = {
   sessionsCreate: (session: Session): Promise<{ ok: boolean }> => ipcRenderer.invoke('sessions:create', session),
   sessionsAppend: (sessionId: string, message: Message): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('sessions:append', sessionId, message),
+
+  // ---- 使用统计 ----
+  usageList: (): Promise<UsageRecord[]> => ipcRenderer.invoke('usage:list'),
+
+  // ---- MCP ----
+  listMcpTools: (command: string, args: string[]): Promise<McpListToolsResult> =>
+    ipcRenderer.invoke('mcp:list-tools', command, args),
+
+  // ---- 插件 ----
+  pluginsList: (): Promise<Plugin[]> => ipcRenderer.invoke('plugins:list'),
+
+  // ---- 代码索引 ----
+  indexStats: (): Promise<IndexStats> => ipcRenderer.invoke('index:stats'),
+  indexBuild: (): Promise<IndexStats> => ipcRenderer.invoke('index:build'),
+  indexSearch: (query: string): Promise<IndexSearchHit[]> => ipcRenderer.invoke('index:search', query),
+
+  // ---- 浏览器 ----
+  browserFetch: (url: string): Promise<{ ok: true; content: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('browser:fetch', url),
 
   // ---- git ----
   gitListBranches: (cwd: string): Promise<GitListResult> => ipcRenderer.invoke('git:list-branches', cwd),

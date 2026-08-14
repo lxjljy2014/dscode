@@ -3,13 +3,14 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '../../stores/session';
 import { useSettingsStore } from '../../stores/settings';
+import { usePluginsStore } from '../../stores/plugins';
 import GitBranchMenu from '../git/GitBranchMenu.vue';
 import PermissionSelector from './PermissionSelector.vue';
 import ProjectPicker from './ProjectPicker.vue';
 
 const props = defineProps<{ generating: boolean }>();
 const emit = defineEmits<{
-  send: [content: string, model: string];
+  send: [content: string, model: string, subagentId: string];
   stop: [];
 }>();
 
@@ -30,13 +31,47 @@ watch(
   { immediate: true, deep: true }
 );
 
+// 自定义斜杠命令 + 插件贡献的命令（/name 展开为 prompt）
+const pluginsStore = usePluginsStore();
+const commands = computed(() => [...(settingsStore.settings.commands ?? []), ...pluginsStore.commands]);
+void pluginsStore.load();
+
+// 子智能体（选定后以其系统提示词运行；空 = 默认）
+const subagentId = ref('');
+const subagents = computed(() => settingsStore.settings.subagents ?? []);
+const subagentName = computed(() => subagents.value.find(s => s.id === subagentId.value)?.name ?? '');
+watch(
+  () => settingsStore.settings.subagents,
+  list => {
+    if (subagentId.value && !list.some(s => s.id === subagentId.value)) subagentId.value = '';
+  },
+  { immediate: true, deep: true }
+);
+
 const effort = ref<'close' | 'high' | 'max'>('max');
 const efforts = ['close', 'high', 'max'] as const;
 
+function applyCommand(cmd: { prompt: string }) {
+  input.value = cmd.prompt;
+}
+
+/** 发送前展开 /name 形式：命中自定义命令则替换为 prompt + 其余文本 */
+function expandCommand(content: string): string {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith('/')) return content;
+  const m = trimmed.match(/^\/(\S+)(?:\s+([\s\S]*))?$/);
+  if (!m) return content;
+  const name = m[1];
+  const rest = m[2] ?? '';
+  const cmd = commands.value.find(c => c.name === name);
+  if (!cmd) return content;
+  return [cmd.prompt, rest].filter(Boolean).join('\n');
+}
+
 function submit() {
-  const content = input.value.trim();
+  const content = expandCommand(input.value.trim());
   if (!content || props.generating) return;
-  emit('send', content, model.value);
+  emit('send', content, model.value, subagentId.value);
   input.value = '';
 }
 
@@ -82,6 +117,24 @@ function onKeydown(e: KeyboardEvent) {
           </template>
         </VTooltip>
 
+        <!-- 斜杠命令 -->
+        <VMenu location="top start" :offset="4">
+          <template #activator="{ props: menuProps }">
+            <VBtn v-bind="menuProps" icon="i-lucide:slash" variant="text" size="small" class="text-muted" />
+          </template>
+          <VList min-width="300" nav max-height="320">
+            <VListItem v-for="c in commands" :key="c.id" @click="applyCommand(c)">
+              <VListItemTitle class="text-sm">
+                <code class="font-mono text-primary">/{{ c.name }}</code>
+                <span class="ml-2 text-muted">{{ c.description }}</span>
+              </VListItemTitle>
+            </VListItem>
+            <div v-if="!commands.length" class="px-4 py-3 text-xs text-faint">
+              {{ t('settingsPage.commands.empty') }}
+            </div>
+          </VList>
+        </VMenu>
+
         <!-- 权限模式 -->
         <PermissionSelector />
 
@@ -105,6 +158,42 @@ function onKeydown(e: KeyboardEvent) {
               <VListItemTitle>{{ m }}</VListItemTitle>
               <template #append>
                 <VIcon v-if="model === m" icon="i-lucide:check" size="16" />
+              </template>
+            </VListItem>
+          </VList>
+        </VMenu>
+
+        <!-- 子智能体 -->
+        <VMenu location="top end" :offset="4">
+          <template #activator="{ props: menuProps }">
+            <VBtn
+              v-bind="menuProps"
+              variant="text"
+              size="small"
+              class="px-2 text-muted"
+              prepend-icon="i-lucide:briefcase"
+              append-icon="i-lucide:chevron-down"
+            >
+              {{ subagentId ? subagentName : t('input.subagentDefault') }}
+            </VBtn>
+          </template>
+          <VList min-width="220" nav>
+            <VListItem :active="!subagentId" @click="subagentId = ''">
+              <VListItemTitle class="text-sm">{{ t('input.subagentDefault') }}</VListItemTitle>
+              <template #append>
+                <VIcon v-if="!subagentId" icon="i-lucide:check" size="16" />
+              </template>
+            </VListItem>
+            <VListItem
+              v-for="s in subagents"
+              :key="s.id"
+              :active="subagentId === s.id"
+              @click="subagentId = s.id"
+            >
+              <VListItemTitle class="text-sm">{{ s.name }}</VListItemTitle>
+              <VListItemSubtitle v-if="s.description" class="text-xs">{{ s.description }}</VListItemSubtitle>
+              <template #append>
+                <VIcon v-if="subagentId === s.id" icon="i-lucide:check" size="16" />
               </template>
             </VListItem>
           </VList>

@@ -14,7 +14,14 @@ export interface Message {
 }
 
 /** agent 可调用的工具名 */
-export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file';
+export type AgentToolName =
+  | 'read_file'
+  | 'list_dir'
+  | 'search'
+  | 'run_command'
+  | 'write_file'
+  | 'edit_file'
+  | 'browse';
 
 /** 工具事件（聊天流中与消息交错展示） */
 export interface AgentToolEvent {
@@ -88,7 +95,10 @@ export interface FileNode {
   content?: string;
 }
 
+export * from './code-index';
 export * from './git';
+export * from './mcp';
 export * from './projects';
 export * from './settings';
 export * from './terminal';
+export * from './usage';

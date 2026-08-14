@@ -14,6 +14,7 @@ export { useSessionStore } from './stores/session';
 export { useAgentStore } from './stores/agent';
 export { useWorkspaceStore } from './stores/workspace';
 export { useSettingsStore } from './stores/settings';
+export { usePluginsStore } from './stores/plugins';
 
 // 页面
 export { default as WorkspaceView } from './pages/WorkspaceView.vue';
@@ -21,7 +22,19 @@ export { default as OnboardingView } from './pages/OnboardingView.vue';
 export { default as SettingsView } from './pages/settings/SettingsView.vue';
 export { default as SettingsSidebar } from './pages/settings/SettingsSidebar.vue';
 export { default as SettingsHeader } from './pages/settings/SettingsHeader.vue';
+export { default as SettingsAppearance } from './pages/settings/SettingsAppearance.vue';
+export { default as SettingsBrowser } from './pages/settings/SettingsBrowser.vue';
+export { default as SettingsCommands } from './pages/settings/SettingsCommands.vue';
 export { default as SettingsGeneral } from './pages/settings/SettingsGeneral.vue';
+export { default as SettingsHooks } from './pages/settings/SettingsHooks.vue';
+export { default as SettingsIndex } from './pages/settings/SettingsIndex.vue';
+export { default as SettingsMcp } from './pages/settings/SettingsMcp.vue';
+export { default as SettingsMemory } from './pages/settings/SettingsMemory.vue';
+export { default as SettingsSkills } from './pages/settings/SettingsSkills.vue';
+export { default as SettingsSubagents } from './pages/settings/SettingsSubagents.vue';
+export { default as SettingsUsage } from './pages/settings/SettingsUsage.vue';
+export { default as SettingsModel } from './pages/settings/SettingsModel.vue';
+export { default as SettingsPlugins } from './pages/settings/SettingsPlugins.vue';
 export { default as SettingsProviders } from './pages/settings/SettingsProviders.vue';
 export { default as SettingsPlaceholder } from './pages/settings/SettingsPlaceholder.vue';
 

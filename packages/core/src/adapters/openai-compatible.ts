@@ -5,23 +5,32 @@ import type { ChatRequest, ChatRequestInput, ModelAdapter, NormalizedDelta } fro
  * 导出为共享辅助：deepseek 等衍生适配器在覆写 parseDelta 时复用。
  */
 export function parseOpenAiDelta(parsed: unknown): NormalizedDelta | undefined {
-  const delta = (parsed as { choices?: Array<{ delta?: Record<string, unknown> }> }).choices?.[0]?.delta;
-  if (!delta) return undefined;
+  const obj = parsed as {
+    choices?: Array<{ delta?: Record<string, unknown> }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
+  const delta = obj.choices?.[0]?.delta;
   const out: NormalizedDelta = {};
-  if (typeof delta['content'] === 'string' && delta['content'].length > 0) out.content = delta['content'];
-  const calls = delta['tool_calls'];
-  if (Array.isArray(calls)) {
-    out.toolCalls = (calls as Array<Record<string, unknown>>).map(raw => {
-      const fn = (raw['function'] ?? {}) as Record<string, unknown>;
-      return {
-        index: typeof raw['index'] === 'number' ? raw['index'] : -1,
-        id: typeof raw['id'] === 'string' ? raw['id'] : undefined,
-        name: typeof fn['name'] === 'string' ? fn['name'] : undefined,
-        arguments: typeof fn['arguments'] === 'string' ? fn['arguments'] : undefined
-      };
-    });
+  const u = obj.usage;
+  if (u && typeof u.prompt_tokens === 'number' && typeof u.completion_tokens === 'number') {
+    out.usage = { promptTokens: u.prompt_tokens, completionTokens: u.completion_tokens };
   }
-  if (!out.content && !out.toolCalls) return undefined;
+  if (delta) {
+    if (typeof delta['content'] === 'string' && delta['content'].length > 0) out.content = delta['content'];
+    const calls = delta['tool_calls'];
+    if (Array.isArray(calls)) {
+      out.toolCalls = (calls as Array<Record<string, unknown>>).map(raw => {
+        const fn = (raw['function'] ?? {}) as Record<string, unknown>;
+        return {
+          index: typeof raw['index'] === 'number' ? raw['index'] : -1,
+          id: typeof raw['id'] === 'string' ? raw['id'] : undefined,
+          name: typeof fn['name'] === 'string' ? fn['name'] : undefined,
+          arguments: typeof fn['arguments'] === 'string' ? fn['arguments'] : undefined
+        };
+      });
+    }
+  }
+  if (!out.content && !out.toolCalls && !out.usage) return undefined;
   return out;
 }
 
@@ -34,7 +43,14 @@ export const openAiCompatibleAdapter: ModelAdapter = {
     return {
       url: url.toString(),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${input.apiKey}` },
-      body: JSON.stringify({ model: input.model, messages: input.messages, tools: input.tools, stream: true })
+      body: JSON.stringify({
+        model: input.model,
+        messages: input.messages,
+        tools: input.tools,
+        stream: true,
+        // 流式默认不返回 usage，需显式请求；流末尾会带 usage 帧供用量统计
+        stream_options: { include_usage: true }
+      })
     };
   },
   parseDelta(data: string): NormalizedDelta | null | undefined {

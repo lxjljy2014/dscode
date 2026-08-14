@@ -24,6 +24,68 @@ export interface ProviderConfig {
   adapter?: string;
 }
 
+/** 用户自定义斜杠命令（/name 展开为 prompt） */
+export interface Command {
+  /** 唯一标识（uuid） */
+  id: string;
+  /** 命令名（不含前导 /） */
+  name: string;
+  /** 菜单展示用一句话说明 */
+  description: string;
+  /** 展开后的提示词模板 */
+  prompt: string;
+}
+
+/** 长期记忆条目（注入系统提示词） */
+export interface MemoryEntry {
+  id: string;
+  content: string;
+}
+
+/** 技能：注入系统提示词的可用能力说明，agent 按需调用 */
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+}
+
+/** 生命周期钩子触发时机 */
+export type HookTrigger = 'session_start' | 'session_end' | 'tool_done';
+
+/** 生命周期钩子：在触发时机执行一条 shell 命令 */
+export interface Hook {
+  id: string;
+  name: string;
+  trigger: HookTrigger;
+  command: string;
+}
+
+/** 子智能体：可切换的专用 agent 人设（选定后以其 systemPrompt 运行） */
+export interface Subagent {
+  id: string;
+  name: string;
+  description: string;
+  systemPrompt: string;
+}
+
+/** MCP 服务器配置（stdio 传输） */
+export interface McpServer {
+  id: string;
+  name: string;
+  command: string;
+  args: string[];
+}
+
+/** 插件：userData/plugins 下的 .mjs 模块，贡献斜杠命令（后续可扩展钩子/技能） */
+export interface Plugin {
+  id: string;
+  name: string;
+  description: string;
+  /** 贡献的斜杠命令 */
+  commands?: Command[];
+}
+
 export interface AppSettings {
   /** 工作目录（默认家目录） */
   workingDirectory: string;
@@ -33,6 +95,20 @@ export interface AppSettings {
   providers: ProviderConfig[];
   /** 是否已完成引导（完成/跳过后为 true，避免每次启动都弹引导页） */
   onboardingDone: boolean;
+  /** 用户自定义斜杠命令 */
+  commands: Command[];
+  /** 长期记忆条目 */
+  memory: MemoryEntry[];
+  /** 技能列表 */
+  skills: Skill[];
+  /** 生命周期钩子列表 */
+  hooks: Hook[];
+  /** 子智能体列表 */
+  subagents: Subagent[];
+  /** MCP 服务器列表 */
+  mcpServers: McpServer[];
+  /** 是否启用网页浏览工具（browse） */
+  browsingEnabled: boolean;
 }
 
 /** DeepSeek 预置供应商：引导页在 providers 为空时预填（apiKey 留空待用户填写） */

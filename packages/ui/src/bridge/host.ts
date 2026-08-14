@@ -9,14 +9,19 @@ import type {
   GitGraphResult,
   GitListResult,
   GitOpResult,
+  IndexSearchHit,
+  IndexStats,
+  McpListToolsResult,
   Message,
+  Plugin,
   ProjectsListResult,
   ProviderVerifyResult,
   Session,
   SettingsPatch,
   TerminalDataEvent,
   TerminalEnsureResult,
-  TerminalExitInfo
+  TerminalExitInfo,
+  UsageRecord
 } from '@dscode/shared';
 
 /**
@@ -46,7 +51,7 @@ export interface HostApi {
   verifyProvider: (baseUrl: string, apiKey: string) => Promise<ProviderVerifyResult>;
 
   // ---- agent ----
-  agentStart: (sessionId: string, model: string, messages: ChatMessagePayload[]) => Promise<{ ok: boolean }>;
+  agentStart: (sessionId: string, model: string, messages: ChatMessagePayload[], subagentId: string) => Promise<{ ok: boolean }>;
   agentStop: (sessionId: string) => Promise<void>;
   agentConfirmResponse: (toolEventId: string, approve: boolean) => Promise<void>;
   /** 订阅 agent 事件（按 sessionId 分发），均返回取消订阅函数 */
@@ -65,6 +70,23 @@ export interface HostApi {
   sessionsList: () => Promise<Session[]>;
   sessionsCreate: (session: Session) => Promise<{ ok: boolean }>;
   sessionsAppend: (sessionId: string, message: Message) => Promise<{ ok: boolean }>;
+
+  // ---- 使用统计 ----
+  usageList: () => Promise<UsageRecord[]>;
+
+  // ---- MCP ----
+  listMcpTools: (command: string, args: string[]) => Promise<McpListToolsResult>;
+
+  // ---- 插件 ----
+  pluginsList: () => Promise<Plugin[]>;
+
+  // ---- 代码索引 ----
+  indexStats: () => Promise<IndexStats>;
+  indexBuild: () => Promise<IndexStats>;
+  indexSearch: (query: string) => Promise<IndexSearchHit[]>;
+
+  // ---- 浏览器 ----
+  browserFetch: (url: string) => Promise<{ ok: true; content: string } | { ok: false; error: string }>;
 
   // ---- git ----
   gitListBranches: (cwd: string) => Promise<GitListResult>;
