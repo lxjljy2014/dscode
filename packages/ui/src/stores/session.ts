@@ -202,7 +202,9 @@ export const useSessionStore = defineStore('session', () => {
         ...(message.steps && message.steps.length > 0
           ? { steps: JSON.parse(JSON.stringify(message.steps)) as Message['steps'] }
           : {}),
-        ...(message.errorCode ? { errorCode: message.errorCode } : {})
+        ...(message.errorCode ? { errorCode: message.errorCode } : {}),
+        // 回复运行统计随消息落库（重启/恢复历史后仍可展示）
+        ...(message.stats ? { stats: JSON.parse(JSON.stringify(message.stats)) as Message['stats'] } : {})
       });
       if (!r.ok) console.warn('[dscode] 消息持久化失败', message.id);
       await persistSession(session);

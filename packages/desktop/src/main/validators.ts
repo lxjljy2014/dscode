@@ -51,7 +51,20 @@ function isAssistantSteps(v: unknown): v is AssistantStep[] {
   });
 }
 
-/** 校验持久化消息（required + errorCode/steps 可选；streaming/reasoning 顶层字段为渲染端瞬态不落库） */
+/** 校验消息运行统计（startAt/endAt 必填，firstTokenMs/promptTokens/completionTokens 可选数字） */
+function isMessageStats(v: unknown): v is Message['stats'] {
+  if (!isRecord(v)) return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r['startAt'] === 'number' &&
+    typeof r['endAt'] === 'number' &&
+    (r['firstTokenMs'] === undefined || typeof r['firstTokenMs'] === 'number') &&
+    (r['promptTokens'] === undefined || typeof r['promptTokens'] === 'number') &&
+    (r['completionTokens'] === undefined || typeof r['completionTokens'] === 'number')
+  );
+}
+
+/** 校验持久化消息（required + errorCode/steps/stats 可选；streaming/reasoning 顶层字段为渲染端瞬态不落库） */
 export function isMessage(v: unknown): v is Message {
   if (!isRecord(v)) return false;
   const r = v as Record<string, unknown>;
@@ -61,7 +74,8 @@ export function isMessage(v: unknown): v is Message {
     isString(r['content']) &&
     typeof r['createdAt'] === 'number' &&
     (r['errorCode'] === undefined || isString(r['errorCode'])) &&
-    (r['steps'] === undefined || isAssistantSteps(r['steps']))
+    (r['steps'] === undefined || isAssistantSteps(r['steps'])) &&
+    (r['stats'] === undefined || isMessageStats(r['stats']))
   );
 }
 

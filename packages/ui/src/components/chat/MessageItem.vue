@@ -166,8 +166,8 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
           {{ message.errorDetail }}
         </div>
 
-        <!-- 回复结束后底部操作行：复制 / 点赞 / 踩 / fork + 内联运行统计（时间 · 用时 · 首 token · token 速率） -->
-        <div v-if="!message.streaming" class="mt-1.5 flex flex-wrap items-center gap-x-1 text-xs text-muted">
+        <!-- 回复结束后底部操作行：复制 / 点赞 / 踩 / fork；悬停按钮行时在下方显示运行统计 -->
+        <div v-if="!message.streaming" class="group/stats relative mt-1.5 text-xs text-muted">
           <div class="flex items-center gap-0.5 rounded-lg px-1 py-0.5">
             <VTooltip :text="copied ? t('chat.copied') : t('chat.copy')" location="top">
               <template #activator="{ props: tip }">
@@ -223,27 +223,29 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
             </VTooltip>
           </div>
 
-          <!-- 内联运行统计：01:44 · 用时 13分05秒 · 首 token 1.1秒 · 139 tok/s -->
-          <template v-if="message.stats">
-            <span class="mx-0.5 select-none text-faint">·</span>
+          <!-- 运行统计（悬停按钮行显示在下方）：01:44 · 用时 13分05秒 · 首 token 1.1秒 · 139 tok/s -->
+          <div
+            v-if="message.stats"
+            class="pointer-events-none absolute left-2 top-full mt-1 flex items-center gap-x-1 whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover/stats:opacity-100"
+          >
             <span class="tabular-nums">{{ formatClock(message.stats.endAt) }}</span>
-            <span class="mx-0.5 select-none text-faint">·</span>
+            <span class="select-none text-faint">·</span>
             <span>
               {{ t('chat.stats.duration') }}
               <span class="tabular-nums">{{ formatDuration(message.stats.endAt - message.stats.startAt) }}</span>
             </span>
-            <span class="mx-0.5 select-none text-faint">·</span>
+            <span class="select-none text-faint">·</span>
             <span>
               {{ t('chat.stats.firstToken') }}
               <span class="tabular-nums">
                 {{ message.stats.firstTokenMs !== undefined ? formatDuration(message.stats.firstTokenMs) : '—' }}
               </span>
             </span>
-            <span class="mx-0.5 select-none text-faint">·</span>
+            <span class="select-none text-faint">·</span>
             <span class="tabular-nums">
               {{ formatTokensPerSec(message.stats.completionTokens, message.stats.endAt - message.stats.startAt) }}
             </span>
-          </template>
+          </div>
         </div>
       </div>
     </div>

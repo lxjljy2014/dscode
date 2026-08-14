@@ -324,6 +324,67 @@ describe('sessions 持久化', () => {
     expect(msg?.steps).toEqual([{ kind: 'text', content: 'x' }]);
   });
 
+  it('回复运行统计 stats 落库读回；无 stats 的消息不携带', () => {
+    file = join(dir, 'stats-roundtrip.db');
+    initSessions(file);
+    upsertSession(file, makeSession('s1', 'a'));
+    const stats = { startAt: 1000, endAt: 8000, firstTokenMs: 1200, promptTokens: 300, completionTokens: 402 };
+    upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: 'ok', stats, createdAt: 1 });
+    upsertMessage(file, 's1', { id: 'm2', role: 'user', content: 'hi', createdAt: 2 });
+    const msgs = listSessions(file)[0]?.messages;
+    expect(msgs?.[0]?.stats).toEqual(stats);
+    expect(msgs?.[1]?.stats).toBeUndefined();
+  });
+
+  it('stats 缺失可选字段时读回仅含必填字段', () => {
+    file = join(dir, 'stats-partial.db');
+    initSessions(file);
+    upsertSession(file, makeSession('s1', 'a'));
+    // 中断场景：无 token 用量
+    upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: 'x', stats: { startAt: 1, endAt: 900 }, createdAt: 1 });
+    const msg = listSessions(file)[0]?.messages[0];
+    expect(msg?.stats).toEqual({ startAt: 1, endAt: 900 });
+  });
+
+  it('stats JSON 损坏时读回无 stats（不抛异常）', () => {
+    file = join(dir, 'stats-corrupt.db');
+    initSessions(file);
+    upsertSession(file, makeSession('s1', 'a'));
+    upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: 'x', createdAt: 1 });
+    const db = new DatabaseSync(file);
+    db.prepare('UPDATE messages SET stats = ? WHERE id = ?').run('not-json', 'm1');
+    db.close();
+    const msg = listSessions(file)[0]?.messages[0];
+    expect(msg?.stats).toBeUndefined();
+    expect(msg?.content).toBe('x');
+  });
+
+  it('旧库无 stats 列时自动迁移并可读写统计', () => {
+    file = join(dir, 'stats-migrate.db');
+    // 按早期 schema 手工建库（messages 无 stats 列）
+    const db = new DatabaseSync(file);
+    db.exec(
+      'CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL, ' +
+        "working_directory TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)"
+    );
+    db.exec(
+      'CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL, ' +
+        'content TEXT NOT NULL, error_code TEXT, created_at INTEGER NOT NULL)'
+    );
+    db.close();
+    initSessions(file);
+    upsertSession(file, makeSession('s1', '旧会话'));
+    upsertMessage(file, 's1', {
+      id: 'm1',
+      role: 'assistant',
+      content: 'x',
+      stats: { startAt: 1, endAt: 5000, completionTokens: 66 },
+      createdAt: 1
+    });
+    const msg = listSessions(file)[0]?.messages[0];
+    expect(msg?.stats).toEqual({ startAt: 1, endAt: 5000, completionTokens: 66 });
+  });
+
   it('backfill 回填空工作目录', () => {
     file = join(dir, 'backfill.db');
     initSessions(file);

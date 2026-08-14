@@ -32,6 +32,7 @@ function getDb(file: string): DatabaseSync {
         'content TEXT NOT NULL, ' +
         'error_code TEXT, ' +
         'steps TEXT, ' +
+        'stats TEXT, ' +
         'created_at INTEGER NOT NULL)'
     );
     // 旧库迁移：早期表结构没有 working_directory 列
@@ -47,6 +48,10 @@ function getDb(file: string): DatabaseSync {
     const msgCols = db.prepare('PRAGMA table_info(messages)').all() as Array<{ name: string }>;
     if (!msgCols.some(c => c.name === 'steps')) {
       db.exec('ALTER TABLE messages ADD COLUMN steps TEXT');
+    }
+    // 旧库迁移：早期表结构没有 stats 列（回复运行统计，缺失时渲染端不展示）
+    if (!msgCols.some(c => c.name === 'stats')) {
+      db.exec('ALTER TABLE messages ADD COLUMN stats TEXT');
     }
     dbs.set(file, db);
   }
@@ -78,6 +83,7 @@ interface MessageRow {
   content: string;
   error_code: string | null;
   steps: string | null;
+  stats: string | null;
   created_at: number;
 }
 
@@ -134,6 +140,24 @@ function parseSteps(steps: string | null): AssistantStep[] | undefined {
   }
 }
 
+/** 读库时把 stats JSON 反序列化回回复运行统计；字段缺失/损坏时返回 undefined */
+function parseStats(stats: string | null): Message['stats'] | undefined {
+  if (stats === null) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(stats);
+    if (typeof parsed !== 'object' || parsed === null) return undefined;
+    const s = parsed as Record<string, unknown>;
+    if (typeof s['startAt'] !== 'number' || typeof s['endAt'] !== 'number') return undefined;
+    const result: Message['stats'] = { startAt: s['startAt'], endAt: s['endAt'] };
+    if (typeof s['firstTokenMs'] === 'number') result.firstTokenMs = s['firstTokenMs'];
+    if (typeof s['promptTokens'] === 'number') result.promptTokens = s['promptTokens'];
+    if (typeof s['completionTokens'] === 'number') result.completionTokens = s['completionTokens'];
+    return result;
+  } catch {
+    return undefined;
+  }
+}
+
 /** 全部会话（按更新时间倒序，含消息，不持久化的 toolEvents 置空） */
 export function listSessions(file: string): Session[] {
   const rows = getDb(file)
@@ -141,7 +165,7 @@ export function listSessions(file: string): Session[] {
     .all() as unknown as SessionRow[];
   const messages = getDb(file)
     .prepare(
-      'SELECT id, session_id, role, content, error_code, steps, created_at FROM messages ORDER BY created_at ASC'
+      'SELECT id, session_id, role, content, error_code, steps, stats, created_at FROM messages ORDER BY created_at ASC'
     )
     .all() as unknown as MessageRow[];
   return rows.map(r => ({
@@ -156,13 +180,15 @@ export function listSessions(file: string): Session[] {
       .filter(m => m.session_id === r.id)
       .map((m): Message => {
         const steps = parseSteps(m.steps);
+        const stats = parseStats(m.stats);
         return {
           id: m.id,
           role: m.role,
           content: m.content,
           createdAt: m.created_at,
           ...(m.error_code ? { errorCode: m.error_code } : {}),
-          ...(steps !== undefined ? { steps } : {})
+          ...(steps !== undefined ? { steps } : {}),
+          ...(stats !== undefined ? { stats } : {})
         };
       })
   }));
@@ -196,8 +222,8 @@ export function setSessionArchived(file: string, sessionId: string, archived: bo
 export function upsertMessage(file: string, sessionId: string, message: Message): void {
   getDb(file)
     .prepare(
-      'INSERT INTO messages (id, session_id, role, content, error_code, steps, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) ' +
-        'ON CONFLICT(id) DO UPDATE SET content = excluded.content, error_code = excluded.error_code, steps = excluded.steps'
+      'INSERT INTO messages (id, session_id, role, content, error_code, steps, stats, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ' +
+        'ON CONFLICT(id) DO UPDATE SET content = excluded.content, error_code = excluded.error_code, steps = excluded.steps, stats = excluded.stats'
     )
     .run(
       message.id,
@@ -206,6 +232,7 @@ export function upsertMessage(file: string, sessionId: string, message: Message)
       message.content,
       message.errorCode ?? null,
       message.steps && message.steps.length > 0 ? JSON.stringify(message.steps) : null,
+      message.stats ? JSON.stringify(message.stats) : null,
       message.createdAt
     );
 }
