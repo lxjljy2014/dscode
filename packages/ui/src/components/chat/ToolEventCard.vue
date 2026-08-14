@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { AgentToolEvent } from '@dscode/shared';
+import type { AgentToolEvent, ConfirmDecision } from '@dscode/shared';
 import { useAgentStore } from '../../stores/agent';
 import { useSettingsStore } from '../../stores/settings';
 
@@ -16,6 +16,15 @@ const expanded = ref(false);
 /** 展开/折叠：点击行内文字或右侧小箭头触发（不整行响应点击） */
 function toggle(): void {
   expanded.value = !expanded.value;
+}
+
+/** 更多审批选项菜单开关 */
+const moreOpen = ref(false);
+
+/** 确认决策响应（Codex 风格多选项：允许一次/本会话/总是/拒绝/换方案） */
+function respond(decision: ConfirmDecision): void {
+  moreOpen.value = false;
+  store.respondConfirm(props.event.id, decision);
 }
 
 /** 工具 → 行首灰色线性图标（运行中替换为转圈） */
@@ -194,18 +203,10 @@ const fileDiff = computed(() => {
       >
         {{ fileSplit.ext }}
       </span>
-      <span
-        v-if="fileSplit"
-        class="shrink-0 cursor-pointer font-mono text-[13px] text-fg"
-        @click="toggle"
-      >
+      <span v-if="fileSplit" class="shrink-0 cursor-pointer font-mono text-[13px] text-fg" @click="toggle">
         {{ fileSplit.base }}
       </span>
-      <span
-        v-if="fileSplit?.dir"
-        class="shrink-0 cursor-pointer font-mono text-xs text-muted"
-        @click="toggle"
-      >
+      <span v-if="fileSplit?.dir" class="shrink-0 cursor-pointer font-mono text-xs text-muted" @click="toggle">
         {{ fileSplit.dir }}
       </span>
       <span
@@ -222,19 +223,48 @@ const fileDiff = computed(() => {
       <span v-if="statusIcon" class="shrink-0 text-3.5" :class="[statusIcon, statusCls]" />
       <span
         class="shrink-0 cursor-pointer text-3.5 text-faint transition-opacity"
-        :class="[expanded ? 'i-lucide:chevron-up opacity-100' : 'i-lucide:chevron-down opacity-0 group-hover:opacity-100']"
+        :class="[
+          expanded ? 'i-lucide:chevron-up opacity-100' : 'i-lucide:chevron-down opacity-0 group-hover:opacity-100'
+        ]"
         @click="toggle"
       />
     </div>
 
-    <!-- 待确认：允许/拒绝 -->
-    <div v-if="event.status === 'confirming'" class="mt-1.5 flex gap-2">
-      <VBtn size="x-small" color="primary" @click="store.respondConfirm(event.id, true)">
-        {{ t('agent.allow') }}
+    <!-- 待确认：Codex 风格多选项（允许一次/拒绝 + 更多：本会话/总是/换方案） -->
+    <div v-if="event.status === 'confirming'" class="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <VBtn size="x-small" color="primary" prepend-icon="i-lucide:check" @click="respond({ kind: 'allow-once' })">
+        {{ t('agent.approveOnce') }}
       </VBtn>
-      <VBtn size="x-small" variant="outlined" @click="store.respondConfirm(event.id, false)">
+      <VBtn size="x-small" variant="outlined" prepend-icon="i-lucide:x" @click="respond({ kind: 'deny' })">
         {{ t('agent.deny') }}
       </VBtn>
+      <VMenu v-model="moreOpen" location="bottom start" :offset="6">
+        <template #activator="{ props: menuProps }">
+          <VBtn v-bind="menuProps" size="x-small" variant="text" icon="i-lucide:chevron-down" />
+        </template>
+        <VCard min-width="320" rounded="12px">
+          <VList nav density="compact" prepend-gap="10">
+            <VListItem
+              :title="t('agent.approveSession')"
+              :subtitle="t('agent.approveSessionHint')"
+              prepend-icon="i-lucide:clock"
+              @click="respond({ kind: 'allow-session' })"
+            />
+            <VListItem
+              :title="t('agent.approveAlways')"
+              :subtitle="t('agent.neverAsk') + '：' + primaryValue"
+              prepend-icon="i-lucide:bookmark"
+              @click="respond({ kind: 'allow-always' })"
+            />
+            <VListItem
+              :title="t('agent.denyAndRedo')"
+              :subtitle="t('agent.denyAndRedoHint')"
+              prepend-icon="i-lucide:rotate-ccw"
+              @click="respond({ kind: 'cancel' })"
+            />
+          </VList>
+        </VCard>
+      </VMenu>
     </div>
 
     <!-- 展开：文件工具显示 diff，其余显示参数/结果 -->

@@ -1,15 +1,17 @@
-import type { AgentToolName, PermissionMode } from '@dscode/shared';
+import type { AgentToolName, ConfirmDecision, PermissionMode } from '@dscode/shared';
 import { toolPermission } from '../tools';
 
 /** 门控决策结果 */
 export interface GateDecision {
   allow: boolean;
-  /** 拒绝原因（plan 模式 / 用户拒绝 / 确认超时） */
-  reason?: string;
+  /** 拒绝原因（plan 模式 / 用户拒绝 / 用户要求换方案 / 确认超时） */
+  reason?: 'plan-mode' | 'denied' | 'cancel' | 'timeout';
+  /** 用户决策（确认路径携带；deny/cancel/timeout 落在拒绝侧） */
+  decision?: ConfirmDecision;
 }
 
 /** 确认回调：由 agent 循环提供（发 agent:confirm 事件并等待渲染端响应） */
-export type ConfirmFn = (toolEventId: string, name: AgentToolName, argsJson: string) => Promise<boolean>;
+export type ConfirmFn = (toolEventId: string, name: AgentToolName, argsJson: string) => Promise<ConfirmDecision>;
 
 const CONFIRM_TIMEOUT_MS = 120_000;
 
@@ -22,9 +24,19 @@ export function needsConfirm(name: AgentToolName, mode: PermissionMode): boolean
   return true;
 }
 
+/** 确认决策结构收窄：kind 必须在合法集合内（allow-always 无需负载，签名由运行时按工具参数推导） */
+export function isConfirmDecision(v: unknown): v is ConfirmDecision {
+  if (typeof v !== 'object' || v === null) return false;
+  const kind = (v as Record<string, unknown>)['kind'];
+  return (
+    kind === 'allow-once' || kind === 'allow-session' || kind === 'allow-always' || kind === 'deny' || kind === 'cancel'
+  );
+}
+
 /**
  * 权限门控：按工具权限分类 + 权限模式决定放行 / 拒绝 / 需确认。
- * 确认等待 120s 超时自动拒绝，保证 agent 循环不会永久挂起。
+ * 确认弹层由宿主实现，提供 Codex 风格多选项（允许一次/本会话/总是/拒绝/换方案）；
+ * 等待 120s 超时自动拒绝，保证 agent 循环不会永久挂起。
  */
 export async function gateTool(
   name: AgentToolName,
@@ -46,14 +58,23 @@ export async function gateTool(
 
   // 确认等待 120s 超时自动拒绝（区分用户拒绝与超时，便于渲染端展示原因）
   let timedOut = false;
-  const approved = await Promise.race([
+  const decision = await Promise.race([
     confirm(toolEventId, name, argsJson),
-    new Promise<boolean>(resolve => {
+    new Promise<ConfirmDecision>(resolve => {
       setTimeout(() => {
         timedOut = true;
-        resolve(false);
+        resolve({ kind: 'deny' });
       }, CONFIRM_TIMEOUT_MS);
     })
   ]);
-  return approved ? { allow: true } : { allow: false, reason: timedOut ? 'timeout' : 'denied' };
+  switch (decision.kind) {
+    case 'allow-once':
+    case 'allow-session':
+    case 'allow-always':
+      return { allow: true, decision };
+    case 'cancel':
+      return { allow: false, reason: 'cancel', decision };
+    case 'deny':
+      return { allow: false, reason: timedOut ? 'timeout' : 'denied', decision };
+  }
 }

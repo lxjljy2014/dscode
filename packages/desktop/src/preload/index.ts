@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   AgentConfirmRequest,
   AgentErrorEvent,
+  ConfirmDecision,
   AppSettings,
   ChatMessagePayload,
   DiffFile,
@@ -74,8 +75,8 @@ const api = {
     subagentId: string
   ): Promise<{ ok: boolean }> => ipcRenderer.invoke('agent:start', sessionId, model, messages, subagentId),
   agentStop: (sessionId: string): Promise<void> => ipcRenderer.invoke('agent:stop', sessionId),
-  agentConfirmResponse: (toolEventId: string, approve: boolean): Promise<void> =>
-    ipcRenderer.invoke('agent:confirm-response', toolEventId, approve),
+  agentConfirmResponse: (toolEventId: string, decision: ConfirmDecision): Promise<void> =>
+    ipcRenderer.invoke('agent:confirm-response', toolEventId, decision),
   /** 订阅 agent 文本增量（kind: content=正文 / reasoning=思维链） */
   onAgentDelta: (
     cb: (ev: { sessionId: string; content: string; kind: 'content' | 'reasoning' }) => void
@@ -89,14 +90,15 @@ const api = {
         (raw['kind'] === undefined || raw['kind'] === 'content' || raw['kind'] === 'reasoning')
     ),
   /** 订阅 agent 工具事件（状态流转） */
-  onAgentTool: (cb: (ev: { sessionId: string; event: import('@dscode/shared').AgentToolEvent }) => void): (() => void) =>
+  onAgentTool: (
+    cb: (ev: { sessionId: string; event: import('@dscode/shared').AgentToolEvent }) => void
+  ): (() => void) =>
     subscribe('agent:tool', cb, raw => hasSessionId(raw) && typeof raw['event'] === 'object' && raw['event'] !== null),
   /** 订阅写/执行工具确认请求 */
   onAgentConfirm: (cb: (ev: AgentConfirmRequest) => void): (() => void) =>
     subscribe('agent:confirm', cb, raw => hasSessionId(raw) && typeof raw['toolEventId'] === 'string'),
   /** 订阅 agent 完成事件 */
-  onAgentDone: (cb: (ev: { sessionId: string }) => void): (() => void) =>
-    subscribe('agent:done', cb, hasSessionId),
+  onAgentDone: (cb: (ev: { sessionId: string }) => void): (() => void) => subscribe('agent:done', cb, hasSessionId),
   /** 订阅 agent token 用量事件（回复底部统计；usage 为 { promptTokens, completionTokens }） */
   onAgentUsage: (
     cb: (ev: { sessionId: string; usage: { promptTokens: number; completionTokens: number } }) => void

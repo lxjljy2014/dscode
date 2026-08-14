@@ -1,6 +1,7 @@
 import type {
   AgentConfirmRequest,
   AgentErrorEvent,
+  ConfirmDecision,
   AgentToolEvent,
   AgentUsageEvent,
   AppSettings,
@@ -53,9 +54,14 @@ export interface HostApi {
   verifyProvider: (baseUrl: string, apiKey: string) => Promise<ProviderVerifyResult>;
 
   // ---- agent ----
-  agentStart: (sessionId: string, model: string, messages: ChatMessagePayload[], subagentId: string) => Promise<{ ok: boolean }>;
+  agentStart: (
+    sessionId: string,
+    model: string,
+    messages: ChatMessagePayload[],
+    subagentId: string
+  ) => Promise<{ ok: boolean }>;
   agentStop: (sessionId: string) => Promise<void>;
-  agentConfirmResponse: (toolEventId: string, approve: boolean) => Promise<void>;
+  agentConfirmResponse: (toolEventId: string, decision: ConfirmDecision) => Promise<void>;
   /** 订阅 agent 事件（按 sessionId 分发），均返回取消订阅函数 */
   onAgentDelta: (cb: (ev: { sessionId: string; content: string; kind: 'content' | 'reasoning' }) => void) => () => void;
   onAgentTool: (cb: (ev: { sessionId: string; event: AgentToolEvent }) => void) => () => void;

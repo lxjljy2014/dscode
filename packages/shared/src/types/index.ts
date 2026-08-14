@@ -89,6 +89,21 @@ export interface AgentConfirmRequest {
   args: string;
 }
 
+/**
+ * 工具确认决策（仿 Codex CLI 审批弹层）：
+ * - allow-once：仅本次放行
+ * - allow-session：本会话内相同签名不再询问
+ * - allow-always：写入持久规则（宿主持久化），之后相同签名不再询问
+ * - deny：拒绝，agent 收到拒绝结果继续
+ * - cancel：拒绝并要求换一种做法（agent 收到用户反馈后重新规划）
+ */
+export type ConfirmDecision =
+  | { kind: 'allow-once' }
+  | { kind: 'allow-session' }
+  | { kind: 'allow-always' }
+  | { kind: 'deny' }
+  | { kind: 'cancel' };
+
 export interface Session {
   id: string;
   title: string;

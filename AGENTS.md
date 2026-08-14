@@ -26,7 +26,7 @@ packages/
 │   └── src/
 │       ├── agent/    # 运行时编排：runtime.ts（SSE 流式+工具循环+30 轮上限）、types.ts（AgentEventSink 事件抽象，宿主各自实现）
 │       ├── tools/    # 工具注册表：Tool 接口（描述+实现一体）+ 每工具一文件 ×6，注册表 Record<AgentToolName, Tool> 编译期保证完整
-│       ├── gate/     # 权限门控（只读放行/四权限模式/确认 120s 超时拒绝）
+│       ├── gate/     # 权限门控（只读放行/四权限模式；确认弹层 Codex 风格多选项：允许一次/本会话/总是+持久规则/拒绝/换方案，120s 超时自动拒绝）
 │       ├── adapters/ # 模型适配：ModelAdapter 接口（请求构造 + SSE 增量归一化）+ openai-compatible/deepseek + 通用 streamChat
 │       ├── workspace/# 文件树扫描/读文件、paths.ts（SKIP_DIRS+resolveSafePath）、diff.ts（快照 + LCS 行级 diff）
 │       ├── git/      # git CLI 封装（execFile 参数数组）
@@ -125,7 +125,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
   - `projects:list` —— 最近项目（`node:sqlite`，`userData/projects.db`，无原生依赖）
   - `dialog:pick-directory` —— 选择工作目录（取消返回 null）
   - `provider:verify` —— API key 校验（主进程 fetch `GET {baseUrl}/models`）
-  - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（运行时在 `@dscode/core`（SSE 流式 + 工具循环 + 门控 + 模型适配，事件经 AgentEventSink 上抛），`desktop/src/main/agent/agent.ts` 实现 sink 映射到 IPC；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求，120s 超时自动拒绝）/ `agent:done` / `agent:error`（code: no-api-key/api/network/aborted/running/unknown；unknown 等携带 detail 真实原因，渲染端随错误气泡展示），均带 sessionId；同会话重复 `agent:start` 会先中止旧运行再启动新运行（窗口重载后重发不报错）；窗口关闭时其发起的运行被回收（见 `stopWindowAgents`）
+  - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（运行时在 `@dscode/core`（SSE 流式 + 工具循环 + 门控 + 模型适配，事件经 AgentEventSink 上抛），`desktop/src/main/agent/agent.ts` 实现 sink 映射到 IPC；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求；响应为 ConfirmDecision 多选项：allow-once/allow-session/allow-always/deny/cancel，allow-session 会话内免问，allow-always 写入 settings.json 的 approvalRules 持久规则，cancel 以用户消息注入让 agent 换方案，120s 超时自动拒绝）/ `agent:done` / `agent:error`（code: no-api-key/api/network/aborted/running/unknown；unknown 等携带 detail 真实原因，渲染端随错误气泡展示），均带 sessionId；同会话重复 `agent:start` 会先中止旧运行再启动新运行（窗口重载后重发不报错）；窗口关闭时其发起的运行被回收（见 `stopWindowAgents`）
   - `workspace:tree` / `workspace:read-file` —— 真实文件树扫描与文件读取（路径限定工作目录内）；`workspace:diff` 事件 —— 写/执行工具后主进程按「agent 启动快照 vs 当前内容」LCS 行级 diff 推送
   - `sessions:list` / `sessions:create` / `sessions:append` —— 会话持久化（`node:sqlite`，`userData/sessions.db`；消息的 steps（思维链/正文/工具调用交错的有序步骤）以 JSON 存 `messages.steps` 列，重启后按此恢复折叠块与工具卡；旧消息无 steps 走正文兜底；会话级 toolEvents 数组仍为瞬态不落库）
   - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` —— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合

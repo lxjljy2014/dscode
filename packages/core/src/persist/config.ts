@@ -170,7 +170,8 @@ export function defaultSettings(homeDir: string): AppSettings {
     hooks: [],
     subagents: [...DEFAULT_SUBAGENTS],
     mcpServers: [],
-    browsingEnabled: true
+    browsingEnabled: true,
+    approvalRules: []
   };
 }
 
@@ -195,6 +196,9 @@ export function loadSettings(file: string, homeDir: string, crypto?: SettingsCry
     const subagents = rawSubagents.length > 0 ? rawSubagents : defaults.subagents;
     const mcpServers = Array.isArray(raw['mcpServers']) ? raw['mcpServers'].filter(isMcpServer) : [];
     const browsingEnabled = typeof raw['browsingEnabled'] === 'boolean' ? raw['browsingEnabled'] : true;
+    const approvalRules = Array.isArray(raw['approvalRules'])
+      ? raw['approvalRules'].filter((v): v is string => typeof v === 'string')
+      : [];
     return {
       workingDirectory,
       permissionMode,
@@ -206,7 +210,8 @@ export function loadSettings(file: string, homeDir: string, crypto?: SettingsCry
       hooks,
       subagents,
       mcpServers,
-      browsingEnabled
+      browsingEnabled,
+      approvalRules
     };
   } catch {
     return defaults;
@@ -237,7 +242,10 @@ export function saveSettings(
     hooks: Array.isArray(patch.hooks) ? patch.hooks.filter(isHook) : current.hooks,
     subagents: Array.isArray(patch.subagents) ? patch.subagents.filter(isSubagent) : current.subagents,
     mcpServers: Array.isArray(patch.mcpServers) ? patch.mcpServers.filter(isMcpServer) : current.mcpServers,
-    browsingEnabled: typeof patch.browsingEnabled === 'boolean' ? patch.browsingEnabled : current.browsingEnabled
+    browsingEnabled: typeof patch.browsingEnabled === 'boolean' ? patch.browsingEnabled : current.browsingEnabled,
+    approvalRules: Array.isArray(patch.approvalRules)
+      ? patch.approvalRules.filter((v): v is string => typeof v === 'string')
+      : current.approvalRules
   };
   const persisted: AppSettings = { ...next, providers: encryptProviders(next.providers, crypto) };
   writeFileSync(file, JSON.stringify(persisted, null, 2), 'utf8');

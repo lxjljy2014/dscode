@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import type { AgentToolEvent, ChatMessagePayload, DiffFile, Message, Session } from '@dscode/shared';
+import type { AgentToolEvent, ChatMessagePayload, ConfirmDecision, DiffFile, Message, Session } from '@dscode/shared';
 import { host } from '../bridge/host';
 import { useSessionStore } from './session';
 
@@ -122,10 +122,10 @@ export const useAgentStore = defineStore('agent', () => {
     if (sessionStore.activeSessionId) await host.agentStop(sessionStore.activeSessionId);
   }
 
-  /** 确认弹窗响应（allow=true 放行 / false 拒绝） */
-  function respondConfirm(toolEventId: string, approve: boolean) {
+  /** 确认弹窗响应（决策由 ToolEventCard 多选项给出：允许一次/本会话/总是/拒绝/换方案） */
+  function respondConfirm(toolEventId: string, decision: ConfirmDecision) {
     if (!host) return;
-    void host.agentConfirmResponse(toolEventId, approve);
+    void host.agentConfirmResponse(toolEventId, decision);
   }
 
   // ---- agent/workspace 事件订阅（按 sessionId 分发） ----

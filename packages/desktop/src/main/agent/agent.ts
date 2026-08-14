@@ -9,7 +9,7 @@ import {
 } from '@dscode/core';
 import type { Hook } from '@dscode/shared';
 import type { AgentEventSink, AgentStartResult } from '@dscode/core';
-import { loadAppSettings } from '../settings';
+import { loadAppSettings, saveAppSettings } from '../settings';
 import { isChatMessagePayload } from '../validators';
 import { fireHooks } from '../hooks';
 
@@ -34,6 +34,15 @@ function createSink(win: BrowserWindow, hooks: Hook[], cwd: string, model: strin
       if (event.status === 'done') fireHooks(hooks, 'tool_done', cwd);
     },
     confirm: (sessionId, toolEventId, name, args) => send('agent:confirm', { sessionId, toolEventId, name, args }),
+    ruleUpdated: (_sessionId, signature) => {
+      // 把「总是允许」规则写入 settings.json（下次运行由 startAgent 注入 config.approvalRules）
+      const file = app.getPath('userData') + '/settings.json';
+      const homeDir = app.getPath('home');
+      const current = loadAppSettings(file, homeDir);
+      if (!current.approvalRules.includes(signature)) {
+        saveAppSettings(file, homeDir, { approvalRules: [...current.approvalRules, signature] });
+      }
+    },
     usage: (sessionId, usage) => {
       // 用量同时推给渲染端（回复底部统计：首token/token 速率等），与 usage.db 落库并行
       send('agent:usage', { sessionId, usage });
@@ -85,7 +94,7 @@ export async function startAgent(
   const skillSection =
     settings.skills.length > 0
       ? '\n\n可用技能（按需调用其说明执行）：\n' +
-        settings.skills.map((s, i) => (i + 1) + '. ' + s.name + '：' + s.description + '\n' + s.instructions).join('\n')
+        settings.skills.map((s, i) => i + 1 + '. ' + s.name + '：' + s.description + '\n' + s.instructions).join('\n')
       : '';
   // 会话开始钩子
   fireHooks(settings.hooks, 'session_start', settings.workingDirectory);
@@ -99,7 +108,8 @@ export async function startAgent(
       permissionMode: settings.permissionMode,
       providers: settings.providers,
       systemPrompt: basePrompt + memorySection + skillSection,
-      browsingEnabled: settings.browsingEnabled
+      browsingEnabled: settings.browsingEnabled,
+      approvalRules: settings.approvalRules
     }
   });
   if (result.ok) winBySession.set(sessionId, win);

@@ -4,7 +4,7 @@
  * - auto-edit（自动编辑）：写工具直接放行，执行（bash）仍需确认
  * - plan（计划模式）：写/执行一律拒绝，只读 + 出方案
  * - full-access（完全访问）：全部放行
- * 门控实现在主进程 `desktop/src/main/agent-gate.ts`（确认等待 120s 超时自动拒绝）。
+ * 门控实现在 @dscode/core 的 gate（确认弹层提供 Codex 风格多选项：允许一次/本会话/总是+持久规则/拒绝/换方案，120s 超时自动拒绝）。
  */
 export type PermissionMode = 'confirm' | 'auto-edit' | 'plan' | 'full-access';
 
@@ -109,6 +109,8 @@ export interface AppSettings {
   mcpServers: McpServer[];
   /** 是否启用网页浏览工具（browse） */
   browsingEnabled: boolean;
+  /** 「总是允许」审批规则（工具签名列表，确认弹层选择后写入；命中则不再询问） */
+  approvalRules: string[];
 }
 
 /** DeepSeek 预置供应商：引导页在 providers 为空时预填（apiKey 留空待用户填写） */
