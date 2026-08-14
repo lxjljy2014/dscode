@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { DEEPSEEK_PRESET } from '@dscode/shared';
 import type { AppSettings, PermissionMode, ProviderConfig, SettingsPatch } from '@dscode/shared';
 
 /**
@@ -24,6 +25,11 @@ function isProviderConfig(v: unknown): v is ProviderConfig {
   );
 }
 
+/** 预置供应商的模型列表强制对齐 DEEPSEEK_PRESET，防旧数据漂移（如已下线的 deepseek-chat 残留） */
+function normalizeProviders(providers: ProviderConfig[]): ProviderConfig[] {
+  return providers.map(p => (p.id === DEEPSEEK_PRESET.id ? { ...p, models: DEEPSEEK_PRESET.models } : p));
+}
+
 export function defaultSettings(homeDir: string): AppSettings {
   return { workingDirectory: homeDir, permissionMode: 'confirm', providers: [], onboardingDone: false };
 }
@@ -37,7 +43,9 @@ export function loadSettings(file: string, homeDir: string): AppSettings {
     const workingDirectory =
       typeof raw['workingDirectory'] === 'string' ? raw['workingDirectory'] : defaults.workingDirectory;
     const permissionMode = isPermissionMode(raw['permissionMode']) ? raw['permissionMode'] : defaults.permissionMode;
-    const providers = Array.isArray(raw['providers']) ? raw['providers'].filter(isProviderConfig) : defaults.providers;
+    const providers = normalizeProviders(
+      Array.isArray(raw['providers']) ? raw['providers'].filter(isProviderConfig) : defaults.providers
+    );
     const onboardingDone =
       typeof raw['onboardingDone'] === 'boolean' ? raw['onboardingDone'] : defaults.onboardingDone;
     return { workingDirectory, permissionMode, providers, onboardingDone };
@@ -55,7 +63,9 @@ export function saveSettings(file: string, homeDir: string, patch: SettingsPatch
         ? patch.workingDirectory
         : current.workingDirectory,
     permissionMode: isPermissionMode(patch.permissionMode) ? patch.permissionMode : current.permissionMode,
-    providers: Array.isArray(patch.providers) ? patch.providers.filter(isProviderConfig) : current.providers,
+    providers: normalizeProviders(
+      Array.isArray(patch.providers) ? patch.providers.filter(isProviderConfig) : current.providers
+    ),
     onboardingDone: typeof patch.onboardingDone === 'boolean' ? patch.onboardingDone : current.onboardingDone
   };
   writeFileSync(file, JSON.stringify(next, null, 2), 'utf8');

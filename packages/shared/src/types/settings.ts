@@ -39,7 +39,7 @@ export const DEEPSEEK_PRESET: ProviderConfig = {
   name: 'DeepSeek',
   baseUrl: 'https://api.deepseek.com',
   apiKey: '',
-  models: ['deepseek-v4-pro']
+  models: ['deepseek-v4-pro', 'deepseek-v4-flash']
 };
 
 /**
