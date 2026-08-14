@@ -1,8 +1,9 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { Message, Session } from '@dscode/shared';
+import type { AssistantStep, Message, Session } from '@dscode/shared';
 import { defaultSettings, loadSettings, saveSettings } from '../src/persist/config';
 import type { SettingsCrypto } from '../src/persist/config';
 import { backfillSessions, initSessions, listSessions, upsertMessage, upsertSession } from '../src/persist/sessions';
@@ -152,6 +153,12 @@ describe('config 持久化', () => {
     expect(saved.subagents[0]?.name).toBe('reviewer');
   });
 
+  it('无自定义 subagents 时预置默认子智能体', () => {
+    const s = loadSettings(file, home);
+    expect(s.subagents.length).toBeGreaterThan(0);
+    expect(s.subagents.some(x => x.id === 'code-review')).toBe(true);
+  });
+
   it('mcpServers 落库读回并过滤非法项', () => {
     const saved = saveSettings(file, home, {
       mcpServers: [
@@ -220,6 +227,87 @@ describe('sessions 持久化', () => {
     const msgs = listSessions(file)[0]?.messages;
     expect(msgs?.[0]?.errorCode).toBe('api');
     expect(msgs?.[1]?.errorCode).toBeUndefined();
+  });
+
+  it('steps（思维链/工具/正文交错）落库读回且顺序保持', () => {
+    file = join(dir, 'steps.db');
+    initSessions(file);
+    upsertSession(file, makeSession('s1', 'a'));
+    const steps: AssistantStep[] = [
+      { kind: 'reasoning', content: '先看看文件结构' },
+      { kind: 'tool', event: { id: 'e1', name: 'read_file', args: '{"path":"a.ts"}', status: 'done', createdAt: 1 } },
+      { kind: 'tool', event: { id: 'e2', name: 'write_file', args: '{"path":"b.ts"}', status: 'done', summary: '已写入', createdAt: 2 } },
+      { kind: 'text', content: '已完成' }
+    ];
+    upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: '已完成', steps, createdAt: 3 });
+    const msg = listSessions(file)[0]?.messages[0];
+    expect(msg?.steps).toEqual(steps);
+    expect(msg?.content).toBe('已完成');
+  });
+
+  it('无 steps 的老消息读回不带 steps（渲染端走正文兜底）', () => {
+    file = join(dir, 'nosteps.db');
+    initSessions(file);
+    upsertSession(file, makeSession('s1', 'a'));
+    upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: '正文', createdAt: 1 });
+    expect(listSessions(file)[0]?.messages[0]?.steps).toBeUndefined();
+  });
+
+  it('崩溃残留的非终态工具事件读回归一化为 error 并补说明', () => {
+    file = join(dir, 'interrupted.db');
+    initSessions(file);
+    upsertSession(file, makeSession('s1', 'a'));
+    const steps: AssistantStep[] = [
+      { kind: 'tool', event: { id: 'e1', name: 'run_command', args: '{"command":"x"}', status: 'running', createdAt: 1 } },
+      { kind: 'tool', event: { id: 'e2', name: 'edit_file', args: '{"path":"y"}', status: 'confirming', error: '用户未响应', createdAt: 2 } }
+    ];
+    upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: '', steps, createdAt: 3 });
+    const msg = listSessions(file)[0]?.messages[0];
+    const events = msg?.steps?.map(s => (s.kind === 'tool' ? s.event : null));
+    expect(events?.[0]?.status).toBe('error');
+    expect(events?.[0]?.error).toBe('会话中断，工具未完成');
+    expect(events?.[1]?.status).toBe('error');
+    expect(events?.[1]?.error).toBe('用户未响应');
+  });
+
+  it('steps JSON 损坏时读回无 steps（不抛异常）', () => {
+    file = join(dir, 'corrupt.db');
+    initSessions(file);
+    upsertSession(file, makeSession('s1', 'a'));
+    upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: '正文', createdAt: 1 });
+    const db = new DatabaseSync(file);
+    db.prepare('UPDATE messages SET steps = ? WHERE id = ?').run('not-json', 'm1');
+    db.close();
+    const msg = listSessions(file)[0]?.messages[0];
+    expect(msg?.steps).toBeUndefined();
+    expect(msg?.content).toBe('正文');
+  });
+
+  it('旧库无 steps 列时自动迁移并可正常读写', () => {
+    file = join(dir, 'migrate.db');
+    // 按早期 schema 手工建库（messages 无 steps 列）
+    const db = new DatabaseSync(file);
+    db.exec(
+      'CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL, ' +
+        "working_directory TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)"
+    );
+    db.exec(
+      'CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL, ' +
+        'content TEXT NOT NULL, error_code TEXT, created_at INTEGER NOT NULL)'
+    );
+    db.close();
+    initSessions(file);
+    upsertSession(file, makeSession('s1', '旧会话'));
+    upsertMessage(file, 's1', {
+      id: 'm1',
+      role: 'assistant',
+      content: 'x',
+      steps: [{ kind: 'text', content: 'x' }],
+      createdAt: 1
+    });
+    const msg = listSessions(file)[0]?.messages[0];
+    expect(msg?.content).toBe('x');
+    expect(msg?.steps).toEqual([{ kind: 'text', content: 'x' }]);
   });
 
   it('backfill 回填空工作目录', () => {

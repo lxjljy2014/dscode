@@ -125,6 +125,10 @@ export const useSessionStore = defineStore('session', () => {
         role: message.role,
         content: message.content,
         createdAt: message.createdAt,
+        // steps（思维链/工具调用）随消息落库；响应式代理须转成普通对象再经 IPC 结构化克隆
+        ...(message.steps && message.steps.length > 0
+          ? { steps: JSON.parse(JSON.stringify(message.steps)) as Message['steps'] }
+          : {}),
         ...(message.errorCode ? { errorCode: message.errorCode } : {})
       });
       if (!r.ok) console.warn('[dscode] 消息持久化失败', message.id);

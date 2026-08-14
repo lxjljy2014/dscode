@@ -1,4 +1,4 @@
-import type { ChatMessagePayload, Message, Session } from '@dscode/shared';
+import type { AgentToolEvent, AssistantStep, ChatMessagePayload, Message, Session } from '@dscode/shared';
 
 /**
  * IPC 参数校验的共享收窄函数。
@@ -19,7 +19,39 @@ export function isChatMessagePayload(v: unknown): v is ChatMessagePayload {
   return (r['role'] === 'user' || r['role'] === 'assistant') && isString(r['content']);
 }
 
-/** 校验持久化消息（required + errorCode；streaming/reasoning 为渲染端瞬态字段不落库） */
+const TOOL_NAMES = new Set(['read_file', 'list_dir', 'search', 'run_command', 'write_file', 'edit_file', 'browse']);
+const TOOL_STATUSES = new Set(['running', 'done', 'error', 'confirming', 'denied']);
+
+/** 校验工具事件（required 字段 + 可选 summary/error 的类型） */
+function isToolEvent(v: unknown): v is AgentToolEvent {
+  if (!isRecord(v)) return false;
+  const r = v as Record<string, unknown>;
+  return (
+    isString(r['id']) &&
+    isString(r['name']) &&
+    TOOL_NAMES.has(r['name']) &&
+    isString(r['args']) &&
+    isString(r['status']) &&
+    TOOL_STATUSES.has(r['status']) &&
+    typeof r['createdAt'] === 'number' &&
+    (r['summary'] === undefined || isString(r['summary'])) &&
+    (r['error'] === undefined || isString(r['error']))
+  );
+}
+
+/** 校验消息步骤（reasoning/text 带字符串 content；tool 带完整事件），非法项整体拒绝 */
+function isAssistantSteps(v: unknown): v is AssistantStep[] {
+  if (!Array.isArray(v)) return false;
+  return v.every(s => {
+    if (!isRecord(s)) return false;
+    const r = s as Record<string, unknown>;
+    if (r['kind'] === 'reasoning' || r['kind'] === 'text') return isString(r['content']);
+    if (r['kind'] === 'tool') return isToolEvent(r['event']);
+    return false;
+  });
+}
+
+/** 校验持久化消息（required + errorCode/steps 可选；streaming/reasoning 顶层字段为渲染端瞬态不落库） */
 export function isMessage(v: unknown): v is Message {
   if (!isRecord(v)) return false;
   const r = v as Record<string, unknown>;
@@ -28,7 +60,8 @@ export function isMessage(v: unknown): v is Message {
     (r['role'] === 'user' || r['role'] === 'assistant') &&
     isString(r['content']) &&
     typeof r['createdAt'] === 'number' &&
-    (r['errorCode'] === undefined || isString(r['errorCode']))
+    (r['errorCode'] === undefined || isString(r['errorCode'])) &&
+    (r['steps'] === undefined || isAssistantSteps(r['steps']))
   );
 }
 

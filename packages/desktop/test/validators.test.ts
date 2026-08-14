@@ -33,6 +33,26 @@ describe('isMessage', () => {
     expect(isMessage({ id: 'm1', role: 'assistant', content: 'x', createdAt: 1, errorCode: 'api' })).toBe(true);
   });
 
+  it('合法 steps（reasoning/text/tool 交错）通过', () => {
+    const steps = [
+      { kind: 'reasoning', content: '先想一下' },
+      { kind: 'tool', event: { id: 'e1', name: 'write_file', args: '{}', status: 'done', createdAt: 1, summary: 'ok' } },
+      { kind: 'text', content: '完成了' }
+    ];
+    expect(isMessage({ id: 'm1', role: 'assistant', content: 'x', createdAt: 1, steps })).toBe(true);
+    expect(isMessage({ id: 'm1', role: 'user', content: 'x', createdAt: 1, steps: [] })).toBe(true);
+  });
+
+  it('拒绝非法 steps（未知工具/坏状态/缺字段）', () => {
+    const base = { id: 'm1', role: 'assistant' as const, content: 'x', createdAt: 1 };
+    expect(isMessage({ ...base, steps: [{ kind: 'tool', event: { id: 'e', name: 'evil', args: '{}', status: 'done', createdAt: 1 } }] })).toBe(false);
+    expect(isMessage({ ...base, steps: [{ kind: 'tool', event: { id: 'e', name: 'write_file', args: '{}', status: 'hacked', createdAt: 1 } }] })).toBe(false);
+    expect(isMessage({ ...base, steps: [{ kind: 'tool', event: { id: 'e', name: 'write_file', args: 1, status: 'done', createdAt: 1 } }] })).toBe(false);
+    expect(isMessage({ ...base, steps: [{ kind: 'text', content: 1 }] })).toBe(false);
+    expect(isMessage({ ...base, steps: [{ kind: 'other', content: 'x' }] })).toBe(false);
+    expect(isMessage({ ...base, steps: 'not-array' })).toBe(false);
+  });
+
   it('拒绝非法字段', () => {
     expect(isMessage({ id: 'm1', role: 'user', content: 'x' })).toBe(false);
     expect(isMessage({ id: 'm1', role: 'system', content: 'x', createdAt: 1 })).toBe(false);
