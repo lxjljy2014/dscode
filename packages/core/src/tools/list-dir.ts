@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { SKIP_DIRS, resolveSafePath } from '../workspace/paths';
 import { STRING, strArg } from './types';
@@ -18,28 +18,30 @@ export const listDirTool: Tool = {
     properties: { path: { ...STRING, description: '相对工作目录的路径，默认根目录' } },
     required: []
   },
-  execute(args: Record<string, unknown>, ctx: ToolContext): ToolResult {
+  async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
     const p = strArg(args, 'path');
-    const base = p ? resolveSafePath(ctx.cwd, p) : ctx.cwd;
+    const base = p ? await resolveSafePath(ctx.cwd, p) : ctx.cwd;
     if (!base) return { ok: false, error: '路径不在工作目录内' };
     const lines: string[] = [];
-    const walk = (dir: string, depth: number): void => {
+    const walk = async (dir: string, depth: number): Promise<void> => {
       if (depth > LIST_DEPTH || lines.length >= MAX_DIR_ENTRIES) return;
       let entries;
       try {
-        entries = readdirSync(dir, { withFileTypes: true });
+        entries = await readdir(dir, { withFileTypes: true });
       } catch {
         return;
       }
-      const dirs = entries.filter(e => e.isDirectory() && !SKIP_DIRS.has(e.name)).sort((a, b) => a.name.localeCompare(b.name));
+      const dirs = entries
+        .filter(e => e.isDirectory() && !SKIP_DIRS.has(e.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
       const files = entries.filter(e => e.isFile()).sort((a, b) => a.name.localeCompare(b.name));
       for (const d of dirs) {
         lines.push(`${relative(ctx.cwd, join(dir, d.name))}/`);
-        walk(join(dir, d.name), depth + 1);
+        await walk(join(dir, d.name), depth + 1);
       }
       for (const f of files) lines.push(relative(ctx.cwd, join(dir, f.name)));
     };
-    walk(base, 0);
+    await walk(base, 0);
     const content = lines.length >= MAX_DIR_ENTRIES ? `${lines.join('\n')}\n……（条目过多，已截断）` : lines.join('\n');
     return { ok: true, content: content || '（空目录）' };
   }

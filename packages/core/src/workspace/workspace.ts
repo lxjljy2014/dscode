@@ -1,24 +1,24 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import type { FileNode } from '@dscode/shared';
+import { MAX_FILE_BYTES } from '../constants';
 import { SKIP_DIRS, resolveSafePath } from './paths';
 
 /**
- * 真实工作区读取：文件树扫描与单文件读取。
+ * 真实工作区读取：文件树扫描与单文件读取（异步，避免阻塞主进程事件循环）。
  * 文件树按工作目录相对路径组织（与渲染端 FileTree 现有数据形态一致）。
  */
 
 const MAX_DEPTH = 8;
 const MAX_DIR_ENTRIES = 500;
-const MAX_FILE_BYTES = 512 * 1024;
 
 /** 扫描工作目录为文件树（目录在前按名排序；跳过 node_modules/.git/out/dist） */
-export function scanTree(cwd: string): FileNode[] {
-  const walk = (dir: string, depth: number): FileNode[] => {
+export async function scanTree(cwd: string): Promise<FileNode[]> {
+  const walk = async (dir: string, depth: number): Promise<FileNode[]> => {
     if (depth > MAX_DEPTH) return [];
     let entries;
     try {
-      entries = readdirSync(dir, { withFileTypes: true });
+      entries = await readdir(dir, { withFileTypes: true });
     } catch {
       return [];
     }
@@ -33,7 +33,7 @@ export function scanTree(cwd: string): FileNode[] {
         name: d.name,
         path: relative(cwd, full),
         type: 'dir',
-        children: walk(full, depth + 1)
+        children: await walk(full, depth + 1)
       });
     }
     for (const f of files.slice(0, MAX_DIR_ENTRIES - nodes.length)) {
@@ -46,17 +46,17 @@ export function scanTree(cwd: string): FileNode[] {
 }
 
 /** 读取工作目录内的单个文件（UTF-8，≤512KB，越界/过大拒绝） */
-export function readWorkspaceFile(
+export async function readWorkspaceFile(
   cwd: string,
   relPath: string
-): { ok: true; content: string } | { ok: false; error: string } {
-  const target = resolveSafePath(cwd, relPath);
+): Promise<{ ok: true; content: string } | { ok: false; error: string }> {
+  const target = await resolveSafePath(cwd, relPath);
   if (!target) return { ok: false, error: '路径不在工作目录内' };
   try {
-    const stat = statSync(target);
-    if (!stat.isFile()) return { ok: false, error: '目标不是文件' };
-    if (stat.size > MAX_FILE_BYTES) return { ok: false, error: '文件过大（>512KB）' };
-    return { ok: true, content: readFileSync(target, 'utf8') };
+    const st = await stat(target);
+    if (!st.isFile()) return { ok: false, error: '目标不是文件' };
+    if (st.size > MAX_FILE_BYTES) return { ok: false, error: '文件过大（>512KB）' };
+    return { ok: true, content: await readFile(target, 'utf8') };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }

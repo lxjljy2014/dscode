@@ -40,8 +40,13 @@ export const useSettingsStore = defineStore('settings', () => {
     await loadPromise;
   }
 
-  async function save(patch: SettingsPatch): Promise<void> {
-    settings.value = await requireHost().setSettings(patch);
+  // save 串行化：快速连续切换权限模式/工作目录时按提交顺序落盘，避免响应乱序覆盖 settings.value
+  let saveChain: Promise<void> = Promise.resolve();
+  function save(patch: SettingsPatch): Promise<void> {
+    saveChain = saveChain.then(async () => {
+      settings.value = await requireHost().setSettings(patch);
+    });
+    return saveChain;
   }
 
   return { settings, loaded, load, save };

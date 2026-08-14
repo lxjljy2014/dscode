@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import { useSessionStore } from '../../stores/session';
+import { useAgentStore } from '../../stores/agent';
 import FileTree from './FileTree.vue';
 
 const { t } = useI18n();
-const store = useSessionStore();
+const store = useAgentStore();
 const { diffFiles } = storeToRefs(store);
 
 const tab = defineModel<'changes' | 'files'>({ default: 'changes' });

@@ -1,7 +1,7 @@
 import type { AgentToolName } from '@dscode/shared';
 
-/** 工具执行结果（统一判别联合） */
-export type ToolResult = { ok: true; content: string } | { ok: false; error: string };
+/** 工具执行结果（统一判别联合）。changedPaths 为本次实际变更的文件相对路径，供 diff 增量重算（run_command 无法追踪时缺省，退化为全量扫描）。 */
+export type ToolResult = { ok: true; content: string; changedPaths?: string[] } | { ok: false; error: string };
 
 /** 工具权限分类：决定门控策略（只读放行 / 写与执行按权限模式处理） */
 export type ToolPermission = 'read' | 'write' | 'execute';

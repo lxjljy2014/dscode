@@ -3,13 +3,16 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '../../stores/session';
+import { useAgentStore } from '../../stores/agent';
 import ChatInput from './ChatInput.vue';
 import MessageItem from './MessageItem.vue';
 import ToolEventCard from './ToolEventCard.vue';
 
 const { t } = useI18n();
-const store = useSessionStore();
-const { activeSession, generating } = storeToRefs(store);
+const sessionStore = useSessionStore();
+const agentStore = useAgentStore();
+const { activeSession } = storeToRefs(sessionStore);
+const { generating } = storeToRefs(agentStore);
 
 const messages = computed(() => activeSession.value?.messages ?? []);
 
@@ -42,7 +45,11 @@ function scrollToBottom() {
 }
 
 watch(
-  () => [messages.value.length, messages.value[messages.value.length - 1]?.content, activeSession.value?.toolEvents.length],
+  () => [
+    messages.value.length,
+    messages.value[messages.value.length - 1]?.content,
+    activeSession.value?.toolEvents.length
+  ],
   scrollToBottom,
   { flush: 'post' }
 );
@@ -67,8 +74,8 @@ watch(activeSession, scrollToBottom, { flush: 'post' });
         <ChatInput
           class="mx-auto max-w-200"
           :generating="generating"
-          @send="store.sendMessage"
-          @stop="store.stopGenerating"
+          @send="agentStore.sendMessage"
+          @stop="agentStore.stopGenerating"
         />
       </div>
     </template>
@@ -79,8 +86,8 @@ watch(activeSession, scrollToBottom, { flush: 'post' });
       <ChatInput
         class="w-full max-w-180"
         :generating="generating"
-        @send="store.sendMessage"
-        @stop="store.stopGenerating"
+        @send="agentStore.sendMessage"
+        @stop="agentStore.stopGenerating"
       />
     </div>
   </div>

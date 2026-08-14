@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
-import type { AgentToolEvent, ChatMessagePayload, DiffFile, FileNode, Message, Session } from '@dscode/shared';
+import type { Message, Session } from '@dscode/shared';
 import { host } from '../bridge/host';
 import { useSettingsStore } from './settings';
 import { useUiStore } from './ui';
@@ -10,38 +10,24 @@ function nextId(prefix: string): string {
   return `${prefix}-${Date.now()}-${idSeq++}`;
 }
 
-function findFileNode(nodes: FileNode[], path: string): FileNode | null {
-  for (const node of nodes) {
-    if (node.path === path) return node.type === 'file' ? node : null;
-    if (node.children) {
-      const found = findFileNode(node.children, path);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
 /** 路径 basename（兼容 Windows 反斜杠） */
 function basename(p: string): string {
-  return p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p;
+  return (
+    p
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .pop() || p
+  );
 }
 
+/**
+ * 会话域 store：会话列表 / 分组 / 最近工作空间 / 会话持久化。
+ * 文件树移到 useWorkspaceStore，agent 编排与事件分发移到 useAgentStore，职责边界收敛。
+ */
 export const useSessionStore = defineStore('session', () => {
   const sessions = ref<Session[]>([]);
   const activeSessionId = ref<string | null>(sessions.value[0]?.id ?? null);
   const keyword = ref('');
-  const generating = ref(false);
-
-  /** 各会话的 diff 结果（主进程 workspace:diff 推送，按 sessionId 缓存） */
-  const diffBySession = new Map<string, DiffFile[]>();
-  const diffFiles = computed<DiffFile[]>(
-    () => (activeSessionId.value ? (diffBySession.get(activeSessionId.value) ?? []) : [])
-  );
-
-  const fileTree = ref<FileNode[]>([]);
-  const selectedFilePath = ref<string | null>(null);
-  /** 已加载的文件内容缓存（path → content） */
-  const fileContents = ref<Record<string, string>>({});
 
   /** 最近工作空间（主进程最近项目表，侧边栏分组与输入卡项目菜单的同一数据源） */
   const recentWorkspaces = ref<Array<{ path: string; name: string; lastOpenedAt: number }>>([]);
@@ -108,50 +94,44 @@ export const useSessionStore = defineStore('session', () => {
     return groups;
   });
 
-  const selectedFile = computed(() => {
-    if (!selectedFilePath.value) return null;
-    const node = findFileNode(fileTree.value, selectedFilePath.value);
-    if (!node) return null;
-    return { ...node, content: fileContents.value[node.path] ?? '' };
-  });
-
   function select(id: string) {
     activeSessionId.value = id;
   }
 
-  /** 查找正在流式的 assistant 消息（会话内最后一条 streaming 消息） */
-  function streamingReply(session: Session): Message | null {
-    const messages = session.messages;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].streaming) return messages[i];
+  /** 持久化会话行（IPC 结构化克隆不支持 Vue 响应式 Proxy，须传普通对象）；失败记录告警，不再静默吞掉 */
+  async function persistSession(session: Session): Promise<void> {
+    if (!host) return;
+    try {
+      const r = await host.sessionsCreate({
+        id: session.id,
+        title: session.title,
+        workingDirectory: session.workingDirectory,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        toolEvents: [],
+        messages: []
+      });
+      if (!r.ok) console.warn('[dscode] 会话持久化失败', session.id);
+    } catch (e) {
+      console.warn('[dscode] 会话持久化异常', e);
     }
-    return null;
   }
 
-  /** 持久化会话行（IPC 结构化克隆不支持 Vue 响应式 Proxy，须传普通对象） */
-  function persistSession(session: Session): void {
+  async function persistMessage(session: Session, message: Message): Promise<void> {
     if (!host) return;
-    void host.sessionsCreate({
-      id: session.id,
-      title: session.title,
-      workingDirectory: session.workingDirectory,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-      toolEvents: [],
-      messages: []
-    });
-  }
-
-  function persistMessage(session: Session, message: Message): void {
-    if (!host) return;
-    void host.sessionsAppend(session.id, {
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      createdAt: message.createdAt,
-      ...(message.errorCode ? { errorCode: message.errorCode } : {})
-    });
-    persistSession(session);
+    try {
+      const r = await host.sessionsAppend(session.id, {
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        createdAt: message.createdAt,
+        ...(message.errorCode ? { errorCode: message.errorCode } : {})
+      });
+      if (!r.ok) console.warn('[dscode] 消息持久化失败', message.id);
+      await persistSession(session);
+    } catch (e) {
+      console.warn('[dscode] 消息持久化异常', e);
+    }
   }
 
   function createSession() {
@@ -169,166 +149,13 @@ export const useSessionStore = defineStore('session', () => {
     activeSessionId.value = session.id;
     // 新建任务时收起右侧面板与终端，聚焦对话区
     useUiStore().hideSidePanels();
-    persistSession(session);
-  }
-
-  async function selectFile(path: string) {
-    selectedFilePath.value = path;
-    if (!host) return;
-    const r = await host.workspaceReadFile(path);
-    fileContents.value[path] = r.ok ? r.content : `（读取失败：${r.error}）`;
-  }
-
-  async function sendMessage(content: string, model = '') {
-    if (generating.value) return;
-    if (!host) return;
-    // 空会话状态（无激活任务）直接发送：自动新建任务，避免静默吞掉输入
-    if (!activeSession.value) createSession();
-    const session = activeSession.value;
-    if (!session) return;
-
-    const userMsg: Message = {
-      id: nextId('m'),
-      role: 'user',
-      content,
-      createdAt: Date.now()
-    };
-    session.messages.push(userMsg);
-    if (!session.title) {
-      session.title = content.length > 24 ? `${content.slice(0, 24)}…` : content;
-    }
-    session.updatedAt = Date.now();
-    persistMessage(session, userMsg);
-
-    const reply: Message = {
-      id: nextId('m'),
-      role: 'assistant',
-      content: '',
-      streaming: true,
-      createdAt: Date.now()
-    };
-    session.messages.push(reply);
-    generating.value = true;
-
-    // 真实 agent：历史取非流式消息（含刚发送的用户消息）
-    const history: ChatMessagePayload[] = session.messages
-      .filter(m => !m.streaming)
-      .map(m => ({ role: m.role, content: m.content }));
-    let r: { ok: boolean };
-    try {
-      r = await host.agentStart(session.id, model, history);
-    } catch {
-      // IPC 异常兜底：避免 generating 卡死
-      r = { ok: false };
-    }
-    if (!r.ok) {
-      reply.streaming = false;
-      reply.errorCode = 'unknown';
-      generating.value = false;
-      persistMessage(session, reply);
-    }
-  }
-
-  async function stopGenerating() {
-    if (!host) return;
-    if (activeSessionId.value) await host.agentStop(activeSessionId.value);
-  }
-
-  /** 确认弹窗响应（allow=true 放行 / false 拒绝） */
-  function respondConfirm(toolEventId: string, approve: boolean) {
-    if (!host) return;
-    void host.agentConfirmResponse(toolEventId, approve);
-  }
-
-  // ---- agent/workspace 事件订阅（按 sessionId 分发） ----
-
-  function onDelta(ev: { sessionId: string; content: string; kind: 'content' | 'reasoning' }) {
-    const session = sessions.value.find(s => s.id === ev.sessionId);
-    const reply = session ? streamingReply(session) : null;
-    if (!reply) return;
-    // 推理模型的思维链与正文分流展示（思维链不落库）
-    if (ev.kind === 'reasoning') {
-      reply.reasoning = (reply.reasoning ?? '') + ev.content;
-    } else {
-      reply.content += ev.content;
-    }
-  }
-
-  function onTool(ev: { sessionId: string; event: AgentToolEvent }) {
-    const session = sessions.value.find(s => s.id === ev.sessionId);
-    if (!session) return;
-    const existing = session.toolEvents.find(e => e.id === ev.event.id);
-    if (existing) {
-      // 状态流转：更新既有事件
-      Object.assign(existing, ev.event);
-    } else {
-      session.toolEvents.push(ev.event);
-    }
-  }
-
-  function onConfirm(ev: { sessionId: string; toolEventId: string; name: AgentToolEvent['name']; args: string }) {
-    // 主进程在发确认请求前已推 confirming 事件；此处兜底补一条，避免事件缺失
-    const session = sessions.value.find(s => s.id === ev.sessionId);
-    if (!session || session.toolEvents.some(e => e.id === ev.toolEventId)) return;
-    session.toolEvents.push({
-      id: ev.toolEventId,
-      name: ev.name,
-      args: ev.args,
-      status: 'confirming',
-      createdAt: Date.now()
-    });
-  }
-
-  function onDone(ev: { sessionId: string }) {
-    const session = sessions.value.find(s => s.id === ev.sessionId);
-    if (!session) return;
-    const reply = streamingReply(session);
-    if (reply) {
-      reply.streaming = false;
-      session.updatedAt = Date.now();
-      persistMessage(session, reply);
-    }
-    generating.value = false;
-  }
-
-  function onError(ev: { sessionId: string; code: string; detail?: string }) {
-    const session = sessions.value.find(s => s.id === ev.sessionId);
-    if (!session) return;
-    const reply = streamingReply(session);
-    if (reply) {
-      reply.streaming = false;
-      reply.errorCode = ev.code;
-      session.updatedAt = Date.now();
-      persistMessage(session, reply);
-    }
-    generating.value = false;
-  }
-
-  function onWorkspaceDiff(ev: { sessionId: string; files: DiffFile[] }) {
-    diffBySession.set(ev.sessionId, ev.files);
-  }
-
-  let subscribed = false;
-  function subscribeEvents(): void {
-    if (!host || subscribed) return;
-    subscribed = true;
-    host.onAgentDelta(onDelta);
-    host.onAgentTool(onTool);
-    host.onAgentConfirm(onConfirm);
-    host.onAgentDone(onDone);
-    host.onAgentError(onError);
-    host.onWorkspaceDiff(onWorkspaceDiff);
+    void persistSession(session);
   }
 
   async function load(): Promise<void> {
     if (!host) return;
-    const [list, tree, projects] = await Promise.all([
-      host.sessionsList(),
-      host.workspaceTree(),
-      host.listRecentProjects()
-    ]);
+    const [list, projects] = await Promise.all([host.sessionsList(), host.listRecentProjects()]);
     sessions.value = list;
-    fileTree.value = tree;
     recentWorkspaces.value = projects.projects;
     homeDir.value = projects.homeDir;
     // 选中当前工作空间最近的任务（与 wd watch 同一规则；settings 未加载时由 watch 接管）
@@ -337,16 +164,13 @@ export const useSessionStore = defineStore('session', () => {
     activeSessionId.value = inWd[0]?.id ?? null;
   }
 
-  subscribeEvents();
   void load();
 
-  // 工作目录变化：刷新文件树与最近工作空间 + 切到该工作空间最近的任务（无任务则空态）
+  // 工作目录变化：刷新最近工作空间 + 切到该工作空间最近的任务（无任务则空态）
   if (host) {
-    const h = host;
     watch(
       () => useSettingsStore().settings.workingDirectory,
       async wd => {
-        fileTree.value = await h.workspaceTree();
         await refreshWorkspaces();
         const list = sessions.value
           .filter(s => (s.workingDirectory || '') === wd)
@@ -360,25 +184,17 @@ export const useSessionStore = defineStore('session', () => {
     sessions,
     activeSessionId,
     keyword,
-    generating,
     recentWorkspaces,
     homeDir,
     refreshWorkspaces,
-    diffFiles,
-    fileTree,
-    selectedFilePath,
-    fileContents,
     activeSession,
     hasMessage,
     filteredSessions,
     workspaceGroups,
-    selectedFile,
     select,
     createSession,
-    selectFile,
-    sendMessage,
-    stopGenerating,
-    respondConfirm,
+    persistSession,
+    persistMessage,
     load
   };
 });

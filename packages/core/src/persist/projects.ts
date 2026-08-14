@@ -6,9 +6,11 @@ import type { ProjectsListResult, RecentProject } from '@dscode/shared';
  * 数据文件：userData/projects.db，表 recent_projects。
  */
 
-let db: DatabaseSync | null = null;
+/** 按数据文件路径隔离连接（此前为模块级单例，file 参数在首次初始化后被忽略，复用多库会写错文件） */
+const dbs = new Map<string, DatabaseSync>();
 
 function getDb(file: string): DatabaseSync {
+  let db = dbs.get(file);
   if (!db) {
     db = new DatabaseSync(file);
     db.exec(
@@ -17,6 +19,7 @@ function getDb(file: string): DatabaseSync {
         'name TEXT NOT NULL, ' +
         'last_opened_at INTEGER NOT NULL)'
     );
+    dbs.set(file, db);
   }
   return db;
 }

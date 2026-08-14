@@ -39,7 +39,7 @@ packages/
     └── src/
         ├── pages/       # 页面级：OnboardingView、WorkspaceView、settings/ 设置页组件 ×6
         ├── components/  # 业务组件按域分：chat/（聊天流）、workspace/（工作区布局/diff/文件树/终端）、git/（分支/图谱）、common/（通用）
-        ├── stores/      # ui.ts（主题/语言/侧栏显隐/面板尺寸）、session.ts（会话/agent 事件分发/持久化）、settings.ts（工作目录/权限模式，主进程持久化）
+        ├── stores/      # ui.ts（主题/语言/侧栏显隐/面板尺寸）、session.ts（会话/最近工作空间/持久化）、agent.ts（agent 编排/事件分发/diff）、workspace.ts（文件树/文件内容）、settings.ts（工作目录/权限模式，主进程持久化）
         ├── bridge/      # host.ts：宿主桥接 API 抽象（HostApi 类型 + window.dscode 封装）
         ├── plugins/     # vuetify.ts、i18n.ts（createXxxPlugin 工厂函数）
         └── theme/       # tokens.ts（主题色唯一事实源）、global.css（滚动条/选区/拖拽区）
@@ -79,9 +79,10 @@ pnpm lint:fast      # 仅 oxlint（毫秒级快速反馈）
 pnpm lint:eslint    # 仅 ESLint
 pnpm lint:fix       # 两个 linter 自动修复
 pnpm fmt            # oxfmt 格式化
+pnpm test           # 运行 @dscode/core 的 vitest 单测
 ```
 
-注意：**当前没有测试框架、没有 CI**。改动后至少跑 `pnpm typecheck` + `pnpm lint` 验证。
+注意：**当前没有 CI**。改动后至少跑 `pnpm typecheck` + `pnpm lint` + `pnpm test` 验证。
 
 Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror 镜像）下载；`.npmrc` 的 `electron_mirror` 对 pnpm 无效（pnpm 不会把 `.npmrc` 配置转成 `npm_config_*` 环境变量传给 postinstall），不要回退到那种写法。注意 `.pnpmfile.cjs` 内容变化会使 lockfile 的 `pnpmfileChecksum` 失效，需执行一次 `pnpm install --no-frozen-lockfile` 更新。
 
@@ -133,7 +134,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 ## 测试与质量
 
-- 无单元测试 / E2E 测试设施。若引入测试，需自行选型并在本节补充说明。
+- 单测框架 **vitest**（仅在 `@dscode/core`，覆盖纯逻辑层）：`pnpm test`（或 `pnpm --filter @dscode/core test`）运行；测试文件位于 `packages/core/test/*.test.ts`，配置 `packages/core/vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 core `tsc` 的 `src/**/*` 类型检查范围）。当前覆盖：权限门控（`gate.test.ts`）、LCS 行级 diff（`diff.test.ts`）、模型适配器 delta 归一化（`adapters.test.ts`）、`resolveSafePath` 防目录穿越/symlink（`paths.test.ts`）。E2E 测试设施暂无。
 - **lint 双轨并存**（配置都在仓库根）：
   - `oxlint`（`.oxlintrc.json`）：Rust 实现、毫秒级；内置 vue 插件 lint `.vue` 的 `<script>` 块（模板规则暂缺，官方语言插件路线图中）；自动读取 `.gitignore` 排除产物。**负责全部 TS/JS 文件**
   - `eslint`（`eslint.config.js`，flat config，基于 `@soybeanjs/eslint-config-vue`）：**仅覆盖 `.vue` 文件**（soybean 的 defineConfig 硬编码 `files: ['**/*.vue']`），提供模板相关规则；全局 ignores 必须放在数组第一项的无 files config 里（soybean 自带的 ignores 带 files 不生效，会误扫 `out/`）

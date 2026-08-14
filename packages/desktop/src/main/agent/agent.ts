@@ -1,16 +1,13 @@
 import { app, BrowserWindow } from 'electron';
-import {
-  disposeAgents,
-  loadSettings,
-  resolveConfirm,
-  startAgent as startAgentCore,
-  stopAgent as stopAgentCore
-} from '@dscode/core';
-import type { AgentEventSink } from '@dscode/core';
+import { disposeAgents, resolveConfirm, startAgent as startAgentCore, stopAgent as stopAgentCore } from '@dscode/core';
+import type { AgentEventSink, AgentStartResult } from '@dscode/core';
+import { loadAppSettings } from '../settings';
+import { isChatMessagePayload } from '../validators';
 
 /**
  * agent 的 Electron 壳：把 core 的 AgentEventSink 适配到 IPC 事件推送。
  * 运行时逻辑（LLM 流式 + 工具循环 + 门控）在 @dscode/core，将来 TUI 端复用同一运行时、自实现 sink。
+ * IPC 边界在此完成 model / messages 的类型收窄（公共边界强类型化，core 不再依赖运行时过滤）。
  */
 
 /** 把 core 的 AgentEventSink 适配到 IPC 通道（通道名是壳的细节，不进 core） */
@@ -29,13 +26,17 @@ function createSink(win: BrowserWindow): AgentEventSink {
 }
 
 /** 启动一次 agent 运行（渲染端经 agent:start invoke 调用） */
-export function startAgent(
+export async function startAgent(
   win: BrowserWindow,
   sessionId: string,
   model: unknown,
   rawMessages: unknown
-): { ok: true } | { ok: false; error: string } {
-  const settings = loadSettings(app.getPath('userData') + '/settings.json', app.getPath('home'));
+): Promise<AgentStartResult> {
+  if (typeof model !== 'string') return { ok: false, error: 'invalid model' };
+  if (!Array.isArray(rawMessages) || !rawMessages.every(isChatMessagePayload)) {
+    return { ok: false, error: 'invalid messages' };
+  }
+  const settings = loadAppSettings(app.getPath('userData') + '/settings.json', app.getPath('home'));
   return startAgentCore({
     sessionId,
     model,

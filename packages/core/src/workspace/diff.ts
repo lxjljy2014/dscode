@@ -1,63 +1,64 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import type { DiffFile, DiffLine } from '@dscode/shared';
+import { MAX_FILE_BYTES } from '../constants';
 import { SKIP_DIRS } from './paths';
 
 /**
- * 真实 diff：每会话在 agent 启动时快照工作目录全部文本文件，
+ * 真实 diff：每次 agent 运行在启动时快照工作目录全部文本文件，
  * 写/执行工具执行成功后对比快照与当前内容，LCS 行级 diff 结果由调用方推送。
+ * 写/编辑工具回报 changedPaths 时只对增量路径重算；run_command 无法追踪则退化为全量扫描。
  */
 
-const MAX_FILE_BYTES = 512 * 1024;
 /** LCS 动态规划规模上限（old行数 × new行数），超出退化为整文件替换 */
 const MAX_LCS_CELLS = 4_000_000;
 /** hunk 两侧保留的上下文行数 */
 const CONTEXT_LINES = 3;
 
-const snapshots = new Map<string, Map<string, string>>();
-
 /** 收集工作目录内全部文本文件（≤512KB，跳过 node_modules/.git/out/dist） */
-function collectTextFiles(cwd: string): Map<string, string> {
+async function collectTextFiles(cwd: string): Promise<Map<string, string>> {
   const files = new Map<string, string>();
-  const walk = (dir: string): void => {
+  const walk = async (dir: string): Promise<void> => {
     let entries;
     try {
-      entries = readdirSync(dir, { withFileTypes: true });
+      entries = await readdir(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of entries) {
       if (e.isDirectory()) {
-        if (!SKIP_DIRS.has(e.name)) walk(join(dir, e.name));
+        if (!SKIP_DIRS.has(e.name)) await walk(join(dir, e.name));
         continue;
       }
       if (!e.isFile()) continue;
       const full = join(dir, e.name);
       try {
-        const stat = statSync(full);
-        if (stat.size > MAX_FILE_BYTES) return;
-        files.set(relative(cwd, full), readFileSync(full, 'utf8'));
+        const st = await stat(full);
+        if (st.size > MAX_FILE_BYTES) continue;
+        files.set(relative(cwd, full), await readFile(full, 'utf8'));
       } catch {
         // 二进制/不可读文件跳过
       }
     }
   };
-  walk(cwd);
+  await walk(cwd);
   return files;
 }
 
-/** agent 启动时建立快照 */
-export function initSnapshot(sessionId: string, cwd: string): void {
-  snapshots.set(sessionId, collectTextFiles(cwd));
-}
-
-/** agent 运行结束后清理快照 */
-export function clearSnapshot(sessionId: string): void {
-  snapshots.delete(sessionId);
+/** 读取单个文件当前文本（缺失/过大/不可读返回 null） */
+async function readCurrentText(cwd: string, relPath: string): Promise<string | null> {
+  try {
+    const full = join(cwd, relPath);
+    const st = await stat(full);
+    if (!st.isFile() || st.size > MAX_FILE_BYTES) return null;
+    return await readFile(full, 'utf8');
+  } catch {
+    return null;
+  }
 }
 
 /** 单文件 LCS 行级 diff（DP + 回溯；规模超限退化为整文件替换） */
-function diffLines(oldText: string, newText: string): DiffLine[] {
+export function diffLines(oldText: string, newText: string): DiffLine[] {
   const a = oldText.split('\n');
   const b = newText.split('\n');
   const n = a.length;
@@ -67,8 +68,8 @@ function diffLines(oldText: string, newText: string): DiffLine[] {
   if (n * m > MAX_LCS_CELLS) {
     const lines: DiffLine[] = [
       { type: 'hunk', content: `@@ -1,${n} +1,${m} @@` },
-      ...a.map((content, i) => ({ type: 'del', content, oldLineNo: i + 1 } as DiffLine)),
-      ...b.map((content, i) => ({ type: 'add', content, newLineNo: i + 1 } as DiffLine))
+      ...a.map((content, i) => ({ type: 'del', content, oldLineNo: i + 1 }) as DiffLine),
+      ...b.map((content, i) => ({ type: 'add', content, newLineNo: i + 1 }) as DiffLine)
     ];
     return lines;
   }
@@ -78,7 +79,9 @@ function diffLines(oldText: string, newText: string): DiffLine[] {
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
       dp[i * (m + 1) + j] =
-        a[i - 1] === b[j - 1] ? dp[(i - 1) * (m + 1) + j - 1] + 1 : Math.max(dp[(i - 1) * (m + 1) + j], dp[i * (m + 1) + j - 1]);
+        a[i - 1] === b[j - 1]
+          ? dp[(i - 1) * (m + 1) + j - 1] + 1
+          : Math.max(dp[(i - 1) * (m + 1) + j], dp[i * (m + 1) + j - 1]);
     }
   }
 
@@ -111,7 +114,9 @@ function diffLines(oldText: string, newText: string): DiffLine[] {
   let start = -1;
   let end = -1;
   for (let idx = 0; idx < ops.length; idx++) {
-    const inHunk = changedIdx.has(idx) || Array.from({ length: CONTEXT_LINES * 2 + 1 }, (_, k) => idx - CONTEXT_LINES + k).some(k => changedIdx.has(k));
+    const inHunk =
+      changedIdx.has(idx) ||
+      Array.from({ length: CONTEXT_LINES * 2 + 1 }, (_, k) => idx - CONTEXT_LINES + k).some(k => changedIdx.has(k));
     if (inHunk) {
       if (start === -1) start = idx;
       end = idx;
@@ -137,7 +142,8 @@ function diffLines(oldText: string, newText: string): DiffLine[] {
     lines.push({ type: 'hunk', content: `@@ -${oldStart || 0},${oldCount} +${newStart || 0},${newCount} @@` });
     for (let idx = s; idx <= e; idx++) {
       const op = ops[idx];
-      if (op.kind === 'eq') lines.push({ type: 'context', content: op.content, oldLineNo: op.oldLine, newLineNo: op.newLine });
+      if (op.kind === 'eq')
+        lines.push({ type: 'context', content: op.content, oldLineNo: op.oldLine, newLineNo: op.newLine });
       else if (op.kind === 'del') lines.push({ type: 'del', content: op.content, oldLineNo: op.oldLine });
       else lines.push({ type: 'add', content: op.content, newLineNo: op.newLine });
     }
@@ -146,7 +152,7 @@ function diffLines(oldText: string, newText: string): DiffLine[] {
 }
 
 /** 构建单个文件的 DiffFile（新增/删除文件整文件标记） */
-function buildDiffFile(relPath: string, oldText: string | null, newText: string | null): DiffFile {
+export function buildDiffFile(relPath: string, oldText: string | null, newText: string | null): DiffFile {
   if (oldText === null) {
     const b = newText!.split('\n');
     return {
@@ -154,7 +160,10 @@ function buildDiffFile(relPath: string, oldText: string | null, newText: string 
       status: 'new',
       additions: b.length,
       deletions: 0,
-      lines: [{ type: 'hunk', content: `@@ -0,0 +1,${b.length} @@` }, ...b.map((content, i) => ({ type: 'add', content, newLineNo: i + 1 }) as DiffLine)]
+      lines: [
+        { type: 'hunk', content: `@@ -0,0 +1,${b.length} @@` },
+        ...b.map((content, i) => ({ type: 'add', content, newLineNo: i + 1 }) as DiffLine)
+      ]
     };
   }
   if (newText === null) {
@@ -164,7 +173,10 @@ function buildDiffFile(relPath: string, oldText: string | null, newText: string 
       status: 'deleted',
       additions: 0,
       deletions: a.length,
-      lines: [{ type: 'hunk', content: `@@ -1,${a.length} +0,0 @@` }, ...a.map((content, i) => ({ type: 'del', content, oldLineNo: i + 1 }) as DiffLine)]
+      lines: [
+        { type: 'hunk', content: `@@ -1,${a.length} +0,0 @@` },
+        ...a.map((content, i) => ({ type: 'del', content, oldLineNo: i + 1 }) as DiffLine)
+      ]
     };
   }
   const lines = diffLines(oldText, newText);
@@ -176,19 +188,49 @@ function buildDiffFile(relPath: string, oldText: string | null, newText: string 
   };
 }
 
-/** 对比快照与当前内容，返回 diff 文件列表（推送由调用方负责） */
-export function recomputeDiff(sessionId: string, cwd: string): DiffFile[] {
-  const snap = snapshots.get(sessionId);
-  if (!snap) return [];
-  const current = collectTextFiles(cwd);
-  const allPaths = new Set([...snap.keys(), ...current.keys()]);
-  const files: DiffFile[] = [];
-  for (const p of allPaths) {
-    const oldText = snap.has(p) ? snap.get(p)! : null;
-    const newText = current.has(p) ? current.get(p)! : null;
-    if (oldText !== null && newText !== null && oldText === newText) continue;
-    files.push(buildDiffFile(p, oldText, newText));
+/**
+ * 每会话一份快照存储（实例化，避免模块级全局单例的串扰）。
+ * 由 AgentRuntime 各持有一份，便于多实例与单测隔离。
+ */
+export class DiffSnapshotStore {
+  private snapshots = new Map<string, Map<string, string>>();
+
+  /** agent 启动时建立快照 */
+  async initSnapshot(sessionId: string, cwd: string): Promise<void> {
+    this.snapshots.set(sessionId, await collectTextFiles(cwd));
   }
-  files.sort((x, y) => x.path.localeCompare(y.path));
-  return files;
+
+  /** agent 运行结束后清理快照 */
+  clearSnapshot(sessionId: string): void {
+    this.snapshots.delete(sessionId);
+  }
+
+  /** 对比快照与当前内容，返回 diff 文件列表（推送由调用方负责） */
+  async recomputeDiff(sessionId: string, cwd: string, changedPaths?: string[]): Promise<DiffFile[]> {
+    const snap = this.snapshots.get(sessionId);
+    if (!snap) return [];
+    const files: DiffFile[] = [];
+
+    if (changedPaths) {
+      // 增量：只重算回报的变更路径
+      for (const p of changedPaths) {
+        const oldText = snap.has(p) ? snap.get(p)! : null;
+        const newText = await readCurrentText(cwd, p);
+        if (oldText !== null && newText !== null && oldText === newText) continue;
+        files.push(buildDiffFile(p, oldText, newText));
+      }
+    } else {
+      // 全量：对比快照键与当前全部文件（run_command 等无法追踪路径时）
+      const current = await collectTextFiles(cwd);
+      const allPaths = new Set([...snap.keys(), ...current.keys()]);
+      for (const p of allPaths) {
+        const oldText = snap.has(p) ? snap.get(p)! : null;
+        const newText = current.has(p) ? current.get(p)! : null;
+        if (oldText !== null && newText !== null && oldText === newText) continue;
+        files.push(buildDiffFile(p, oldText, newText));
+      }
+    }
+    files.sort((x, y) => x.path.localeCompare(y.path));
+    return files;
+  }
 }

@@ -12,6 +12,7 @@
     "lint:fix": "eslint . --fix && oxlint . --fix",
     "postinstall": "node scripts/fix-node-pty-exec.mjs",
     "start": "pnpm --filter @dscode/desktop start",
+    "test": "pnpm --filter @dscode/core test",
     "typecheck": "pnpm --filter @dscode/desktop typecheck && pnpm --filter @dscode/core typecheck"
   },
   "devDependencies": {

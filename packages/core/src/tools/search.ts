@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { SKIP_DIRS, resolveSafePath } from '../workspace/paths';
 import { STRING, strArg } from './types';
@@ -8,6 +8,10 @@ import type { Tool, ToolContext, ToolResult } from './types';
 const MAX_SEARCH_HITS = 50;
 /** 参与内容搜索的单文件大小上限（字节） */
 const SEARCH_MAX_FILE_BYTES = 256 * 1024;
+/** 递归深度上限（此前无限制，深目录会无限递归） */
+const SEARCH_MAX_DEPTH = 16;
+/** 参与搜索的最大文件数（防止超大目录长时间遍历） */
+const SEARCH_MAX_FILES = 20_000;
 
 export const searchTool: Tool = {
   name: 'search',
@@ -21,29 +25,31 @@ export const searchTool: Tool = {
     },
     required: ['query']
   },
-  execute(args: Record<string, unknown>, ctx: ToolContext): ToolResult {
+  async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
     const q = strArg(args, 'query');
     if (!q) return { ok: false, error: '缺少参数 query' };
     const p = strArg(args, 'path');
-    const base = p ? resolveSafePath(ctx.cwd, p) : ctx.cwd;
+    const base = p ? await resolveSafePath(ctx.cwd, p) : ctx.cwd;
     if (!base) return { ok: false, error: '路径不在工作目录内' };
     const needle = q.toLowerCase();
     const hits: string[] = [];
-    const walk = (dir: string): void => {
-      if (hits.length >= MAX_SEARCH_HITS) return;
+    let visitedFiles = 0;
+    const walk = async (dir: string, depth: number): Promise<void> => {
+      if (hits.length >= MAX_SEARCH_HITS || depth > SEARCH_MAX_DEPTH || visitedFiles >= SEARCH_MAX_FILES) return;
       let entries;
       try {
-        entries = readdirSync(dir, { withFileTypes: true });
+        entries = await readdir(dir, { withFileTypes: true });
       } catch {
         return;
       }
       for (const e of entries) {
-        if (hits.length >= MAX_SEARCH_HITS) return;
+        if (hits.length >= MAX_SEARCH_HITS || visitedFiles >= SEARCH_MAX_FILES) return;
         if (e.isDirectory()) {
-          if (!SKIP_DIRS.has(e.name)) walk(join(dir, e.name));
+          if (!SKIP_DIRS.has(e.name)) await walk(join(dir, e.name), depth + 1);
           continue;
         }
         if (!e.isFile()) continue;
+        visitedFiles++;
         const full = join(dir, e.name);
         const rel = relative(ctx.cwd, full);
         if (e.name.toLowerCase().includes(needle)) {
@@ -51,9 +57,9 @@ export const searchTool: Tool = {
           continue;
         }
         try {
-          const stat = statSync(full);
-          if (stat.size > SEARCH_MAX_FILE_BYTES) return;
-          const text = readFileSync(full, 'utf8');
+          const st = await stat(full);
+          if (st.size > SEARCH_MAX_FILE_BYTES) continue;
+          const text = await readFile(full, 'utf8');
           const lines = text.split('\n');
           for (let i = 0; i < lines.length && hits.length < MAX_SEARCH_HITS; i++) {
             const line = lines[i];
@@ -69,7 +75,7 @@ export const searchTool: Tool = {
         }
       }
     };
-    walk(base);
+    await walk(base, 0);
     const content = hits.length >= MAX_SEARCH_HITS ? `${hits.join('\n')}\n……（命中过多，已截断）` : hits.join('\n');
     return { ok: true, content: content || '（无匹配结果）' };
   }

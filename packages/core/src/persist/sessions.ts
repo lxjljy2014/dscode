@@ -7,16 +7,18 @@ import type { Message, Session } from '@dscode/shared';
  * toolEvents 为瞬态展示数据，不落库。
  */
 
-let db: DatabaseSync | null = null;
+/** 按数据文件路径隔离连接（此前为模块级单例，file 参数在首次初始化后被忽略，复用多库会写错文件） */
+const dbs = new Map<string, DatabaseSync>();
 
 function getDb(file: string): DatabaseSync {
+  let db = dbs.get(file);
   if (!db) {
     db = new DatabaseSync(file);
     db.exec(
       'CREATE TABLE IF NOT EXISTS sessions (' +
         'id TEXT PRIMARY KEY, ' +
         'title TEXT NOT NULL, ' +
-        'working_directory TEXT NOT NULL DEFAULT \'\', ' +
+        "working_directory TEXT NOT NULL DEFAULT '', " +
         'created_at INTEGER NOT NULL, ' +
         'updated_at INTEGER NOT NULL)'
     );
@@ -34,6 +36,7 @@ function getDb(file: string): DatabaseSync {
     if (!cols.some(c => c.name === 'working_directory')) {
       db.exec("ALTER TABLE sessions ADD COLUMN working_directory TEXT NOT NULL DEFAULT ''");
     }
+    dbs.set(file, db);
   }
   return db;
 }
@@ -44,9 +47,7 @@ export function initSessions(file: string): void {
 
 /** 把无工作空间归属的旧会话回填到当前工作目录（历史数据迁移） */
 export function backfillSessions(file: string, workingDirectory: string): void {
-  getDb(file)
-    .prepare("UPDATE sessions SET working_directory = ? WHERE working_directory = ''")
-    .run(workingDirectory);
+  getDb(file).prepare("UPDATE sessions SET working_directory = ? WHERE working_directory = ''").run(workingDirectory);
 }
 
 interface SessionRow {

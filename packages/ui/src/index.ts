@@ -11,6 +11,8 @@ export type { HostApi, TitleBarOverlayOptions } from './bridge/host';
 export { useUiStore } from './stores/ui';
 export type { LocaleSetting, ThemeMode } from './stores/ui';
 export { useSessionStore } from './stores/session';
+export { useAgentStore } from './stores/agent';
+export { useWorkspaceStore } from './stores/workspace';
 export { useSettingsStore } from './stores/settings';
 
 // 页面

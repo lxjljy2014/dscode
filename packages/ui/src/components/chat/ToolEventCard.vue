@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { AgentToolEvent } from '@dscode/shared';
-import { useSessionStore } from '../../stores/session';
+import { useAgentStore } from '../../stores/agent';
 
 /**
  * 工具事件卡：聊天流内的紧凑行（工具图标 + 名称 + 参数摘要 + 状态），可展开查看完整参数与结果；
@@ -12,7 +12,7 @@ import { useSessionStore } from '../../stores/session';
 const props = defineProps<{ event: AgentToolEvent }>();
 
 const { t } = useI18n();
-const store = useSessionStore();
+const store = useAgentStore();
 
 const expanded = ref(false);
 
@@ -98,9 +98,9 @@ const prettyArgs = computed(() => {
         }}</pre>
         <template v-if="event.summary || event.error">
           <div class="mt-2 mb-1 text-[11px] text-faint">{{ t('agent.result') }}</div>
-          <pre
-            class="max-h-56 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-fg"
-          >{{ event.error ?? event.summary }}</pre>
+          <pre class="max-h-56 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-fg">{{
+            event.error ?? event.summary
+          }}</pre>
         </template>
       </div>
     </div>

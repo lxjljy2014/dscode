@@ -7,7 +7,14 @@ import type { AppSettings, PermissionMode, ProviderConfig, SettingsPatch } from 
 /**
  * 应用设置的 JSON 持久化（userData/settings.json）。
  * 工作目录、权限模式、AI 供应商配置与引导状态随应用重启保留。
+ * 通过可选 crypto 钩子支持 apiKey 静态加密（Electron safeStorage 由 desktop 层注入，core 保持无 Electron 依赖）。
  */
+
+/** 静态加密钩子：desktop 注入 safeStorage 实现；缺省则明文存储 */
+export interface SettingsCrypto {
+  encrypt(plaintext: string): string;
+  decrypt(ciphertext: string): string;
+}
 
 function isPermissionMode(v: unknown): v is PermissionMode {
   return v === 'confirm' || v === 'auto-edit' || v === 'plan' || v === 'full-access';
@@ -40,12 +47,34 @@ function normalizeProviders(providers: ProviderConfig[]): ProviderConfig[] {
   );
 }
 
+function decryptProviders(providers: ProviderConfig[], crypto?: SettingsCrypto): ProviderConfig[] {
+  if (!crypto) return providers;
+  return providers.map(p => {
+    try {
+      return { ...p, apiKey: crypto.decrypt(p.apiKey) };
+    } catch {
+      return p;
+    }
+  });
+}
+
+function encryptProviders(providers: ProviderConfig[], crypto?: SettingsCrypto): ProviderConfig[] {
+  if (!crypto) return providers;
+  return providers.map(p => {
+    try {
+      return { ...p, apiKey: crypto.encrypt(p.apiKey) };
+    } catch {
+      return p;
+    }
+  });
+}
+
 export function defaultSettings(homeDir: string): AppSettings {
   return { workingDirectory: homeDir, permissionMode: 'confirm', providers: [], onboardingDone: false };
 }
 
-/** 加载 + 归一化：非法字段回退默认值 */
-export function loadSettings(file: string, homeDir: string): AppSettings {
+/** 加载 + 归一化 + 解密：非法字段回退默认值 */
+export function loadSettings(file: string, homeDir: string, crypto?: SettingsCrypto): AppSettings {
   const defaults = defaultSettings(homeDir);
   try {
     if (!existsSync(file)) return defaults;
@@ -56,17 +85,21 @@ export function loadSettings(file: string, homeDir: string): AppSettings {
     const providers = normalizeProviders(
       Array.isArray(raw['providers']) ? raw['providers'].filter(isProviderConfig) : defaults.providers
     );
-    const onboardingDone =
-      typeof raw['onboardingDone'] === 'boolean' ? raw['onboardingDone'] : defaults.onboardingDone;
-    return { workingDirectory, permissionMode, providers, onboardingDone };
+    const onboardingDone = typeof raw['onboardingDone'] === 'boolean' ? raw['onboardingDone'] : defaults.onboardingDone;
+    return { workingDirectory, permissionMode, providers: decryptProviders(providers, crypto), onboardingDone };
   } catch {
     return defaults;
   }
 }
 
-/** 合并 patch 并落盘，返回最新设置 */
-export function saveSettings(file: string, homeDir: string, patch: SettingsPatch): AppSettings {
-  const current = loadSettings(file, homeDir);
+/** 合并 patch、加密 apiKey 后落盘，返回最新设置（返回值为解密后的明文，供调用方使用） */
+export function saveSettings(
+  file: string,
+  homeDir: string,
+  patch: SettingsPatch,
+  crypto?: SettingsCrypto
+): AppSettings {
+  const current = loadSettings(file, homeDir, crypto);
   const next: AppSettings = {
     workingDirectory:
       typeof patch.workingDirectory === 'string' && patch.workingDirectory.length > 0
@@ -78,6 +111,7 @@ export function saveSettings(file: string, homeDir: string, patch: SettingsPatch
     ),
     onboardingDone: typeof patch.onboardingDone === 'boolean' ? patch.onboardingDone : current.onboardingDone
   };
-  writeFileSync(file, JSON.stringify(next, null, 2), 'utf8');
+  const persisted: AppSettings = { ...next, providers: encryptProviders(next.providers, crypto) };
+  writeFileSync(file, JSON.stringify(persisted, null, 2), 'utf8');
   return next;
 }

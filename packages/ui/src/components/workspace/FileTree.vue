@@ -2,11 +2,11 @@
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import { useSessionStore } from '../../stores/session';
+import { useWorkspaceStore } from '../../stores/workspace';
 import type { FileNode } from '@dscode/shared';
 
 const { t } = useI18n();
-const store = useSessionStore();
+const store = useWorkspaceStore();
 const { fileTree, selectedFile, selectedFilePath } = storeToRefs(store);
 
 const opened = ref<string[]>([]);
