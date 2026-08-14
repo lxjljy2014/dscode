@@ -1,0 +1,247 @@
+import type { AgentToolEvent, ChatMessagePayload, PermissionMode, ProviderConfig } from '@dscode/shared';
+import { ApiError, resolveAdapter, streamChat } from '../adapters';
+import { gateTool, needsConfirm } from '../gate/gate';
+import { executeTool, toolPermission, toolSchemas } from '../tools';
+import { clearSnapshot, initSnapshot, recomputeDiff } from '../workspace/diff';
+import type { AgentEventSink } from './types';
+
+/**
+ * agent 运行时：执行「LLM 流式对话 + 工具循环」，与宿主解耦（事件经 AgentEventSink 上抛）。
+ * 会话按 sessionId 管理（Map）；配置（供应商/工作目录/权限模式）由宿主读自己的持久化后传入，
+ * 渲染端不可注入 baseUrl/key。
+ */
+
+const MAX_TOOL_ROUNDS = 30;
+/** 单轮 LLM 请求最长等待（含流式全程） */
+const ROUND_TIMEOUT_MS = 5 * 60_000;
+
+interface RunState {
+  controller: AbortController;
+}
+
+/** 进行中的 agent 运行（按 sessionId） */
+const runs = new Map<string, RunState>();
+
+/** 等待用户确认的工具调用：toolEventId → resolve */
+const pendingConfirms = new Map<string, (approve: boolean) => void>();
+
+let toolSeq = 0;
+function nextToolId(): string {
+  return `t-${Date.now()}-${toolSeq++}`;
+}
+
+const SYSTEM_PROMPT =
+  '你是 DSCode 内置的编程助手，在用户的工作目录中工作。可以调用工具读取文件、列出目录、搜索代码、执行命令、写入或编辑文件。规则：\n' +
+  '- 修改代码前先阅读相关文件，理解上下文\n' +
+  '- 写文件/编辑/执行命令会经过系统权限门控，可能需要用户确认\n' +
+  '- 工作目录内的路径一律使用相对路径\n' +
+  '- 回答语言与用户提问一致\n' +
+  '- 只做用户要求的事，不擅自扩大改动范围';
+
+// ---- agent 循环 ----
+
+async function runLoop(
+  sessionId: string,
+  cwd: string,
+  permissionMode: PermissionMode,
+  provider: { baseUrl: string; apiKey: string; adapter?: string },
+  model: string,
+  messages: unknown[],
+  sink: AgentEventSink
+): Promise<void> {
+  const run = runs.get(sessionId);
+  if (!run) return;
+  const signal = run.controller.signal;
+
+  try {
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const combined = AbortSignal.any([signal, AbortSignal.timeout(ROUND_TIMEOUT_MS)]);
+      const toolCalls = await streamChat(
+        resolveAdapter(provider.adapter),
+        { baseUrl: provider.baseUrl, apiKey: provider.apiKey, model, messages, tools: toolSchemas() },
+        combined,
+        text => sink.delta(sessionId, 'content', text),
+        text => sink.delta(sessionId, 'reasoning', text)
+      );
+      if (toolCalls.length === 0) {
+        sink.done(sessionId);
+        return;
+      }
+
+      // 本轮 assistant 消息（含文本与工具调用）入上下文
+      messages.push({
+        role: 'assistant',
+        content: '',
+        tool_calls: toolCalls.map(t => ({
+          id: t.id,
+          type: 'function',
+          function: { name: t.name, arguments: t.arguments }
+        }))
+      });
+
+      // 逐个执行工具：门控 → 执行 → 结果入上下文
+      for (const t of toolCalls) {
+        if (signal.aborted) return;
+        const toolEventId = nextToolId();
+        const event: AgentToolEvent = {
+          id: toolEventId,
+          name: t.name,
+          args: t.arguments,
+          status: needsConfirm(t.name, permissionMode) ? 'confirming' : 'running',
+          createdAt: Date.now()
+        };
+        sink.tool(sessionId, event);
+
+        let toolResultContent: string;
+        if (needsConfirm(t.name, permissionMode)) {
+          const decision = await gateTool(t.name, permissionMode, toolEventId, t.arguments, (id, name, argsJson) =>
+            new Promise<boolean>(resolve => {
+              pendingConfirms.set(id, resolve);
+              sink.confirm(sessionId, id, name, argsJson);
+            })
+          );
+          if (signal.aborted) return;
+          if (!decision.allow) {
+            sink.tool(sessionId, {
+              ...event,
+              status: 'denied',
+              error: decision.reason === 'timeout' ? '确认超时' : decision.reason === 'plan-mode' ? 'plan 模式已拒绝' : '用户拒绝'
+            });
+            toolResultContent = `工具调用被拒绝：${decision.reason ?? 'denied'}`;
+            messages.push({ role: 'tool', tool_call_id: t.id, content: toolResultContent });
+            continue;
+          }
+          sink.tool(sessionId, { ...event, status: 'running' });
+        }
+
+        const result = await executeTool(t.name, t.arguments, cwd);
+        if (result.ok) {
+          sink.tool(sessionId, { ...event, status: 'done', summary: result.content.slice(0, 200) });
+          toolResultContent = result.content;
+          // 写/执行成功后重算快照 diff 并推送
+          if (toolPermission(t.name) !== 'read') {
+            sink.diff(sessionId, recomputeDiff(sessionId, cwd));
+          }
+        } else {
+          sink.tool(sessionId, { ...event, status: 'error', error: result.error });
+          toolResultContent = `执行失败：${result.error}`;
+        }
+        messages.push({ role: 'tool', tool_call_id: t.id, content: toolResultContent });
+      }
+    }
+    sink.done(sessionId);
+  } catch (e) {
+    if (signal.aborted) {
+      sink.error(sessionId, 'aborted');
+      return;
+    }
+    if (e instanceof ApiError) {
+      sink.error(sessionId, 'api', `HTTP ${e.status} ${e.message}`);
+    } else if (e instanceof Error && e.name === 'TimeoutError') {
+      sink.error(sessionId, 'network', '请求超时');
+    } else {
+      sink.error(sessionId, 'network', e instanceof Error ? e.message : String(e));
+    }
+  }
+}
+
+// ---- 对外接口 ----
+
+/** 启动一次 agent 运行所需的输入 */
+export interface AgentStartInput {
+  sessionId: string;
+  model: unknown;
+  rawMessages: unknown;
+  /** 事件接收方（宿主实现） */
+  sink: AgentEventSink;
+  /** 运行配置：宿主读自己的持久化后传入 */
+  config: {
+    workingDirectory: string;
+    permissionMode: PermissionMode;
+    providers: ProviderConfig[];
+  };
+}
+
+/** 启动一次 agent 运行 */
+export function startAgent(input: AgentStartInput): { ok: true } | { ok: false; error: string } {
+  const { sessionId, model, rawMessages, sink, config } = input;
+  if (runs.has(sessionId)) return { ok: false, error: 'session already running' };
+  // 校验消息列表
+  if (!Array.isArray(rawMessages)) return { ok: false, error: 'invalid messages' };
+  const messages: ChatMessagePayload[] = rawMessages.filter(
+    (m): m is ChatMessagePayload =>
+      typeof m === 'object' &&
+      m !== null &&
+      ((m as Record<string, unknown>)['role'] === 'user' || (m as Record<string, unknown>)['role'] === 'assistant') &&
+      typeof (m as Record<string, unknown>)['content'] === 'string'
+  );
+  if (messages.length === 0) return { ok: false, error: 'empty messages' };
+
+  const provider = config.providers[0];
+  if (!provider || provider.apiKey.length === 0) {
+    sink.error(sessionId, 'no-api-key');
+    return { ok: true };
+  }
+  const requestedModel = typeof model === 'string' ? model : '';
+  const resolvedModel = provider.models.includes(requestedModel) ? requestedModel : (provider.models[0] ?? '');
+  if (resolvedModel.length === 0) return { ok: false, error: 'no models configured' };
+
+  const controller = new AbortController();
+  runs.set(sessionId, { controller });
+  // agent 启动时快照工作目录，作为本次运行 diff 的基线
+  initSnapshot(sessionId, config.workingDirectory);
+
+  const context = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    ...messages.map(m => ({ role: m.role, content: m.content }))
+  ];
+
+  runLoop(
+    sessionId,
+    config.workingDirectory,
+    config.permissionMode,
+    { baseUrl: provider.baseUrl, apiKey: provider.apiKey, adapter: provider.adapter },
+    resolvedModel,
+    context,
+    sink
+  ).finally(() => {
+    runs.delete(sessionId);
+    clearSnapshot(sessionId);
+    // 运行结束未处理的确认一律视为拒绝，避免残留挂起
+    for (const [id, resolve] of pendingConfirms) {
+      resolve(false);
+      pendingConfirms.delete(id);
+    }
+  });
+  return { ok: true };
+}
+
+/** 停止会话的 agent 运行（abort 后 runLoop 会推 aborted 错误收尾） */
+export function stopAgent(sessionId: string): void {
+  runs.get(sessionId)?.controller.abort();
+  // 解除确认等待（gateTool 收到拒绝后循环随 abort 退出）
+  for (const [id, resolve] of pendingConfirms) {
+    resolve(false);
+    pendingConfirms.delete(id);
+  }
+}
+
+/** 渲染端确认响应入口（agent:confirm-response） */
+export function resolveConfirm(toolEventId: unknown, approve: unknown): void {
+  if (typeof toolEventId !== 'string' || typeof approve !== 'boolean') return;
+  const resolve = pendingConfirms.get(toolEventId);
+  if (resolve) {
+    pendingConfirms.delete(toolEventId);
+    resolve(approve);
+  }
+}
+
+/** 应用退出前中止全部 agent 运行 */
+export function disposeAgents(): void {
+  for (const run of runs.values()) run.controller.abort();
+  runs.clear();
+  for (const [id, resolve] of pendingConfirms) {
+    resolve(false);
+    pendingConfirms.delete(id);
+  }
+}
