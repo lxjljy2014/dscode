@@ -60,26 +60,28 @@ html {
   animation: ds-fade-in var(--ds-duration) var(--ds-easing);
 }
 
-/* ---- 流式光标 ---- */
-@keyframes ds-blink {
+/* ---- 流式光标（仿 Claude Code：主题色圆点 + 平滑呼吸，代替硬闪烁方块） ---- */
+@keyframes ds-cursor-pulse {
   0%,
   100% {
     opacity: 1;
+    transform: scale(1);
   }
   50% {
-    opacity: 0;
+    opacity: 0.35;
+    transform: scale(0.7);
   }
 }
 
 .ds-streaming-cursor {
   display: inline-block;
-  width: 7px;
-  height: 1em;
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  border-radius: 1px;
-  background: currentColor;
-  animation: ds-blink 0.9s ease-in-out infinite;
+  width: 8px;
+  height: 8px;
+  margin-left: 3px;
+  border-radius: 9999px;
+  background: rgb(var(--v-theme-primary));
+  vertical-align: middle;
+  animation: ds-cursor-pulse 1.3s ease-in-out infinite;
 }
 
 /* ---- 工具执行中旋转 ---- */
