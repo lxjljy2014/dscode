@@ -38,7 +38,8 @@ function respond(kind: ConfirmDecision['kind']): void {
 
 <template>
   <!-- 覆盖输入卡片：有待确认工具时盖住输入区，处理完即消失 -->
-  <div v-if="confirm" class="absolute inset-0 z-10 flex items-center justify-center p-2">
+  <!-- 底部与输入卡片底部对齐（items-end），覆盖输入卡片 -->
+  <div v-if="confirm" class="absolute inset-0 z-10 flex items-end justify-center">
     <VCard rounded="2xl" class="w-full border border-line bg-elevated" elevation="8">
       <!-- 工具信息：动词 + 主参数 -->
       <div class="flex items-center gap-2 px-3.5 pt-3">
