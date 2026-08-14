@@ -12,7 +12,7 @@
     "lint:fix": "eslint . --fix && oxlint . --fix",
     "postinstall": "node scripts/fix-node-pty-exec.mjs",
     "start": "pnpm --filter @dscode/desktop start",
-    "typecheck": "pnpm --filter @dscode/desktop typecheck"
+    "typecheck": "pnpm --filter @dscode/desktop typecheck && pnpm --filter @dscode/core typecheck"
   },
   "devDependencies": {
     "@soybeanjs/eslint-config-vue": "^0.1.1",

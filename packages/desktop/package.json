@@ -10,6 +10,7 @@
     "typecheck": "vue-tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
+    "@dscode/core": "workspace:*",
     "@dscode/shared": "workspace:*",
     "@dscode/ui": "workspace:*",
     "@fontsource-variable/inter": "^5.2.0",

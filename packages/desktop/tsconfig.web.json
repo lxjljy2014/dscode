@@ -4,6 +4,7 @@
     "types": ["vite/client"],
     "baseUrl": "../../",
     "paths": {
+      "@dscode/core": ["packages/core/src/index.ts"],
       "@dscode/shared": ["packages/shared/src/index.ts"],
       "@dscode/shared/settings": ["packages/shared/src/types/settings.ts"],
       "@dscode/shared/locales/*": ["packages/shared/src/locales/*"],

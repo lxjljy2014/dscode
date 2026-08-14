@@ -26,8 +26,24 @@ importers:
         specifier: ^1.78.0
         version: 1.78.0
 
+  packages/core:
+    dependencies:
+      '@dscode/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
   packages/desktop:
     dependencies:
+      '@dscode/core':
+        specifier: workspace:*
+        version: link:../core
       '@dscode/shared':
         specifier: workspace:*
         version: link:../shared
