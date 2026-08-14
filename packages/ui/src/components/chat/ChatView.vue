@@ -6,7 +6,6 @@ import { useSessionStore } from '../../stores/session';
 import { useAgentStore } from '../../stores/agent';
 import ChatInput from './ChatInput.vue';
 import MessageItem from './MessageItem.vue';
-import ToolEventCard from './ToolEventCard.vue';
 
 const { t } = useI18n();
 const sessionStore = useSessionStore();
@@ -15,15 +14,6 @@ const { activeSession } = storeToRefs(sessionStore);
 const { generating } = storeToRefs(agentStore);
 
 const messages = computed(() => activeSession.value?.messages ?? []);
-
-/** 消息与工具事件按 createdAt 交错合并（工具卡插入在其触发时刻的消息流位置） */
-const items = computed(() => {
-  const session = activeSession.value;
-  if (!session) return [];
-  const msgs = session.messages.map(m => ({ kind: 'message' as const, at: m.createdAt, data: m }));
-  const tools = session.toolEvents.map(e => ({ kind: 'tool' as const, at: e.createdAt, data: e }));
-  return [...msgs, ...tools].sort((a, b) => a.at - b.at);
-});
 
 const listRef = ref<HTMLElement>();
 
@@ -62,10 +52,7 @@ watch(activeSession, scrollToBottom, { flush: 'post' });
     <template v-if="messages.length">
       <div ref="listRef" class="min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto max-w-200 px-6 py-6">
-          <template v-for="item in items" :key="item.kind + item.data.id">
-            <MessageItem v-if="item.kind === 'message'" :message="item.data" />
-            <ToolEventCard v-else :event="item.data" />
-          </template>
+          <MessageItem v-for="m in messages" :key="m.id" :message="m" />
           <div class="h-2" />
         </div>
       </div>
