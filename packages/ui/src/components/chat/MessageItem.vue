@@ -93,14 +93,12 @@ function formatClock(ts: number): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/** 毫秒 → 人类可读时长（<1s 用毫秒，<1m 用秒，否则 13分05秒 / 13m05s） */
+/** 毫秒 → 统一以秒为单位（<100s 保留 1 位小数，更长取整），如 0.8秒 / 13.1秒 / 785秒 */
 function formatDuration(ms: number): string {
   const v = Math.max(0, ms);
-  const unit = (m: number, s: number) =>
-    `${m}${t('chat.stats.minute')}${String(s).padStart(2, '0')}${t('chat.stats.second')}`;
-  if (v < 1000) return `${Math.round(v)}${t('chat.stats.millisecond')}`;
-  if (v < 60000) return `${(v / 1000).toFixed(1)}${t('chat.stats.second')}`;
-  return unit(Math.floor(v / 60000), Math.round((v % 60000) / 1000));
+  const sec = v / 1000;
+  const s = sec >= 100 ? String(Math.round(sec)) : sec.toFixed(1);
+  return `${s}${t('chat.stats.second')}`;
 }
 
 /** token 速率：整数 tok/s（无 token 数据或时长为 0 时显示 —） */
