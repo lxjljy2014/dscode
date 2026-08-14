@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { registerIpcHandlers } from './ipc';
-import { disposeAgents } from './agent';
-import { disposeTerminals, killWindowTerminals } from './terminal';
+import { disposeAgents } from './agent/agent';
+import { disposeTerminals, killWindowTerminals } from './shell/terminal';
 
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
