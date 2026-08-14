@@ -1,25 +1,14 @@
 import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
-import { mockDiffFiles, mockFileTree, mockSessions } from '@dscode/shared';
 import type { AgentToolEvent, ChatMessagePayload, DiffFile, FileNode, Message, Session } from '@dscode/shared';
 import { host } from '../host';
 import { useSettingsStore } from './settings';
 import { useUiStore } from './ui';
 
-/** 纯浏览器降级（host undefined）时的模拟流式回复语料 */
-const mockReplies = [
-  '收到。我先看一下相关代码的上下文，然后给出修改方案。\n\n计划如下：\n\n- 定位需要改动的模块，确认影响面\n- 以最小侵入的方式实现，保持现有行为不变\n- 完成后在右侧给出变更，供你逐条确认\n\n稍等片刻。',
-  'Got it. Let me look at the surrounding code first, then propose a minimal change.\n\nMy plan:\n\n- Locate the modules involved and check the blast radius\n- Implement with the least intrusion, keeping existing behavior intact\n- Present the diff on the right for your review\n\nOne moment.',
-  '明白，这个需求可以拆成两步：先调整状态结构，再更新组件绑定。\n\n我已经开始处理了，变更会实时同步到右侧「变更」面板。'
-];
-
 let idSeq = 0;
 function nextId(prefix: string): string {
   return `${prefix}-${Date.now()}-${idSeq++}`;
 }
-
-/** 纯浏览器 mock 流式的定时器（真实 agent 路径不使用） */
-let mockTimer: ReturnType<typeof setInterval> | undefined;
 
 function findFileNode(nodes: FileNode[], path: string): FileNode | null {
   for (const node of nodes) {
@@ -38,19 +27,18 @@ function basename(p: string): string {
 }
 
 export const useSessionStore = defineStore('session', () => {
-  const sessions = ref<Session[]>(host ? [] : mockSessions);
+  const sessions = ref<Session[]>([]);
   const activeSessionId = ref<string | null>(sessions.value[0]?.id ?? null);
   const keyword = ref('');
   const generating = ref(false);
 
   /** 各会话的 diff 结果（主进程 workspace:diff 推送，按 sessionId 缓存） */
   const diffBySession = new Map<string, DiffFile[]>();
-  const diffFiles = computed<DiffFile[]>(() => {
-    if (!host) return mockDiffFiles;
-    return activeSessionId.value ? (diffBySession.get(activeSessionId.value) ?? []) : [];
-  });
+  const diffFiles = computed<DiffFile[]>(
+    () => (activeSessionId.value ? (diffBySession.get(activeSessionId.value) ?? []) : [])
+  );
 
-  const fileTree = ref<FileNode[]>(host ? [] : mockFileTree);
+  const fileTree = ref<FileNode[]>([]);
   const selectedFilePath = ref<string | null>(null);
   /** 已加载的文件内容缓存（path → content） */
   const fileContents = ref<Record<string, string>>({});
@@ -193,6 +181,7 @@ export const useSessionStore = defineStore('session', () => {
 
   async function sendMessage(content: string, model = '') {
     if (generating.value) return;
+    if (!host) return;
     // 空会话状态（无激活任务）直接发送：自动新建任务，避免静默吞掉输入
     if (!activeSession.value) createSession();
     const session = activeSession.value;
@@ -221,21 +210,6 @@ export const useSessionStore = defineStore('session', () => {
     session.messages.push(reply);
     generating.value = true;
 
-    if (!host) {
-      // 纯浏览器环境：模拟流式回复
-      const fullText = mockReplies[Math.floor(Math.random() * mockReplies.length)];
-      let cursor = 0;
-      mockTimer = setInterval(() => {
-        cursor = Math.min(cursor + 2 + Math.floor(Math.random() * 3), fullText.length);
-        reply.content = fullText.slice(0, cursor);
-        if (cursor >= fullText.length) {
-          stopGenerating();
-          stopMockTimer();
-        }
-      }, 24);
-      return;
-    }
-
     // 真实 agent：历史取非流式消息（含刚发送的用户消息）
     const history: ChatMessagePayload[] = session.messages
       .filter(m => !m.streaming)
@@ -255,25 +229,8 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
-  function stopMockTimer() {
-    if (mockTimer) {
-      clearInterval(mockTimer);
-      mockTimer = undefined;
-    }
-  }
-
   async function stopGenerating() {
-    if (!host) {
-      stopMockTimer();
-      const session = activeSession.value;
-      const reply = session ? streamingReply(session) : null;
-      if (session && reply?.streaming) {
-        reply.streaming = false;
-        session.updatedAt = Date.now();
-      }
-      generating.value = false;
-      return;
-    }
+    if (!host) return;
     if (activeSessionId.value) await host.agentStop(activeSessionId.value);
   }
 
