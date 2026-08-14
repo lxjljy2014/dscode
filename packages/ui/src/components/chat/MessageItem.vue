@@ -227,26 +227,28 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
             <!-- 运行统计（内联跟在按钮后，悬停按钮行时展开显示）：01:44 · 用时 13分05秒 · 首 token 1.1秒 · 139 tok/s -->
             <span
               v-if="message.stats"
-              class="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/stats:max-w-60 group-hover/stats:opacity-100"
+              class="grid grid-cols-[0fr] opacity-0 transition-all duration-200 group-hover/stats:grid-cols-[1fr] group-hover/stats:opacity-100"
             >
-              <span class="flex items-center gap-x-1">
-                <span class="select-none text-faint">·</span>
-                <span class="tabular-nums">{{ formatClock(message.stats.endAt) }}</span>
-                <span class="select-none text-faint">·</span>
-                <span>
-                  {{ t('chat.stats.duration') }}
-                  <span class="tabular-nums">{{ formatDuration(message.stats.endAt - message.stats.startAt) }}</span>
-                </span>
-                <span class="select-none text-faint">·</span>
-                <span>
-                  {{ t('chat.stats.firstToken') }}
-                  <span class="tabular-nums">
-                    {{ message.stats.firstTokenMs !== undefined ? formatDuration(message.stats.firstTokenMs) : '—' }}
+              <span class="min-w-0 overflow-hidden whitespace-nowrap">
+                <span class="flex items-center gap-x-1">
+                  <span class="select-none text-faint">·</span>
+                  <span class="tabular-nums">{{ formatClock(message.stats.endAt) }}</span>
+                  <span class="select-none text-faint">·</span>
+                  <span>
+                    {{ t('chat.stats.duration') }}
+                    <span class="tabular-nums">{{ formatDuration(message.stats.endAt - message.stats.startAt) }}</span>
                   </span>
-                </span>
-                <span class="select-none text-faint">·</span>
-                <span class="tabular-nums">
-                  {{ formatTokensPerSec(message.stats.completionTokens, message.stats.endAt - message.stats.startAt) }}
+                  <span class="select-none text-faint">·</span>
+                  <span>
+                    {{ t('chat.stats.firstToken') }}
+                    <span class="tabular-nums">
+                      {{ message.stats.firstTokenMs !== undefined ? formatDuration(message.stats.firstTokenMs) : '—' }}
+                    </span>
+                  </span>
+                  <span class="select-none text-faint">·</span>
+                  <span class="tabular-nums">
+                    {{ formatTokensPerSec(message.stats.completionTokens, message.stats.endAt - message.stats.startAt) }}
+                  </span>
                 </span>
               </span>
             </span>
