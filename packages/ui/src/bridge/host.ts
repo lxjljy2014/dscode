@@ -13,6 +13,7 @@ import type {
   GitOpResult,
   IndexSearchHit,
   IndexStats,
+  LlmCacheStats,
   McpListToolsResult,
   Message,
   Plugin,
@@ -85,6 +86,10 @@ export interface HostApi {
 
   // ---- 使用统计 ----
   usageList: () => Promise<UsageRecord[]>;
+  /** LLM 回复缓存统计（命中率/节省 token） */
+  cacheStats: () => Promise<LlmCacheStats>;
+  /** 清空 LLM 回复缓存，返回清空后的统计 */
+  cacheClear: () => Promise<LlmCacheStats>;
 
   // ---- MCP ----
   listMcpTools: (command: string, args: string[]) => Promise<McpListToolsResult>;

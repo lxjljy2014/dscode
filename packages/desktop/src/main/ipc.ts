@@ -3,6 +3,8 @@ import type { SettingsPatch } from '@dscode/shared';
 import {
   backfillSessions,
   buildIndex,
+  createSqliteLlmCache,
+  initLlmCache,
   checkout,
   createBranch,
   fetchWebPage,
@@ -122,6 +124,18 @@ export function registerIpcHandlers(): void {
     withMainWindow(() => listUsage(usageFile))
   );
 
+  // ---- LLM 回复缓存（省成本；命中率在「使用统计」页展示） ----
+  const cacheFile = app.getPath('userData') + '/cache.db';
+  initLlmCache(cacheFile);
+  ipcMain.handle(
+    'usage:cache-stats',
+    withMainWindow(() => createSqliteLlmCache(cacheFile).stats())
+  );
+  ipcMain.handle(
+    'usage:cache-clear',
+    withMainWindow(() => createSqliteLlmCache(cacheFile).clear())
+  );
+
   // ---- MCP ----
   ipcMain.handle(
     'mcp:list-tools',
@@ -145,7 +159,10 @@ export function registerIpcHandlers(): void {
   );
 
   // ---- 代码索引 ----
-  ipcMain.handle('index:stats', withMainWindow(() => indexStats(indexFile)));
+  ipcMain.handle(
+    'index:stats',
+    withMainWindow(() => indexStats(indexFile))
+  );
   ipcMain.handle(
     'index:build',
     withMainWindow(() => buildIndex(loadAppSettings(settingsFile, homeDir).workingDirectory, indexFile))

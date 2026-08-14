@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { UsageRecord } from '@dscode/shared';
+import type { LlmCacheStats, UsageRecord } from '@dscode/shared';
 import { host } from '../../bridge/host';
 
 const { t } = useI18n();
 const records = ref<UsageRecord[]>([]);
 const loading = ref(false);
+const cache = ref<LlmCacheStats | null>(null);
+const clearing = ref(false);
+
+/** 命中率百分比（0 请求时显示 —） */
+const hitRateText = computed(() => {
+  const c = cache.value;
+  if (!c) return '—';
+  return (c.hitRate * 100).toFixed(1) + '%';
+});
 
 const totals = computed(() => {
   const prompt = records.value.reduce((s, r) => s + r.promptTokens, 0);
@@ -23,8 +32,20 @@ async function load() {
   loading.value = true;
   try {
     records.value = await host.usageList();
+    cache.value = await host.cacheStats();
   } finally {
     loading.value = false;
+  }
+}
+
+/** 清空 LLM 回复缓存（命中率清零，重新积累） */
+async function clearCache() {
+  if (!host) return;
+  clearing.value = true;
+  try {
+    cache.value = await host.cacheClear();
+  } finally {
+    clearing.value = false;
   }
 }
 
@@ -47,6 +68,39 @@ onMounted(load);
         <div class="mt-1 text-xl font-semibold">{{ formatNumber(totals.total) }}</div>
       </VCard>
     </div>
+
+    <!-- LLM 回复缓存：命中率与节省量（省成本） -->
+    <VCard class="px-4 py-3.5">
+      <div class="flex items-center justify-between">
+        <div class="text-sm font-medium">{{ t('settingsPage.usage.cacheTitle') }}</div>
+        <VBtn size="small" variant="text" color="error" :loading="clearing" @click="clearCache">
+          {{ t('settingsPage.usage.cacheClear') }}
+        </VBtn>
+      </div>
+      <div v-if="!cache" class="mt-2 text-xs text-faint">{{ t('settingsPage.usage.cacheEmpty') }}</div>
+      <div v-else class="mt-3 grid grid-cols-4 gap-4">
+        <div>
+          <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheHitRate') }}</div>
+          <div class="mt-1 text-xl font-semibold">{{ hitRateText }}</div>
+        </div>
+        <div>
+          <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheHits') }}</div>
+          <div class="mt-1 text-xl font-semibold">{{ cache.hits }}</div>
+          <div class="text-xs text-faint">{{ t('settingsPage.usage.cacheMisses') }} {{ cache.misses }}</div>
+        </div>
+        <div>
+          <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheSaved') }}</div>
+          <div class="mt-1 text-xl font-semibold">
+            {{ formatNumber(cache.savedPromptTokens + cache.savedCompletionTokens) }}
+          </div>
+          <div class="text-xs text-faint">{{ t('settingsPage.usage.tokens') }}</div>
+        </div>
+        <div>
+          <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheEntries') }}</div>
+          <div class="mt-1 text-xl font-semibold">{{ cache.entries }}</div>
+        </div>
+      </div>
+    </VCard>
 
     <VCard class="px-4 py-3.5">
       <div class="flex items-center justify-between">

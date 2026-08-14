@@ -7,6 +7,8 @@ import type {
   ProviderConfig
 } from '@dscode/shared';
 import { ApiError, resolveAdapter, streamChat } from '../adapters';
+import type { ChatUsage } from '../adapters/types';
+import type { LlmCache } from '../cache/llm-cache';
 import { gateTool, isConfirmDecision, needsConfirm } from '../gate/gate';
 import { executeTool, toolPermission, toolSchemas } from '../tools';
 import { DiffSnapshotStore } from '../workspace/diff';
@@ -76,6 +78,8 @@ export interface AgentStartInput {
     systemPrompt?: string;
     /** 是否启用网页浏览（browse 工具）；默认启用 */
     browsingEnabled?: boolean;
+    /** LLM 回复缓存（省成本；命中时重放缓存响应，不调 API） */
+    llmCache?: LlmCache;
   };
 }
 
@@ -137,7 +141,8 @@ export class AgentRuntime {
       resolvedModel,
       context,
       config.browsingEnabled !== false,
-      sink
+      sink,
+      config.llmCache
     ).finally(() => {
       if (this.runs.get(sessionId) === run) this.runs.delete(sessionId);
       this.snapshots.clearSnapshot(sessionId);
@@ -162,7 +167,8 @@ export class AgentRuntime {
     model: string,
     messages: unknown[],
     browsingEnabled: boolean,
-    sink: AgentEventSink
+    sink: AgentEventSink,
+    llmCache?: LlmCache
   ): Promise<void> {
     const run = this.runs.get(sessionId);
     if (!run) return;
@@ -173,13 +179,63 @@ export class AgentRuntime {
       let totalCompletion = 0;
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const combined = AbortSignal.any([signal, AbortSignal.timeout(ROUND_TIMEOUT_MS)]);
-        const { toolCalls, usage } = await streamChat(
-          resolveAdapter(provider.adapter),
-          { baseUrl: provider.baseUrl, apiKey: provider.apiKey, model, messages, tools: toolSchemas(browsingEnabled) },
-          combined,
-          text => sink.delta(sessionId, 'content', text),
-          text => sink.delta(sessionId, 'reasoning', text)
-        );
+        // 一次 LLM 请求（聚合流式文本，供缓存写入）
+        const tools = toolSchemas(browsingEnabled);
+        const requestOnce = async (): Promise<{
+          toolCalls: { id: string; name: AgentToolName; arguments: string }[];
+          usage?: ChatUsage;
+          content: string;
+          reasoning: string;
+        }> => {
+          let contentBuf = '';
+          let reasoningBuf = '';
+          const res = await streamChat(
+            resolveAdapter(provider.adapter),
+            { baseUrl: provider.baseUrl, apiKey: provider.apiKey, model, messages, tools },
+            combined,
+            text => {
+              contentBuf += text;
+              sink.delta(sessionId, 'content', text);
+            },
+            text => {
+              reasoningBuf += text;
+              sink.delta(sessionId, 'reasoning', text);
+            }
+          );
+          return { toolCalls: res.toolCalls, usage: res.usage, content: contentBuf, reasoning: reasoningBuf };
+        };
+
+        // LLM 回复缓存：命中则重放（文本/思维链按流式推送，工具调用进入正常循环），不调 API
+        let toolCalls: { id: string; name: AgentToolName; arguments: string }[];
+        let usage: ChatUsage | undefined;
+        if (llmCache) {
+          const key = llmCache.key(model, messages, tools);
+          const cached = await llmCache.get(key);
+          if (cached) {
+            await llmCache.recordHit(model, cached.promptTokens, cached.completionTokens);
+            if (cached.reasoning) sink.delta(sessionId, 'reasoning', cached.reasoning);
+            if (cached.content) sink.delta(sessionId, 'content', cached.content);
+            toolCalls = cached.toolCalls;
+            usage = { promptTokens: cached.promptTokens, completionTokens: cached.completionTokens };
+          } else {
+            await llmCache.recordMiss(model);
+            const res = await requestOnce();
+            toolCalls = res.toolCalls;
+            usage = res.usage;
+            // 只缓存成功响应；异常（throw）时不会走到这里
+            await llmCache.set(key, {
+              content: res.content,
+              reasoning: res.reasoning,
+              toolCalls: res.toolCalls,
+              promptTokens: res.usage?.promptTokens ?? 0,
+              completionTokens: res.usage?.completionTokens ?? 0
+            });
+          }
+        } else {
+          const res = await requestOnce();
+          toolCalls = res.toolCalls;
+          usage = res.usage;
+        }
         if (usage) {
           totalPrompt += usage.promptTokens;
           totalCompletion += usage.completionTokens;

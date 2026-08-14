@@ -30,7 +30,8 @@ packages/
 │       ├── adapters/ # 模型适配：ModelAdapter 接口（请求构造 + SSE 增量归一化）+ openai-compatible/deepseek + 通用 streamChat
 │       ├── workspace/# 文件树扫描/读文件、paths.ts（SKIP_DIRS+resolveSafePath）、diff.ts（快照 + LCS 行级 diff）
 │       ├── git/      # git CLI 封装（execFile 参数数组）
-│       └── persist/  # 会话/最近项目（node:sqlite）、settings（JSON 归一化）、供应商校验
+│       ├── persist/  # 会话/最近项目/用量（node:sqlite）、settings（JSON 归一化）、供应商校验
+│       └── cache/    # LLM 回复缓存（省成本：按模型+消息+工具哈希，命中重放不调 API；命中率在「使用统计」页展示）
 ├── shared/           # @dscode/shared —— 纯契约层（浏览器安全）：类型定义 + i18n 语言包 + DEEPSEEK_PRESET 预置
 │   └── src/
 │       ├── types/    # Session / Message / DiffFile / FileNode / AgentToolEvent 等类型
@@ -134,7 +135,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 ## 测试与质量
 
-- 单测框架 **vitest**，覆盖 `@dscode/core`（纯逻辑层）与 `@dscode/desktop`（主进程纯逻辑）两处：`pnpm test` 依次运行两者（也可 `pnpm --filter <pkg> test` 单独跑）。测试文件位于 `packages/{core,desktop}/test/*.test.ts`，各自 `vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 tsc 的 `src/**/*` 类型检查范围）。当前覆盖：core —— 门控、LCS diff、适配器 delta 归一化、路径防穿越/symlink、persist 落库/加密、usage 用量、MCP 协议、插件加载、代码索引、browse 工具；desktop —— IPC 校验器、safeStorage 加密封装、钩子触发。E2E 测试设施暂无。
+- 单测框架 **vitest**，覆盖 `@dscode/core`（纯逻辑层）与 `@dscode/desktop`（主进程纯逻辑）两处：`pnpm test` 依次运行两者（也可 `pnpm --filter <pkg> test` 单独跑）。测试文件位于 `packages/{core,desktop}/test/*.test.ts`，各自 `vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 tsc 的 `src/**/*` 类型检查范围）。当前覆盖：core —— 门控、LCS diff、适配器 delta 归一化、路径防穿越/symlink、persist 落库/加密、usage 用量、LLM 缓存（key 确定性/往返/命中统计/容量）、MCP 协议、插件加载、代码索引、browse 工具；desktop —— IPC 校验器、safeStorage 加密封装、钩子触发。E2E 测试设施暂无。
 - **lint 双轨并存**（配置都在仓库根）：
   - `oxlint`（`.oxlintrc.json`）：Rust 实现、毫秒级；内置 vue 插件 lint `.vue` 的 `<script>` 块（模板规则暂缺，官方语言插件路线图中）；自动读取 `.gitignore` 排除产物。**负责全部 TS/JS 文件**
   - `eslint`（`eslint.config.js`，flat config，基于 `@soybeanjs/eslint-config-vue`）：**仅覆盖 `.vue` 文件**（soybean 的 defineConfig 硬编码 `files: ['**/*.vue']`），提供模板相关规则；全局 ignores 必须放在数组第一项的无 files config 里（soybean 自带的 ignores 带 files 不生效，会误扫 `out/`）

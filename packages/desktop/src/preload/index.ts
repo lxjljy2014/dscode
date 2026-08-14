@@ -12,6 +12,7 @@ import type {
   GitOpResult,
   IndexSearchHit,
   IndexStats,
+  LlmCacheStats,
   McpListToolsResult,
   Message,
   Plugin,
@@ -126,6 +127,10 @@ const api = {
 
   // ---- 使用统计 ----
   usageList: (): Promise<UsageRecord[]> => ipcRenderer.invoke('usage:list'),
+  /** LLM 回复缓存统计（命中率/节省 token） */
+  cacheStats: (): Promise<LlmCacheStats> => ipcRenderer.invoke('usage:cache-stats'),
+  /** 清空 LLM 回复缓存，返回清空后的统计 */
+  cacheClear: (): Promise<LlmCacheStats> => ipcRenderer.invoke('usage:cache-clear'),
 
   // ---- MCP ----
   listMcpTools: (command: string, args: string[]): Promise<McpListToolsResult> =>

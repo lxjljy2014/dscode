@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron';
 import {
+  createSqliteLlmCache,
   disposeAgents,
   recordUsage,
   resolveConfirm,
@@ -8,7 +9,7 @@ import {
   SYSTEM_PROMPT
 } from '@dscode/core';
 import type { Hook } from '@dscode/shared';
-import type { AgentEventSink, AgentStartResult } from '@dscode/core';
+import type { AgentEventSink, AgentStartResult, LlmCache } from '@dscode/core';
 import { loadAppSettings } from '../settings';
 import { isChatMessagePayload } from '../validators';
 import { fireHooks } from '../hooks';
@@ -21,6 +22,13 @@ import { fireHooks } from '../hooks';
 
 /** 运行发起窗口归属（事件只推给发起窗口；窗口关闭时回收其运行，避免孤儿运行烧 token） */
 const winBySession = new Map<string, BrowserWindow>();
+
+/** LLM 回复缓存（userData/cache.db，懒初始化；命中时重放响应省 token） */
+let llmCache: LlmCache | null = null;
+function getLlmCache(): LlmCache {
+  if (!llmCache) llmCache = createSqliteLlmCache(app.getPath('userData') + '/cache.db');
+  return llmCache;
+}
 
 /** 把 core 的 AgentEventSink 适配到 IPC 通道（通道名是壳的细节，不进 core） */
 function createSink(win: BrowserWindow, hooks: Hook[], cwd: string, model: string, usageFile: string): AgentEventSink {
@@ -99,7 +107,8 @@ export async function startAgent(
       permissionMode: settings.permissionMode,
       providers: settings.providers,
       systemPrompt: basePrompt + memorySection + skillSection,
-      browsingEnabled: settings.browsingEnabled
+      browsingEnabled: settings.browsingEnabled,
+      llmCache: getLlmCache()
     }
   });
   if (result.ok) winBySession.set(sessionId, win);
