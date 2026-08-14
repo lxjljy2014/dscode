@@ -5,6 +5,7 @@
     "baseUrl": "../../",
     "paths": {
       "@dscode/shared": ["packages/shared/src/index.ts"],
+      "@dscode/shared/settings": ["packages/shared/src/types/settings.ts"],
       "@dscode/shared/locales/*": ["packages/shared/src/locales/*"],
       "@dscode/ui": ["packages/ui/src/index.ts"],
       "@dscode/ui/tokens": ["packages/ui/src/theme/tokens.ts"],

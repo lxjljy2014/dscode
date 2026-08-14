@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { DEEPSEEK_PRESET } from '@dscode/shared';
+// 经子路径出口导入运行时值：主进程外部化 @dscode/shared 后由 Node 直接加载，
+// 主入口 index.ts 的目录 re-export（./types）在 Node ESM 下不可解析
+import { DEEPSEEK_PRESET } from '@dscode/shared/settings';
 import type { AppSettings, PermissionMode, ProviderConfig, SettingsPatch } from '@dscode/shared';
 
 /**
