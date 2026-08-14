@@ -8,7 +8,7 @@ import SettingsSidebar from './SettingsSidebar.vue';
 const { t } = useI18n();
 const route = useRoute();
 
-const title = computed(() => t(`settingsPage.section.${(route.params.section as string | undefined) ?? 'general'}`));
+const title = computed(() => t(`settingsPage.section.${route.path.split('/').filter(Boolean)[1] ?? 'general'}`));
 </script>
 
 <template>

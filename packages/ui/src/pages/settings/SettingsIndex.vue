@@ -68,7 +68,7 @@ onMounted(loadStats);
       <div class="mt-2 flex items-center gap-2">
         <VTextField
           v-model="query"
-          density="compact"
+          density="compact" variant="outlined"
           hide-details
           :placeholder="t('settingsPage.index.searchPlaceholder')"
           class="flex-1"

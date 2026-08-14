@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 // 经子路径出口导入运行时值：主进程外部化 @dscode/shared 后由 Node 直接加载，
 // 主入口 index.ts 的目录 re-export（./types）在 Node ESM 下不可解析
-import { DEEPSEEK_PRESET } from '@dscode/shared/settings';
+import { DEFAULT_SUBAGENTS, DEEPSEEK_PRESET } from '@dscode/shared/settings';
 import type {
   AppSettings,
   Command,
@@ -168,7 +168,7 @@ export function defaultSettings(homeDir: string): AppSettings {
     memory: [],
     skills: [],
     hooks: [],
-    subagents: [],
+    subagents: [...DEFAULT_SUBAGENTS],
     mcpServers: [],
     browsingEnabled: true
   };
@@ -191,7 +191,8 @@ export function loadSettings(file: string, homeDir: string, crypto?: SettingsCry
     const memory = Array.isArray(raw['memory']) ? raw['memory'].filter(isMemoryEntry) : [];
     const skills = Array.isArray(raw['skills']) ? raw['skills'].filter(isSkill) : [];
     const hooks = Array.isArray(raw['hooks']) ? raw['hooks'].filter(isHook) : [];
-    const subagents = Array.isArray(raw['subagents']) ? raw['subagents'].filter(isSubagent) : [];
+    const rawSubagents = Array.isArray(raw['subagents']) ? raw['subagents'].filter(isSubagent) : [];
+    const subagents = rawSubagents.length > 0 ? rawSubagents : defaults.subagents;
     const mcpServers = Array.isArray(raw['mcpServers']) ? raw['mcpServers'].filter(isMcpServer) : [];
     const browsingEnabled = typeof raw['browsingEnabled'] === 'boolean' ? raw['browsingEnabled'] : true;
     return {

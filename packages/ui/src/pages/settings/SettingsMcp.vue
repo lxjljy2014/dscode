@@ -130,7 +130,7 @@ async function listTools(s: McpServer) {
           <VTextField
             v-model="draft.name"
             :label="t('settingsPage.mcp.name')"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
@@ -138,7 +138,7 @@ async function listTools(s: McpServer) {
             v-model="draft.command"
             :label="t('settingsPage.mcp.command')"
             :placeholder="t('settingsPage.mcp.commandPlaceholder')"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
@@ -146,7 +146,7 @@ async function listTools(s: McpServer) {
             v-model="draft.argsText"
             :label="t('settingsPage.mcp.args')"
             :placeholder="t('settingsPage.mcp.argsPlaceholder')"
-            density="compact"
+            density="compact" variant="outlined"
             hide-details
           />
         </VCardText>

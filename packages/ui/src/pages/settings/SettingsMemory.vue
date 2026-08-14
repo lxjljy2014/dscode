@@ -48,7 +48,7 @@ async function persist() {
       <div class="mt-3 flex items-center gap-2">
         <VTextField
           v-model="draft"
-          density="compact"
+          density="compact" variant="outlined"
           hide-details
           :placeholder="t('settingsPage.memory.placeholder')"
           class="flex-1"

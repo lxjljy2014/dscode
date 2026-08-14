@@ -103,21 +103,21 @@ async function persist() {
             v-model="draft.name"
             :label="t('settingsPage.subagents.name')"
             :placeholder="t('settingsPage.subagents.namePlaceholder')"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
           <VTextField
             v-model="draft.description"
             :label="t('settingsPage.subagents.description')"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
           <VTextarea
             v-model="draft.systemPrompt"
             :label="t('settingsPage.subagents.systemPrompt')"
-            density="compact"
+            density="compact" variant="outlined"
             rows="5"
             auto-grow
             hide-details

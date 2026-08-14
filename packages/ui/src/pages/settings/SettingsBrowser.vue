@@ -51,7 +51,7 @@ async function testFetch() {
       <div class="mt-2 flex items-center gap-2">
         <VTextField
           v-model="testUrl"
-          density="compact"
+          density="compact" variant="outlined"
           hide-details
           :placeholder="t('settingsPage.browser.placeholder')"
           class="flex-1"

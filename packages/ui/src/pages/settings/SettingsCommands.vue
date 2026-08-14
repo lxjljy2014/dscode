@@ -104,14 +104,14 @@ async function persist() {
             v-model="draft.name"
             :label="t('settingsPage.commands.name')"
             :placeholder="t('settingsPage.commands.namePlaceholder')"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
           <VTextField
             v-model="draft.description"
             :label="t('settingsPage.commands.description')"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
@@ -119,7 +119,7 @@ async function persist() {
             v-model="draft.prompt"
             :label="t('settingsPage.commands.prompt')"
             :placeholder="t('settingsPage.commands.promptPlaceholder')"
-            density="compact"
+            density="compact" variant="outlined"
             rows="4"
             auto-grow
             hide-details

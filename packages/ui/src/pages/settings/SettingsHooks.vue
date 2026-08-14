@@ -105,7 +105,7 @@ async function persist() {
           <VTextField
             v-model="draft.name"
             :label="t('settingsPage.hooks.name')"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
@@ -115,7 +115,7 @@ async function persist() {
             :items="triggerItems"
             item-title="title"
             item-value="value"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
@@ -123,7 +123,7 @@ async function persist() {
             v-model="draft.command"
             :label="t('settingsPage.hooks.command')"
             :placeholder="t('settingsPage.hooks.commandPlaceholder')"
-            density="compact"
+            density="compact" variant="outlined"
             hide-details
           />
         </VCardText>

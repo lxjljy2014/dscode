@@ -62,7 +62,7 @@ async function save() {
           :type="showKey[p.id] ? 'text' : 'password'"
           :placeholder="t('onboarding.apiKeyPlaceholder')"
           :append-inner-icon="showKey[p.id] ? 'i-lucide:eye-off' : 'i-lucide:eye'"
-          density="compact"
+          density="compact" variant="outlined"
           hide-details
           @click:append-inner="toggleKey(p.id)"
         />
@@ -78,7 +78,7 @@ async function save() {
         <div class="mt-2 flex items-center gap-2">
           <VTextField
             v-model="newModel[p.id]"
-            density="compact"
+            density="compact" variant="outlined"
             :placeholder="t('settingsPage.model.modelPlaceholder')"
             hide-details
             class="flex-1"

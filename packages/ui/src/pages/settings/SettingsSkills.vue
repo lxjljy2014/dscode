@@ -97,21 +97,21 @@ async function persist() {
             v-model="draft.name"
             :label="t('settingsPage.skills.name')"
             :placeholder="t('settingsPage.skills.namePlaceholder')"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
           <VTextField
             v-model="draft.description"
             :label="t('settingsPage.skills.description')"
-            density="compact"
+            density="compact" variant="outlined"
             class="mb-3"
             hide-details
           />
           <VTextarea
             v-model="draft.instructions"
             :label="t('settingsPage.skills.instructions')"
-            density="compact"
+            density="compact" variant="outlined"
             rows="5"
             auto-grow
             hide-details

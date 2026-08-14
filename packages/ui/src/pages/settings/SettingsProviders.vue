@@ -37,7 +37,7 @@ async function save() {
         :label="t('onboarding.apiKey')"
         :placeholder="t('onboarding.apiKeyPlaceholder')"
         :append-inner-icon="showKey ? 'i-lucide:eye-off' : 'i-lucide:eye'"
-        density="compact"
+        density="compact" variant="outlined"
         hide-details
         class="mt-2"
         @click:append-inner="showKey = !showKey"

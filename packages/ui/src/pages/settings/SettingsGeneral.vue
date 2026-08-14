@@ -100,7 +100,7 @@ const proxyExceptions = ref('');
         </div>
         <VTextField
           v-model="terminalFont"
-          density="compact"
+          density="compact" variant="outlined"
           :placeholder="t('settingsPage.general.terminalFontPlaceholder')"
           class="mt-2"
         />
@@ -130,7 +130,7 @@ const proxyExceptions = ref('');
       </div>
       <VTextField
         v-model="httpProxy"
-        density="compact"
+        density="compact" variant="outlined"
         :placeholder="t('settingsPage.general.httpProxyPlaceholder')"
         class="mt-2"
       />
@@ -146,7 +146,7 @@ const proxyExceptions = ref('');
       </div>
       <VTextField
         v-model="proxyExceptions"
-        density="compact"
+        density="compact" variant="outlined"
         :placeholder="t('settingsPage.general.proxyExceptionsPlaceholder')"
         class="mt-2"
       />

@@ -8,7 +8,8 @@ const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 
-const activeSection = computed(() => (route.params.section as string | undefined) ?? 'general');
+// 高亮按路径第二段推导：静态子路由（appearance/model/...）不会写入 :section 参数
+const activeSection = computed(() => route.path.split('/').filter(Boolean)[1] ?? 'general');
 
 // 设置导航分组：icon 与 section key 一一对应，文案走 settingsPage.section.*
 const groups = computed(() => [
