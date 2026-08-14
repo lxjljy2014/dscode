@@ -1,9 +1,18 @@
 import { app, BrowserWindow } from 'electron';
 import type { AgentToolEvent, ChatMessagePayload, PermissionMode } from '@dscode/shared';
-import { ApiError, executeTool, resolveAdapter, streamChat, toolPermission, toolSchemas } from '@dscode/core';
+import {
+  ApiError,
+  clearSnapshot,
+  executeTool,
+  initSnapshot,
+  loadSettings,
+  recomputeDiff,
+  resolveAdapter,
+  streamChat,
+  toolPermission,
+  toolSchemas
+} from '@dscode/core';
 import { gateTool, needsConfirm } from './agent-gate';
-import { clearSnapshot, initSnapshot, recomputeDiff } from '../workspace/diff';
-import { loadSettings } from '../persist/config';
 
 /**
  * agent 运行时：主进程内执行「LLM 流式对话 + 工具循环」。
@@ -132,7 +141,9 @@ async function runLoop(
           pushToolEvent(win, sessionId, { ...event, status: 'done', summary: result.content.slice(0, 200) });
           toolResultContent = result.content;
           // 写/执行成功后重算快照 diff 并推送
-          if (toolPermission(t.name) !== 'read') recomputeDiff(win, sessionId, cwd);
+          if (toolPermission(t.name) !== 'read') {
+            send(win, 'workspace:diff', { sessionId, files: recomputeDiff(sessionId, cwd) });
+          }
         } else {
           pushToolEvent(win, sessionId, { ...event, status: 'error', error: result.error });
           toolResultContent = `执行失败：${result.error}`;

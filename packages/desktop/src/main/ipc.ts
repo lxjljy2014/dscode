@@ -1,13 +1,26 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import type { Message, Session, SettingsPatch } from '@dscode/shared';
-import { loadSettings, saveSettings } from './persist/config';
-import { checkout, createBranch, graph, listBranches } from './shell/git';
-import { initProjects, listProjectsWithHome, touchProject } from './persist/projects';
-import { verifyProvider } from './persist/provider';
+import {
+  backfillSessions,
+  checkout,
+  createBranch,
+  graph,
+  initProjects,
+  initSessions,
+  listBranches,
+  listProjectsWithHome,
+  listSessions,
+  loadSettings,
+  readWorkspaceFile,
+  saveSettings,
+  scanTree,
+  touchProject,
+  upsertMessage,
+  upsertSession,
+  verifyProvider
+} from '@dscode/core';
 import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './shell/terminal';
 import { resolveConfirm, startAgent, stopAgent } from './agent/agent';
-import { readWorkspaceFile, scanTree } from './workspace/workspace';
-import { initSessions, listSessions, backfillSessions, upsertMessage, upsertSession } from './persist/sessions';
 
 /**
  * 业务 IPC 注册（ipcMain.handle / ipcRenderer.invoke；终端输入/尺寸为 ipcMain.on 单向通道）。

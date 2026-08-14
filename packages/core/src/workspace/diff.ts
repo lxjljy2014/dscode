@@ -1,12 +1,11 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { BrowserWindow } from 'electron';
 import type { DiffFile, DiffLine } from '@dscode/shared';
-import { SKIP_DIRS } from '@dscode/core';
+import { SKIP_DIRS } from './paths';
 
 /**
  * 真实 diff：每会话在 agent 启动时快照工作目录全部文本文件，
- * 写/执行工具执行成功后对比快照与当前内容，LCS 行级 diff 经 workspace:diff 推给渲染端。
+ * 写/执行工具执行成功后对比快照与当前内容，LCS 行级 diff 结果由调用方推送。
  */
 
 const MAX_FILE_BYTES = 512 * 1024;
@@ -177,8 +176,8 @@ function buildDiffFile(relPath: string, oldText: string | null, newText: string 
   };
 }
 
-/** 对比快照与当前内容，推送 workspace:diff 事件，返回 diff 文件列表 */
-export function recomputeDiff(win: BrowserWindow, sessionId: string, cwd: string): DiffFile[] {
+/** 对比快照与当前内容，返回 diff 文件列表（推送由调用方负责） */
+export function recomputeDiff(sessionId: string, cwd: string): DiffFile[] {
   const snap = snapshots.get(sessionId);
   if (!snap) return [];
   const current = collectTextFiles(cwd);
@@ -191,6 +190,5 @@ export function recomputeDiff(win: BrowserWindow, sessionId: string, cwd: string
     files.push(buildDiffFile(p, oldText, newText));
   }
   files.sort((x, y) => x.path.localeCompare(y.path));
-  if (!win.isDestroyed()) win.webContents.send('workspace:diff', { sessionId, files });
   return files;
 }
