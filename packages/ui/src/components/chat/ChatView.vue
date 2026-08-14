@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '../../stores/session';
 import { useAgentStore } from '../../stores/agent';
 import ChatInput from './ChatInput.vue';
+import ConfirmOverlay from './ConfirmOverlay.vue';
 import MessageItem from './MessageItem.vue';
 
 const { t } = useI18n();
@@ -58,24 +59,22 @@ watch(activeSession, scrollToBottom, { flush: 'post' });
       </div>
 
       <div class="shrink-0 px-6 pb-4 pt-1">
-        <ChatInput
-          class="mx-auto max-w-200"
-          :generating="generating"
-          @send="agentStore.sendMessage"
-          @stop="agentStore.stopGenerating"
-        />
+        <div class="relative mx-auto max-w-200">
+          <ChatInput :generating="generating" @send="agentStore.sendMessage" @stop="agentStore.stopGenerating" />
+          <!-- 工具确认卡片：覆盖在输入卡片上 -->
+          <ConfirmOverlay />
+        </div>
       </div>
     </template>
 
     <!-- 空状态：问候语 + 居中的输入卡片 -->
     <div v-else class="flex flex-1 flex-col items-center justify-center gap-8 px-6">
       <div class="select-none text-center text-2xl font-medium text-fg">{{ greeting }}</div>
-      <ChatInput
-        class="w-full max-w-180"
-        :generating="generating"
-        @send="agentStore.sendMessage"
-        @stop="agentStore.stopGenerating"
-      />
+      <div class="relative w-full max-w-180">
+        <ChatInput :generating="generating" @send="agentStore.sendMessage" @stop="agentStore.stopGenerating" />
+        <!-- 工具确认卡片：覆盖在输入卡片上 -->
+        <ConfirmOverlay />
+      </div>
     </div>
   </div>
 </template>

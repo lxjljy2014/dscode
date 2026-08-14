@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { AgentRuntime, approvalRuleMatches, approvalSignature, type AgentEventSink } from '../src';
+import { AgentRuntime, approvalSignature, type AgentEventSink } from '../src';
 
 /** AgentRuntime.start 启动前置校验（不触网）：错误码契约与 no-api-key 事件 */
 const noopSink: AgentEventSink = {
   delta: () => {},
   tool: () => {},
   confirm: () => {},
-  ruleUpdated: () => {},
   usage: () => {},
   done: () => {},
   error: () => {},
@@ -45,7 +44,7 @@ describe('AgentRuntime.start 启动校验', () => {
   });
 });
 
-describe('approvalSignature / approvalRuleMatches', () => {
+describe('approvalSignature', () => {
   it('执行命令按 command 生成签名', () => {
     expect(approvalSignature('run_command', '{"command":"git status"}')).toBe('run_command:git status');
   });
@@ -63,11 +62,5 @@ describe('approvalSignature / approvalRuleMatches', () => {
   it('参数缺失或非法 JSON 时签名退化为仅工具名', () => {
     expect(approvalSignature('run_command', '{}')).toBe('run_command:');
     expect(approvalSignature('run_command', 'not-json')).toBe('run_command:');
-  });
-
-  it('规则匹配：完全一致或前缀一致', () => {
-    expect(approvalRuleMatches('run_command:git status', 'run_command:git status')).toBe(true);
-    expect(approvalRuleMatches('run_command:git status --short', 'run_command:git status')).toBe(true);
-    expect(approvalRuleMatches('run_command:git log', 'run_command:git status')).toBe(false);
   });
 });

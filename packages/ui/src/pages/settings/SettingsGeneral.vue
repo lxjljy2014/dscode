@@ -3,11 +3,9 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { supportedLocales } from '../../plugins/i18n';
 import type { LocaleSetting } from '../../stores/ui';
-import { useSettingsStore } from '../../stores/settings';
 import { useUiStore } from '../../stores/ui';
 
 const { t } = useI18n();
-const settingsStore = useSettingsStore();
 const ui = useUiStore();
 
 // 界面语言：system + 支持的语言列表
@@ -22,11 +20,6 @@ const language = computed<LocaleSetting>({
 });
 
 const languageLabel = computed(() => languageItems.value.find(item => item.value === ui.locale)?.title ?? '');
-
-/** 移除「总是允许」审批规则（即时生效，下次运行不再注入） */
-function removeApprovalRule(rule: string): void {
-  void settingsStore.save({ approvalRules: settingsStore.settings.approvalRules.filter(r => r !== rule) });
-}
 
 // 以下为占位设置项：仅组件内状态，接入真实配置后改从设置 store 读写
 const inheritProfile = ref(true);
@@ -160,35 +153,6 @@ const proxyExceptions = ref('');
         :placeholder="t('settingsPage.general.proxyExceptionsPlaceholder')"
         class="mt-2"
       />
-    </VCard>
-
-    <!-- 权限规则（「总是允许」审批规则管理） -->
-    <VCard class="px-4 py-3.5">
-      <div class="min-w-0">
-        <div class="text-sm font-medium">{{ t('settingsPage.general.approvalRules') }}</div>
-        <div class="mt-0.5 text-xs leading-5 text-muted">
-          {{ t('settingsPage.general.approvalRulesDesc') }}
-        </div>
-      </div>
-      <div v-if="settingsStore.settings.approvalRules.length === 0" class="mt-2 text-xs text-faint">
-        {{ t('settingsPage.general.approvalRulesEmpty') }}
-      </div>
-      <div v-else class="mt-2 flex flex-col gap-1.5">
-        <div
-          v-for="rule in settingsStore.settings.approvalRules"
-          :key="rule"
-          class="flex items-center gap-2 rounded-md bg-elevated px-2.5 py-1.5"
-        >
-          <span class="min-w-0 flex-1 truncate font-mono text-xs text-fg">{{ rule }}</span>
-          <VBtn
-            size="x-small"
-            variant="text"
-            icon="i-lucide:trash-2"
-            class="shrink-0 text-muted"
-            @click="removeApprovalRule(rule)"
-          />
-        </div>
-      </div>
     </VCard>
   </div>
 </template>

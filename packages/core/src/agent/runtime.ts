@@ -47,11 +47,6 @@ export function approvalSignature(name: AgentToolName, argsJson: string): string
   return `${name}:${primary}`;
 }
 
-/** 规则匹配：完全一致或命令/路径前缀一致（仿 Codex 的 exec-policy prefix rule） */
-export function approvalRuleMatches(signature: string, rule: string): boolean {
-  return signature === rule || signature.startsWith(rule);
-}
-
 interface RunState {
   controller: AbortController;
   /** 已被新运行替换：中止时不再向渲染端推 aborted 事件（渲染端状态已丢失，推了也无接收方） */
@@ -81,8 +76,6 @@ export interface AgentStartInput {
     systemPrompt?: string;
     /** 是否启用网页浏览（browse 工具）；默认启用 */
     browsingEnabled?: boolean;
-    /** 「总是允许」审批规则（工具签名列表，宿主持久化；命中则不再询问） */
-    approvalRules?: string[];
   };
 }
 
@@ -99,8 +92,6 @@ export class AgentRuntime {
   private toolSeq = 0;
   /** 本会话免问：sessionId → 已放行的工具签名集合 */
   private sessionApprovals = new Map<string, Set<string>>();
-  /** 持久「总是允许」规则（宿主持久化；每次 start 以配置为准重新装载） */
-  private approvalRules = new Set<string>();
 
   private nextToolId(): string {
     return `t-${Date.now()}-${this.toolSeq++}`;
@@ -126,9 +117,6 @@ export class AgentRuntime {
       existing.controller.abort();
       await existing.done.catch(() => {});
     }
-
-    // 以宿主持久化规则为准重新装载（allow-always 的实时新增经 sink.ruleUpdated 写盘后由下次 start 拾取）
-    this.approvalRules = new Set(config.approvalRules ?? []);
 
     const controller = new AbortController();
     const run: RunState = { controller, replacing: false, done: Promise.resolve() };
@@ -228,12 +216,10 @@ export class AgentRuntime {
 
           let toolResultContent: string;
           if (needsConfirm(t.name, permissionMode)) {
-            // 会话记忆 / 持久规则命中：直接放行，不再询问（仿 Codex 的 allow-for-session / exec-policy 规则）
+            // 会话记忆（allow-session）命中：直接放行，不再询问
             const signature = approvalSignature(t.name, t.arguments);
-            const sessionAllowed = this.sessionApprovals.get(sessionId)?.has(signature) ?? false;
-            const ruleAllowed = [...this.approvalRules].some(rule => approvalRuleMatches(signature, rule));
             let decision: ConfirmDecision;
-            if (sessionAllowed || ruleAllowed) {
+            if (this.sessionApprovals.get(sessionId)?.has(signature)) {
               decision = { kind: 'allow-once' };
             } else {
               const gate = await gateTool(
@@ -249,38 +235,26 @@ export class AgentRuntime {
               );
               if (signal.aborted) return;
               decision = gate.decision ?? (gate.allow ? { kind: 'allow-once' } : { kind: 'deny' });
-              // 记录用户选择：本会话免问 / 写入持久规则（经 sink 通知宿主落盘）
+              // 记录用户选择：本会话免问
               if (decision.kind === 'allow-session') {
                 if (!this.sessionApprovals.has(sessionId)) this.sessionApprovals.set(sessionId, new Set());
                 this.sessionApprovals.get(sessionId)!.add(signature);
-              } else if (decision.kind === 'allow-always') {
-                this.approvalRules.add(signature);
-                sink.ruleUpdated(sessionId, signature);
               }
               if (!gate.allow) {
                 sink.tool(sessionId, {
                   ...event,
                   status: 'denied',
                   error:
-                    decision.kind === 'cancel'
-                      ? '用户要求换一种做法'
-                      : gate.reason === 'timeout'
-                        ? '确认超时'
-                        : gate.reason === 'plan-mode'
-                          ? 'plan 模式已拒绝'
-                          : '用户拒绝'
+                    gate.reason === 'timeout'
+                      ? '确认超时'
+                      : gate.reason === 'plan-mode'
+                        ? 'plan 模式已拒绝'
+                        : '用户拒绝'
                 });
-                if (decision.kind === 'cancel') {
-                  // 仿 Codex「No, and tell Codex what to do differently」：以用户消息注入，让模型重新规划
-                  messages.push({
-                    role: 'user',
-                    content: '用户拒绝了刚才的工具调用并要求换一种做法，请重新规划方案后再尝试。'
-                  });
-                  continue;
-                }
-                toolResultContent = `工具调用被拒绝：${gate.reason ?? 'denied'}`;
-                messages.push({ role: 'tool', tool_call_id: t.id, content: toolResultContent });
-                continue;
+                // 用户拒绝：停止整个任务（等同用户点了停止；runLoop 直接退出）
+                run.controller.abort();
+                sink.error(sessionId, 'aborted');
+                return;
               }
             }
             sink.tool(sessionId, { ...event, status: 'running' });

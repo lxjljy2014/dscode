@@ -12,8 +12,6 @@ export interface AgentEventSink {
   tool(sessionId: string, event: AgentToolEvent): void;
   /** 写/执行确认请求 */
   confirm(sessionId: string, toolEventId: string, name: AgentToolName, args: string): void;
-  /** 「总是允许」规则新增（宿主持久化到自己的设置存储，下次运行随配置注入） */
-  ruleUpdated(sessionId: string, signature: string): void;
   /** 运行结束时的 token 用量（聚合整次运行的所有轮次） */
   usage(sessionId: string, usage: ChatUsage): void;
   /** 本轮运行结束 */

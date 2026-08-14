@@ -17,6 +17,9 @@ export const useAgentStore = defineStore('agent', () => {
   const sessionStore = useSessionStore();
   const generating = ref(false);
 
+  /** 待用户确认的工具调用（覆盖输入框的确认卡片数据源；运行时未响应前保持） */
+  const pendingConfirm = ref<{ toolEventId: string; name: AgentToolEvent['name']; args: string } | null>(null);
+
   /** 工具卡最短展示时长：快速工具的「执行中」至少展示一小段时间，避免一闪而过看不到 */
   const TOOL_MIN_DISPLAY_MS = 450;
   /** 工具首次展示时间戳（用于最短展示时长计算） */
@@ -122,9 +125,10 @@ export const useAgentStore = defineStore('agent', () => {
     if (sessionStore.activeSessionId) await host.agentStop(sessionStore.activeSessionId);
   }
 
-  /** 确认弹窗响应（决策由 ToolEventCard 多选项给出：允许一次/本会话/总是/拒绝/换方案） */
+  /** 确认卡片响应（三选项：允许一次/本会话/拒绝；拒绝由运行时停止任务） */
   function respondConfirm(toolEventId: string, decision: ConfirmDecision) {
     if (!host) return;
+    if (pendingConfirm.value?.toolEventId === toolEventId) pendingConfirm.value = null;
     void host.agentConfirmResponse(toolEventId, decision);
   }
 
@@ -207,14 +211,20 @@ export const useAgentStore = defineStore('agent', () => {
   function onConfirm(ev: { sessionId: string; toolEventId: string; name: AgentToolEvent['name']; args: string }) {
     // 主进程在发确认请求前已推 confirming 事件；此处兜底补一条，避免事件缺失
     const session = sessionStore.sessions.find(s => s.id === ev.sessionId);
-    if (!session || session.toolEvents.some(e => e.id === ev.toolEventId)) return;
-    session.toolEvents.push({
-      id: ev.toolEventId,
-      name: ev.name,
-      args: ev.args,
-      status: 'confirming',
-      createdAt: Date.now()
-    });
+    if (!session) return;
+    if (!session.toolEvents.some(e => e.id === ev.toolEventId)) {
+      session.toolEvents.push({
+        id: ev.toolEventId,
+        name: ev.name,
+        args: ev.args,
+        status: 'confirming',
+        createdAt: Date.now()
+      });
+    }
+    // 覆盖输入框的确认卡片：记录当前待确认工具（仅当属于当前激活会话时展示）
+    if (session.id === sessionStore.activeSessionId) {
+      pendingConfirm.value = { toolEventId: ev.toolEventId, name: ev.name, args: ev.args };
+    }
   }
 
   function onDone(ev: { sessionId: string }) {
@@ -229,6 +239,7 @@ export const useAgentStore = defineStore('agent', () => {
       void sessionStore.persistMessage(session, reply);
     }
     generating.value = false;
+    pendingConfirm.value = null;
   }
 
   function onError(ev: { sessionId: string; code: string; detail?: string }) {
@@ -246,6 +257,7 @@ export const useAgentStore = defineStore('agent', () => {
       void sessionStore.persistMessage(session, reply);
     }
     generating.value = false;
+    pendingConfirm.value = null;
   }
 
   function onWorkspaceDiff(ev: { sessionId: string; files: DiffFile[] }) {
@@ -267,5 +279,5 @@ export const useAgentStore = defineStore('agent', () => {
 
   subscribeEvents();
 
-  return { generating, diffFiles, sendMessage, stopGenerating, respondConfirm };
+  return { generating, pendingConfirm, diffFiles, sendMessage, stopGenerating, respondConfirm };
 });

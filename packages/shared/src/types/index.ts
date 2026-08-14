@@ -40,14 +40,7 @@ export interface AgentUsageEvent {
 }
 
 /** agent 可调用的工具名 */
-export type AgentToolName =
-  | 'read_file'
-  | 'list_dir'
-  | 'search'
-  | 'run_command'
-  | 'write_file'
-  | 'edit_file'
-  | 'browse';
+export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file' | 'browse';
 
 /** 工具事件（聊天流中与消息交错展示） */
 export interface AgentToolEvent {
@@ -90,19 +83,12 @@ export interface AgentConfirmRequest {
 }
 
 /**
- * 工具确认决策（仿 Codex CLI 审批弹层）：
+ * 工具确认决策（覆盖输入框的确认卡片三选项）：
  * - allow-once：仅本次放行
  * - allow-session：本会话内相同签名不再询问
- * - allow-always：写入持久规则（宿主持久化），之后相同签名不再询问
- * - deny：拒绝，agent 收到拒绝结果继续
- * - cancel：拒绝并要求换一种做法（agent 收到用户反馈后重新规划）
+ * - deny：拒绝并停止整个任务
  */
-export type ConfirmDecision =
-  | { kind: 'allow-once' }
-  | { kind: 'allow-session' }
-  | { kind: 'allow-always' }
-  | { kind: 'deny' }
-  | { kind: 'cancel' };
+export type ConfirmDecision = { kind: 'allow-once' } | { kind: 'allow-session' } | { kind: 'deny' };
 
 export interface Session {
   id: string;

@@ -4,9 +4,9 @@ import { toolPermission } from '../tools';
 /** 门控决策结果 */
 export interface GateDecision {
   allow: boolean;
-  /** 拒绝原因（plan 模式 / 用户拒绝 / 用户要求换方案 / 确认超时） */
-  reason?: 'plan-mode' | 'denied' | 'cancel' | 'timeout';
-  /** 用户决策（确认路径携带；deny/cancel/timeout 落在拒绝侧） */
+  /** 拒绝原因（plan 模式 / 用户拒绝 / 确认超时） */
+  reason?: 'plan-mode' | 'denied' | 'timeout';
+  /** 用户决策（确认路径携带；deny/timeout 落在拒绝侧，由运行时停止任务） */
   decision?: ConfirmDecision;
 }
 
@@ -24,18 +24,16 @@ export function needsConfirm(name: AgentToolName, mode: PermissionMode): boolean
   return true;
 }
 
-/** 确认决策结构收窄：kind 必须在合法集合内（allow-always 无需负载，签名由运行时按工具参数推导） */
+/** 确认决策结构收窄：kind 必须在合法集合内（allow-session 无需负载，签名由运行时按工具参数推导） */
 export function isConfirmDecision(v: unknown): v is ConfirmDecision {
   if (typeof v !== 'object' || v === null) return false;
   const kind = (v as Record<string, unknown>)['kind'];
-  return (
-    kind === 'allow-once' || kind === 'allow-session' || kind === 'allow-always' || kind === 'deny' || kind === 'cancel'
-  );
+  return kind === 'allow-once' || kind === 'allow-session' || kind === 'deny';
 }
 
 /**
  * 权限门控：按工具权限分类 + 权限模式决定放行 / 拒绝 / 需确认。
- * 确认弹层由宿主实现，提供 Codex 风格多选项（允许一次/本会话/总是/拒绝/换方案）；
+ * 确认卡片由宿主实现，提供三选项（允许一次/本会话/拒绝）；拒绝由运行时停止整个任务；
  * 等待 120s 超时自动拒绝，保证 agent 循环不会永久挂起。
  */
 export async function gateTool(
@@ -70,10 +68,7 @@ export async function gateTool(
   switch (decision.kind) {
     case 'allow-once':
     case 'allow-session':
-    case 'allow-always':
       return { allow: true, decision };
-    case 'cancel':
-      return { allow: false, reason: 'cancel', decision };
     case 'deny':
       return { allow: false, reason: timedOut ? 'timeout' : 'denied', decision };
   }

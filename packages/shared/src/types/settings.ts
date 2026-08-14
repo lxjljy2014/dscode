@@ -4,7 +4,7 @@
  * - auto-edit（自动编辑）：写工具直接放行，执行（bash）仍需确认
  * - plan（计划模式）：写/执行一律拒绝，只读 + 出方案
  * - full-access（完全访问）：全部放行
- * 门控实现在 @dscode/core 的 gate（确认弹层提供 Codex 风格多选项：允许一次/本会话/总是+持久规则/拒绝/换方案，120s 超时自动拒绝）。
+ * 门控实现在 @dscode/core 的 gate（确认卡片三选项：允许一次/本会话/拒绝，拒绝停止整个任务，120s 超时自动拒绝）。
  */
 export type PermissionMode = 'confirm' | 'auto-edit' | 'plan' | 'full-access';
 
@@ -109,8 +109,6 @@ export interface AppSettings {
   mcpServers: McpServer[];
   /** 是否启用网页浏览工具（browse） */
   browsingEnabled: boolean;
-  /** 「总是允许」审批规则（工具签名列表，确认弹层选择后写入；命中则不再询问） */
-  approvalRules: string[];
 }
 
 /** DeepSeek 预置供应商：引导页在 providers 为空时预填（apiKey 留空待用户填写） */
@@ -166,8 +164,6 @@ export const DEFAULT_SUBAGENTS: Subagent[] = [
  * API key 校验结果（校验请求由主进程发起：渲染端 CSP default-src 'self' 不允许直连外部 API）。
  * unauthorized = key 无效；network = 网络/服务异常；invalid-args = 参数不合法。
  */
-export type ProviderVerifyResult =
-  | { ok: true }
-  | { ok: false; reason: 'unauthorized' | 'network' | 'invalid-args' };
+export type ProviderVerifyResult = { ok: true } | { ok: false; reason: 'unauthorized' | 'network' | 'invalid-args' };
 
 export type SettingsPatch = Partial<AppSettings>;

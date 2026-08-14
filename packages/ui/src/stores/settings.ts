@@ -20,8 +20,7 @@ const DEFAULTS: AppSettings = {
   hooks: [],
   subagents: [],
   mcpServers: [],
-  browsingEnabled: true,
-  approvalRules: []
+  browsingEnabled: true
 };
 
 /** 应用只在宿主内运行，桥接缺失视为环境错误 */
