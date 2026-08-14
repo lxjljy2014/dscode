@@ -166,84 +166,91 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
           {{ message.errorDetail }}
         </div>
 
-        <!-- 回复结束后底部操作行：复制 / 点赞 / 踩 / fork + 内联运行统计（时间 · 用时 · 首 token · token 速率） -->
-        <div v-if="!message.streaming" class="mt-1.5 flex flex-wrap items-center gap-x-1 text-xs text-muted">
-          <div class="flex items-center gap-0.5 rounded-lg px-1 py-0.5">
-            <VTooltip :text="copied ? t('chat.copied') : t('chat.copy')" location="bottom">
-              <template #activator="{ props: tip }">
-                <VIconBtn
-                  v-bind="tip"
-                  :icon="copied ? 'i-lucide:check' : 'i-lucide:copy'"
-                  variant="text"
-                  size="small"
-                  rounded="lg"
-                  :class="copied ? 'text-primary' : 'text-muted'"
-                  @click="copyContent"
-                />
-              </template>
-            </VTooltip>
-            <VTooltip :text="t('chat.like')" location="bottom">
-              <template #activator="{ props: tip }">
-                <VIconBtn
-                  v-bind="tip"
-                  icon="i-lucide:thumbs-up"
-                  variant="text"
-                  size="small"
-                  rounded="lg"
-                  :class="feedback.get(message.id) === 'like' ? 'text-primary' : 'text-muted'"
-                  @click="toggleFeedback('like')"
-                />
-              </template>
-            </VTooltip>
-            <VTooltip :text="t('chat.dislike')" location="bottom">
-              <template #activator="{ props: tip }">
-                <VIconBtn
-                  v-bind="tip"
-                  icon="i-lucide:thumbs-down"
-                  variant="text"
-                  size="small"
-                  rounded="lg"
-                  :class="feedback.get(message.id) === 'dislike' ? 'text-warning' : 'text-muted'"
-                  @click="toggleFeedback('dislike')"
-                />
-              </template>
-            </VTooltip>
-            <VTooltip :text="t('chat.fork')" location="bottom">
-              <template #activator="{ props: tip }">
-                <VIconBtn
-                  v-bind="tip"
-                  icon="i-lucide:git-fork"
-                  variant="text"
-                  size="small"
-                  rounded="lg"
-                  class="text-muted"
-                  @click="fork"
-                />
-              </template>
-            </VTooltip>
-          </div>
+        <!-- 回复结束后底部操作行：复制 / 点赞 / 踩 / fork；统计内联跟在按钮后，悬停按钮行时才显示 -->
+        <div v-if="!message.streaming" class="group/stats mt-1.5 text-xs text-muted">
+          <div class="flex items-center gap-x-1">
+            <div class="flex items-center gap-0.5 rounded-lg px-1 py-0.5">
+              <VTooltip :text="copied ? t('chat.copied') : t('chat.copy')" location="bottom">
+                <template #activator="{ props: tip }">
+                  <VIconBtn
+                    v-bind="tip"
+                    :icon="copied ? 'i-lucide:check' : 'i-lucide:copy'"
+                    variant="text"
+                    size="small"
+                    rounded="lg"
+                    :class="copied ? 'text-primary' : 'text-muted'"
+                    @click="copyContent"
+                  />
+                </template>
+              </VTooltip>
+              <VTooltip :text="t('chat.like')" location="bottom">
+                <template #activator="{ props: tip }">
+                  <VIconBtn
+                    v-bind="tip"
+                    icon="i-lucide:thumbs-up"
+                    variant="text"
+                    size="small"
+                    rounded="lg"
+                    :class="feedback.get(message.id) === 'like' ? 'text-primary' : 'text-muted'"
+                    @click="toggleFeedback('like')"
+                  />
+                </template>
+              </VTooltip>
+              <VTooltip :text="t('chat.dislike')" location="bottom">
+                <template #activator="{ props: tip }">
+                  <VIconBtn
+                    v-bind="tip"
+                    icon="i-lucide:thumbs-down"
+                    variant="text"
+                    size="small"
+                    rounded="lg"
+                    :class="feedback.get(message.id) === 'dislike' ? 'text-warning' : 'text-muted'"
+                    @click="toggleFeedback('dislike')"
+                  />
+                </template>
+              </VTooltip>
+              <VTooltip :text="t('chat.fork')" location="bottom">
+                <template #activator="{ props: tip }">
+                  <VIconBtn
+                    v-bind="tip"
+                    icon="i-lucide:git-fork"
+                    variant="text"
+                    size="small"
+                    rounded="lg"
+                    class="text-muted"
+                    @click="fork"
+                  />
+                </template>
+              </VTooltip>
+            </div>
 
-          <!-- 内联运行统计：01:44 · 用时 13分05秒 · 首 token 1.1秒 · 139 tok/s -->
-          <template v-if="message.stats">
-            <span class="mx-0.5 select-none text-faint">·</span>
-            <span class="tabular-nums">{{ formatClock(message.stats.endAt) }}</span>
-            <span class="mx-0.5 select-none text-faint">·</span>
-            <span>
-              {{ t('chat.stats.duration') }}
-              <span class="tabular-nums">{{ formatDuration(message.stats.endAt - message.stats.startAt) }}</span>
-            </span>
-            <span class="mx-0.5 select-none text-faint">·</span>
-            <span>
-              {{ t('chat.stats.firstToken') }}
-              <span class="tabular-nums">
-                {{ message.stats.firstTokenMs !== undefined ? formatDuration(message.stats.firstTokenMs) : '—' }}
+            <!-- 运行统计（内联跟在按钮后，悬停按钮行时展开显示）：01:44 · 用时 13分05秒 · 首 token 1.1秒 · 139 tok/s -->
+            <span
+              v-if="message.stats"
+              class="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/stats:max-w-60 group-hover/stats:opacity-100"
+            >
+              <span class="flex items-center gap-x-1">
+                <span class="select-none text-faint">·</span>
+                <span class="tabular-nums">{{ formatClock(message.stats.endAt) }}</span>
+                <span class="select-none text-faint">·</span>
+                <span>
+                  {{ t('chat.stats.duration') }}
+                  <span class="tabular-nums">{{ formatDuration(message.stats.endAt - message.stats.startAt) }}</span>
+                </span>
+                <span class="select-none text-faint">·</span>
+                <span>
+                  {{ t('chat.stats.firstToken') }}
+                  <span class="tabular-nums">
+                    {{ message.stats.firstTokenMs !== undefined ? formatDuration(message.stats.firstTokenMs) : '—' }}
+                  </span>
+                </span>
+                <span class="select-none text-faint">·</span>
+                <span class="tabular-nums">
+                  {{ formatTokensPerSec(message.stats.completionTokens, message.stats.endAt - message.stats.startAt) }}
+                </span>
               </span>
             </span>
-            <span class="mx-0.5 select-none text-faint">·</span>
-            <span class="tabular-nums">
-              {{ formatTokensPerSec(message.stats.completionTokens, message.stats.endAt - message.stats.startAt) }}
-            </span>
-          </template>
+          </div>
         </div>
       </div>
     </div>
