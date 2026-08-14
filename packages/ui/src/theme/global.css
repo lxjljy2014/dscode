@@ -136,8 +136,12 @@ html {
 }
 
 /* 弹层（菜单/对话框）盖在标题栏拖拽区上方时，其区域同样不能拖动窗口——
-   Electron 拖拽区按 app-region 矩形生效，浮层盖上去不会自动取消底层拖拽 */
-.v-overlay,
+   Electron 拖拽区按 app-region 矩形生效，浮层盖上去不会自动取消底层拖拽。
+   注意：只对“激活中”的 overlay 生效（v-overlay--active）。Vuetify 4 会把所有
+   tooltip/菜单的 .v-overlay 根元素常驻挂载在 DOM 里（仅隐藏内容），若对根元素
+   整体设 no-drag，这些全屏矩形会在 app-region 矩形运算中抵消整个标题栏的拖拽区，
+   导致窗口完全无法拖动；激活态由 Vuetify 在根元素上打 v-overlay--active 类区分 */
+.v-overlay--active,
 .v-overlay__content {
   -webkit-app-region: no-drag;
 }

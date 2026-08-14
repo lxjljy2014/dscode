@@ -68,7 +68,7 @@ export function createVuetifyPlugin() {
       VListItem: {
         rounded: 'lg',
         VIcon: {
-          size: 'small'
+          size: 'x-small'
         }
       },
       VAppBar: {
