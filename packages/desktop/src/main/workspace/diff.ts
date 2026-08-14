@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { BrowserWindow } from 'electron';
 import type { DiffFile, DiffLine } from '@dscode/shared';
-import { SKIP_DIRS } from '../agent/agent-tools';
+import { SKIP_DIRS } from '@dscode/core';
 
 /**
  * 真实 diff：每会话在 agent 启动时快照工作目录全部文本文件，

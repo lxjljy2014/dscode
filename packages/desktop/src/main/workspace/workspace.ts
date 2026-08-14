@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { FileNode } from '@dscode/shared';
-import { SKIP_DIRS, resolveSafePath } from '../agent/agent-tools';
+import { SKIP_DIRS, resolveSafePath } from '@dscode/core';
 
 /**
  * 真实工作区读取：文件树扫描与单文件读取。

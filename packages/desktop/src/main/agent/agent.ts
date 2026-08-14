@@ -1,6 +1,6 @@
 import { app, BrowserWindow } from 'electron';
 import type { AgentToolEvent, AgentToolName, ChatMessagePayload, PermissionMode } from '@dscode/shared';
-import { executeTool, toolPermission, toolSchemas } from './agent-tools';
+import { executeTool, toolPermission, toolSchemas } from '@dscode/core';
 import { gateTool, needsConfirm } from './agent-gate';
 import { clearSnapshot, initSnapshot, recomputeDiff } from '../workspace/diff';
 import { loadSettings } from '../persist/config';

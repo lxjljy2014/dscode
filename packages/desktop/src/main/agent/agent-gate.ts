@@ -1,5 +1,5 @@
 import type { AgentToolName, PermissionMode } from '@dscode/shared';
-import { toolPermission } from './agent-tools';
+import { toolPermission } from '@dscode/core';
 
 /** 门控决策结果 */
 export interface GateDecision {
