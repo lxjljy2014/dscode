@@ -65,7 +65,7 @@ export function isMessage(v: unknown): v is Message {
   );
 }
 
-/** 校验会话行（toolEvents/messages 由渲染端置空后落库，这里不校验其内容） */
+/** 校验会话行（toolEvents/messages 由渲染端置空后落库，这里不校验其内容；archived 可选，缺省未归档） */
 export function isSession(v: unknown): v is Session {
   if (!isRecord(v)) return false;
   const r = v as Record<string, unknown>;
@@ -74,7 +74,8 @@ export function isSession(v: unknown): v is Session {
     isString(r['title']) &&
     typeof r['workingDirectory'] === 'string' &&
     typeof r['createdAt'] === 'number' &&
-    typeof r['updatedAt'] === 'number'
+    typeof r['updatedAt'] === 'number' &&
+    (r['archived'] === undefined || typeof r['archived'] === 'boolean')
   );
 }
 

@@ -77,6 +77,8 @@ export interface Session {
   messages: Message[];
   /** 会话内的工具事件（瞬态展示，不持久化） */
   toolEvents: AgentToolEvent[];
+  /** 已归档（侧边栏收进「已归档」区；旧数据无此字段视为未归档） */
+  archived?: boolean;
 }
 
 export type DiffLineType = 'add' | 'del' | 'context' | 'hunk';

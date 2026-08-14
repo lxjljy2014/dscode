@@ -10,7 +10,15 @@
   },
   "sidebar": {
     "project": "项目",
-    "more": "更多"
+    "more": "更多",
+    "archived": "已归档",
+    "removeProject": "移除项目",
+    "archiveTask": "归档任务",
+    "unarchiveTask": "取消归档",
+    "emptyArchived": "暂无归档任务",
+    "removed": "已移除项目",
+    "archivedDone": "任务已归档",
+    "restored": "任务已恢复"
   },
   "session": {
     "new": "新建任务",

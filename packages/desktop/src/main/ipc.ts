@@ -19,8 +19,10 @@ import {
   listSessions,
   listUsage,
   readWorkspaceFile,
+  removeProject,
   scanTree,
   searchIndex,
+  setSessionArchived,
   touchProject,
   upsertMessage,
   upsertSession,
@@ -86,6 +88,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'projects:list',
     withMainWindow(() => listProjectsWithHome(projectsFile, homeDir))
+  );
+  ipcMain.handle(
+    'projects:remove',
+    withMainWindow((_win, path: unknown) => {
+      if (!isString(path)) return { ok: false as const, error: 'invalid path' };
+      removeProject(projectsFile, path);
+      return { ok: true as const };
+    })
   );
 
   // ---- 目录选择 ----
@@ -209,6 +219,14 @@ export function registerIpcHandlers(): void {
     withMainWindow((_win, sessionId: unknown, message: unknown) => {
       if (!isString(sessionId) || !isMessage(message)) return { ok: false, error: 'invalid args' };
       upsertMessage(sessionsFile, sessionId, message);
+      return { ok: true };
+    })
+  );
+  ipcMain.handle(
+    'sessions:archive',
+    withMainWindow((_win, sessionId: unknown, archived: unknown) => {
+      if (!isString(sessionId) || typeof archived !== 'boolean') return { ok: false, error: 'invalid args' };
+      setSessionArchived(sessionsFile, sessionId, archived);
       return { ok: true };
     })
   );

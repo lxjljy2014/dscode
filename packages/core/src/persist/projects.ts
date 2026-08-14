@@ -17,8 +17,14 @@ function getDb(file: string): DatabaseSync {
       'CREATE TABLE IF NOT EXISTS recent_projects (' +
         'path TEXT PRIMARY KEY, ' +
         'name TEXT NOT NULL, ' +
-        'last_opened_at INTEGER NOT NULL)'
+        'last_opened_at INTEGER NOT NULL, ' +
+        'removed_at INTEGER)'
     );
+    // 旧库迁移：早期表结构没有 removed_at 列（缺省未移除）
+    const cols = db.prepare('PRAGMA table_info(recent_projects)').all() as Array<{ name: string }>;
+    if (!cols.some(c => c.name === 'removed_at')) {
+      db.exec('ALTER TABLE recent_projects ADD COLUMN removed_at INTEGER');
+    }
     dbs.set(file, db);
   }
   return db;
@@ -31,7 +37,9 @@ export function initProjects(file: string): void {
 /** 最近项目列表（最多 10 条，按打开时间倒序） */
 export function listProjects(file: string): RecentProject[] {
   const rows = getDb(file)
-    .prepare('SELECT path, name, last_opened_at FROM recent_projects ORDER BY last_opened_at DESC LIMIT 10')
+    .prepare(
+      'SELECT path, name, last_opened_at FROM recent_projects WHERE removed_at IS NULL ORDER BY last_opened_at DESC LIMIT 10'
+    )
     .all() as Array<{ path: string; name: string; last_opened_at: number }>;
   return rows.map(r => ({ path: r.path, name: r.name, lastOpenedAt: r.last_opened_at }));
 }
@@ -41,12 +49,33 @@ export function touchProject(file: string, path: string): void {
   const name = path.split(/[\\/]/).filter(Boolean).pop() || path;
   getDb(file)
     .prepare(
-      'INSERT INTO recent_projects (path, name, last_opened_at) VALUES (?, ?, ?) ' +
-        'ON CONFLICT(path) DO UPDATE SET name = excluded.name, last_opened_at = excluded.last_opened_at'
+      'INSERT INTO recent_projects (path, name, last_opened_at, removed_at) VALUES (?, ?, ?, NULL) ' +
+        'ON CONFLICT(path) DO UPDATE SET name = excluded.name, last_opened_at = excluded.last_opened_at, removed_at = NULL'
     )
     .run(path, name, Date.now());
 }
 
+/** 被「移除项目」移出的工作空间（渲染端据此把对应分组隐藏，任务数据保留） */
+export function listRemovedProjects(file: string): RecentProject[] {
+  const rows = getDb(file)
+    .prepare(
+      'SELECT path, name, last_opened_at FROM recent_projects WHERE removed_at IS NOT NULL ORDER BY removed_at DESC'
+    )
+    .all() as Array<{ path: string; name: string; last_opened_at: number }>;
+  return rows.map(r => ({ path: r.path, name: r.name, lastOpenedAt: r.last_opened_at }));
+}
+
+/** 从侧边栏移除一个工作空间（仅隐藏分组，不删除任务；项目不在最近表时也补一行以记录移除状态） */
+export function removeProject(file: string, path: string): void {
+  const name = path.split(/[\\/]/).filter(Boolean).pop() || path;
+  getDb(file)
+    .prepare(
+      'INSERT INTO recent_projects (path, name, last_opened_at, removed_at) VALUES (?, ?, ?, ?) ' +
+        'ON CONFLICT(path) DO UPDATE SET removed_at = excluded.removed_at'
+    )
+    .run(path, name, Date.now(), Date.now());
+}
+
 export function listProjectsWithHome(file: string, homeDir: string): ProjectsListResult {
-  return { projects: listProjects(file), homeDir };
+  return { projects: listProjects(file), removed: listRemovedProjects(file), homeDir };
 }

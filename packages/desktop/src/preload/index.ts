@@ -59,6 +59,7 @@ const api = {
 
   // ---- 最近项目 / 目录选择 ----
   listRecentProjects: (): Promise<ProjectsListResult> => ipcRenderer.invoke('projects:list'),
+  removeRecentProject: (path: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('projects:remove', path),
   pickDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-directory'),
 
   // ---- 供应商校验 ----
@@ -113,6 +114,8 @@ const api = {
   sessionsCreate: (session: Session): Promise<{ ok: boolean }> => ipcRenderer.invoke('sessions:create', session),
   sessionsAppend: (sessionId: string, message: Message): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('sessions:append', sessionId, message),
+  sessionSetArchived: (sessionId: string, archived: boolean): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('sessions:archive', sessionId, archived),
 
   // ---- 使用统计 ----
   usageList: (): Promise<UsageRecord[]> => ipcRenderer.invoke('usage:list'),

@@ -41,9 +41,9 @@ export const useAgentStore = defineStore('agent', () => {
   async function sendMessage(content: string, model = '', subagentId = '') {
     if (generating.value) return;
     if (!host) return;
-    // 空会话状态（无激活任务）直接发送：自动新建任务，避免静默吞掉输入
-    if (!sessionStore.activeSession) sessionStore.createSession();
-    const session = sessionStore.activeSession;
+    // 空会话状态（无激活任务）直接发送：首条消息才生成任务，避免静默吞掉输入
+    let session = sessionStore.activeSession;
+    if (!session) session = sessionStore.materializeSession();
     if (!session) return;
 
     const userMsg: Message = {

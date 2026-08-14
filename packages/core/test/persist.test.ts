@@ -6,8 +6,22 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import type { AssistantStep, Message, Session } from '@dscode/shared';
 import { defaultSettings, loadSettings, saveSettings } from '../src/persist/config';
 import type { SettingsCrypto } from '../src/persist/config';
-import { backfillSessions, initSessions, listSessions, upsertMessage, upsertSession } from '../src/persist/sessions';
-import { initProjects, listProjects, listProjectsWithHome, touchProject } from '../src/persist/projects';
+import {
+  backfillSessions,
+  initSessions,
+  listSessions,
+  setSessionArchived,
+  upsertMessage,
+  upsertSession
+} from '../src/persist/sessions';
+import {
+  initProjects,
+  listProjects,
+  listProjectsWithHome,
+  listRemovedProjects,
+  removeProject,
+  touchProject
+} from '../src/persist/projects';
 
 /**
  * persist 层单测：config（JSON 归一化 + 静态加密钩子）与 node:sqlite 的 sessions/projects 落库往返。
@@ -320,6 +334,47 @@ describe('sessions 持久化', () => {
     expect(listSessions(file)[0]?.workingDirectory).toBe('/new-ws');
   });
 
+  it('归档标记落库读回：upsert 携带 archived，缺省未归档', () => {
+    file = join(dir, 'archive-roundtrip.db');
+    initSessions(file);
+    upsertSession(file, makeSession('s1', '普通'));
+    upsertSession(file, { ...makeSession('s2', '已归档'), archived: true });
+    const list = listSessions(file);
+    expect(list.find(s => s.id === 's1')?.archived).toBe(false);
+    expect(list.find(s => s.id === 's2')?.archived).toBe(true);
+  });
+
+  it('setSessionArchived 归档/恢复，且 upsert 冲突更新不覆盖归档状态', () => {
+    file = join(dir, 'archive-toggle.db');
+    initSessions(file);
+    upsertSession(file, makeSession('s1', 'a'));
+    setSessionArchived(file, 's1', true);
+    expect(listSessions(file)[0]?.archived).toBe(true);
+    // 常规会话落库（title 更新）不应把归档状态改回去
+    upsertSession(file, { ...makeSession('s1', 'b'), archived: false });
+    expect(listSessions(file)[0]?.title).toBe('b');
+    expect(listSessions(file)[0]?.archived).toBe(true);
+    // 恢复
+    setSessionArchived(file, 's1', false);
+    expect(listSessions(file)[0]?.archived).toBe(false);
+  });
+
+  it('旧库无 archived 列时自动迁移并可归档', () => {
+    file = join(dir, 'archive-migrate.db');
+    // 按早期 schema 手工建库（sessions 无 archived 列）
+    const db = new DatabaseSync(file);
+    db.exec(
+      'CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL, ' +
+        "working_directory TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)"
+    );
+    db.close();
+    initSessions(file);
+    upsertSession(file, makeSession('s1', '旧会话'));
+    expect(listSessions(file)[0]?.archived).toBe(false);
+    setSessionArchived(file, 's1', true);
+    expect(listSessions(file)[0]?.archived).toBe(true);
+  });
+
   it('多库文件隔离（dbs map 按 file 区分）', () => {
     const file1 = join(dir, 'iso1.db');
     const file2 = join(dir, 'iso2.db');
@@ -374,10 +429,36 @@ describe('projects 持久化', () => {
     expect(listProjects(file)[0]?.name).toBe('project-name');
   });
 
-  it('listProjectsWithHome 附带 homeDir', () => {
+  it('removeProject 移出侧边栏：list 排除、removed 返回、touch 重新打开恢复', () => {
+    file = join(dir, 'remove.db');
+    initProjects(file);
+    touchProject(file, '/a/foo');
+    touchProject(file, '/b/bar');
+    removeProject(file, '/a/foo');
+    expect(listProjects(file).map(p => p.name)).toEqual(['bar']);
+    expect(listRemovedProjects(file).map(p => p.name)).toEqual(['foo']);
+    // 重新打开撤销移除
+    touchProject(file, '/a/foo');
+    expect(listProjects(file).map(p => p.name)).toEqual(['foo', 'bar']);
+    expect(listRemovedProjects(file)).toEqual([]);
+  });
+
+  it('removeProject 对不在最近表的项目补行记录移除状态', () => {
+    file = join(dir, 'remove-fallback.db');
+    initProjects(file);
+    removeProject(file, '/c/ghost');
+    expect(listProjects(file)).toEqual([]);
+    expect(listRemovedProjects(file).map(p => p.name)).toEqual(['ghost']);
+  });
+
+  it('listProjectsWithHome 附带 homeDir 与 removed 列表', () => {
     file = join(dir, 'home.db');
+    initProjects(file);
+    touchProject(file, '/a/foo');
+    removeProject(file, '/b/bar');
     const r = listProjectsWithHome(file, '/home/x');
     expect(r.homeDir).toBe('/home/x');
-    expect(r.projects).toEqual([]);
+    expect(r.projects.map(p => p.name)).toEqual(['foo']);
+    expect(r.removed.map(p => p.name)).toEqual(['bar']);
   });
 });

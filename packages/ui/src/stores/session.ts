@@ -31,6 +31,9 @@ export const useSessionStore = defineStore('session', () => {
 
   /** 最近工作空间（主进程最近项目表，侧边栏分组与输入卡项目菜单的同一数据源） */
   const recentWorkspaces = ref<Array<{ path: string; name: string; lastOpenedAt: number }>>([]);
+  /** 被「移除项目」移出的工作空间（任务保留，分组隐藏；重新打开项目后恢复） */
+  const removedWorkspaces = ref<Array<{ path: string; name: string; lastOpenedAt: number }>>([]);
+  const removedPaths = computed(() => new Set(removedWorkspaces.value.map(p => p.path)));
   /** 用户家目录（「不在项目中工作」的落点） */
   const homeDir = ref('');
 
@@ -39,6 +42,7 @@ export const useSessionStore = defineStore('session', () => {
     if (!host) return;
     const r = await host.listRecentProjects();
     recentWorkspaces.value = r.projects;
+    removedWorkspaces.value = r.removed;
     homeDir.value = r.homeDir;
   }
 
@@ -64,6 +68,7 @@ export const useSessionStore = defineStore('session', () => {
     const currentWd = useSettingsStore().settings.workingDirectory;
     const byWd = new Map<string, Session[]>();
     for (const s of filteredSessions.value) {
+      if (s.archived) continue;
       const key = s.workingDirectory || '';
       const list = byWd.get(key);
       if (list) list.push(s);
@@ -73,29 +78,96 @@ export const useSessionStore = defineStore('session', () => {
 
     const seen = new Set<string>();
     const groups: Array<{ path: string; name: string; sessions: Session[] }> = [];
-    // 当前工作空间置顶
-    seen.add(currentWd);
-    groups.push({
-      path: currentWd,
-      name: basename(currentWd),
-      sessions: byUpdated(byWd.get(currentWd) ?? [])
-    });
-    // 最近项目（所有选过的工作空间，即使无任务也显示）
+    // 当前工作空间置顶；被「移除项目」移出时与其他项目一致隐藏
+    if (!removedPaths.value.has(currentWd)) {
+      seen.add(currentWd);
+      groups.push({
+        path: currentWd,
+        name: basename(currentWd),
+        sessions: byUpdated(byWd.get(currentWd) ?? [])
+      });
+    }
+    // 最近项目（所有选过的工作空间，即使无任务也显示；已移除的除外）
     for (const rp of recentWorkspaces.value) {
-      if (seen.has(rp.path)) continue;
+      if (seen.has(rp.path) || removedPaths.value.has(rp.path)) continue;
       seen.add(rp.path);
       groups.push({ path: rp.path, name: rp.name, sessions: byUpdated(byWd.get(rp.path) ?? []) });
     }
-    // 兜底：有任务但不在最近项目里的工作空间
+    // 兜底：有任务但不在最近项目里的工作空间（已移除的除外）
     for (const [wd, list] of byWd) {
-      if (seen.has(wd)) continue;
+      if (seen.has(wd) || removedPaths.value.has(wd)) continue;
       groups.push({ path: wd, name: basename(wd), sessions: byUpdated(list) });
     }
     return groups;
   });
 
-  function select(id: string) {
-    activeSessionId.value = id;
+  /** 已归档任务（收进侧边栏底部「已归档」区；关键字搜索同样命中） */
+  const archivedSessions = computed(() => {
+    const k = keyword.value.trim().toLowerCase();
+    return sessions.value
+      .filter(s => s.archived && (!k || s.title.toLowerCase().includes(k)))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  });
+
+  /** 跨项目选择任务时待落定的目标任务（等 wd watcher 完成切换后再选中，避免被「切到最近任务」覆盖） */
+  let pendingSelectId: string | null = null;
+
+  /** 选中任务；任务属于其他工作空间时先切换工作空间（文件树/顶栏随之更新） */
+  async function select(id: string) {
+    const s = sessions.value.find(x => x.id === id);
+    if (!s) return;
+    const wd = useSettingsStore().settings.workingDirectory;
+    if (s.workingDirectory && s.workingDirectory !== wd) {
+      pendingSelectId = id;
+      await useSettingsStore().save({ workingDirectory: s.workingDirectory });
+    } else {
+      activeSessionId.value = id;
+    }
+  }
+
+  /** 从侧边栏移除项目（仅隐藏分组，任务保留；重新打开项目后恢复） */
+  async function removeWorkspace(path: string): Promise<void> {
+    if (host) {
+      try {
+        const r = await host.removeRecentProject(path);
+        if (!r.ok) return;
+      } catch (e) {
+        console.warn('[dscode] 移除项目异常', e);
+        return;
+      }
+    }
+    // 本地立即生效：分组从侧边栏隐藏（不影响当前会话聊天）
+    if (!removedPaths.value.has(path)) {
+      removedWorkspaces.value = [...removedWorkspaces.value, { path, name: basename(path), lastOpenedAt: Date.now() }];
+    }
+    // 移除的是当前打开的项目：工作目录归零到「不在项目中工作」（家目录），
+    // 避免该分组隐藏后新建任务落到看不见的组里
+    if (path && path === useSettingsStore().settings.workingDirectory && homeDir.value) {
+      await useSettingsStore().save({ workingDirectory: homeDir.value });
+    }
+    await refreshWorkspaces();
+  }
+
+  /** 归档/恢复任务；归档当前任务时切到该工作空间最近的非归档任务 */
+  async function setArchived(id: string, archived: boolean): Promise<void> {
+    const s = sessions.value.find(x => x.id === id);
+    if (!s) return;
+    s.archived = archived;
+    s.updatedAt = Date.now();
+    if (archived && activeSessionId.value === id) {
+      const next = sessions.value
+        .filter(x => !x.archived && x.workingDirectory === s.workingDirectory && x.id !== id)
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+      activeSessionId.value = next?.id ?? null;
+    }
+    if (host) {
+      try {
+        const r = await host.sessionSetArchived(id, archived);
+        if (!r.ok) console.warn('[dscode] 归档持久化失败', id);
+      } catch (e) {
+        console.warn('[dscode] 归档持久化异常', e);
+      }
+    }
   }
 
   /** 持久化会话行（IPC 结构化克隆不支持 Vue 响应式 Proxy，须传普通对象）；失败记录告警，不再静默吞掉 */
@@ -108,6 +180,7 @@ export const useSessionStore = defineStore('session', () => {
         workingDirectory: session.workingDirectory,
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
+        archived: session.archived ?? false,
         toolEvents: [],
         messages: []
       });
@@ -138,7 +211,15 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  /** 新建任务：回到新任务页（不创建会话行；真正对话时才生成任务） */
   function createSession() {
+    activeSessionId.value = null;
+    // 新建任务时收起右侧面板与终端，聚焦对话区
+    useUiStore().hideSidePanels();
+  }
+
+  /** 实际生成会话（首条消息发送时调用）：任务随对话出现，侧边栏立即可见 */
+  function materializeSession(): Session {
     const session: Session = {
       id: nextId('s'),
       title: '',
@@ -146,14 +227,16 @@ export const useSessionStore = defineStore('session', () => {
       workingDirectory: useSettingsStore().settings.workingDirectory,
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      archived: false,
       messages: [],
       toolEvents: []
     };
     sessions.value.unshift(session);
     activeSessionId.value = session.id;
-    // 新建任务时收起右侧面板与终端，聚焦对话区
+    // 收起右侧面板与终端，聚焦对话区
     useUiStore().hideSidePanels();
     void persistSession(session);
+    return session;
   }
 
   async function load(): Promise<void> {
@@ -161,23 +244,33 @@ export const useSessionStore = defineStore('session', () => {
     const [list, projects] = await Promise.all([host.sessionsList(), host.listRecentProjects()]);
     sessions.value = list;
     recentWorkspaces.value = projects.projects;
+    removedWorkspaces.value = projects.removed;
     homeDir.value = projects.homeDir;
-    // 选中当前工作空间最近的任务（与 wd watch 同一规则；settings 未加载时由 watch 接管）
+    // 选中当前工作空间最近的非归档任务（与 wd watch 同一规则；settings 未加载时由 watch 接管）
     const wd = useSettingsStore().settings.workingDirectory;
-    const inWd = list.filter(s => (s.workingDirectory || '') === wd).sort((a, b) => b.updatedAt - a.updatedAt);
+    const inWd = list
+      .filter(s => !s.archived && (s.workingDirectory || '') === wd)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
     activeSessionId.value = inWd[0]?.id ?? null;
   }
 
   void load();
 
-  // 工作目录变化：刷新最近工作空间 + 切到该工作空间最近的任务（无任务则空态）
+  // 工作目录变化：刷新最近工作空间 + 切到该工作空间最近的任务（无任务则空态）。
+  // 由「跨项目选择任务」触发时（pendingSelectId 非空），落定目标任务而非最近任务
   if (host) {
     watch(
       () => useSettingsStore().settings.workingDirectory,
       async wd => {
         await refreshWorkspaces();
+        if (pendingSelectId) {
+          const target = pendingSelectId;
+          pendingSelectId = null;
+          activeSessionId.value = target;
+          return;
+        }
         const list = sessions.value
-          .filter(s => (s.workingDirectory || '') === wd)
+          .filter(s => !s.archived && (s.workingDirectory || '') === wd)
           .sort((a, b) => b.updatedAt - a.updatedAt);
         activeSessionId.value = list[0]?.id ?? null;
       }
@@ -189,14 +282,19 @@ export const useSessionStore = defineStore('session', () => {
     activeSessionId,
     keyword,
     recentWorkspaces,
+    removedWorkspaces,
     homeDir,
     refreshWorkspaces,
     activeSession,
     hasMessage,
     filteredSessions,
     workspaceGroups,
+    archivedSessions,
     select,
     createSession,
+    materializeSession,
+    removeWorkspace,
+    setArchived,
     persistSession,
     persistMessage,
     load

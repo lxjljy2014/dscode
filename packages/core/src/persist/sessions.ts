@@ -21,7 +21,8 @@ function getDb(file: string): DatabaseSync {
         'title TEXT NOT NULL, ' +
         "working_directory TEXT NOT NULL DEFAULT '', " +
         'created_at INTEGER NOT NULL, ' +
-        'updated_at INTEGER NOT NULL)'
+        'updated_at INTEGER NOT NULL, ' +
+        'archived INTEGER NOT NULL DEFAULT 0)'
     );
     db.exec(
       'CREATE TABLE IF NOT EXISTS messages (' +
@@ -37,6 +38,10 @@ function getDb(file: string): DatabaseSync {
     const cols = db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>;
     if (!cols.some(c => c.name === 'working_directory')) {
       db.exec("ALTER TABLE sessions ADD COLUMN working_directory TEXT NOT NULL DEFAULT ''");
+    }
+    // 旧库迁移：早期表结构没有 archived 列（缺省未归档）
+    if (!cols.some(c => c.name === 'archived')) {
+      db.exec('ALTER TABLE sessions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0');
     }
     // 旧库迁移：早期表结构没有 steps 列（steps 为 NULL 时渲染端走正文兜底）
     const msgCols = db.prepare('PRAGMA table_info(messages)').all() as Array<{ name: string }>;
@@ -63,6 +68,7 @@ interface SessionRow {
   working_directory: string;
   created_at: number;
   updated_at: number;
+  archived: number;
 }
 
 interface MessageRow {
@@ -131,7 +137,7 @@ function parseSteps(steps: string | null): AssistantStep[] | undefined {
 /** 全部会话（按更新时间倒序，含消息，不持久化的 toolEvents 置空） */
 export function listSessions(file: string): Session[] {
   const rows = getDb(file)
-    .prepare('SELECT id, title, working_directory, created_at, updated_at FROM sessions ORDER BY updated_at DESC')
+    .prepare('SELECT id, title, working_directory, created_at, updated_at, archived FROM sessions ORDER BY updated_at DESC')
     .all() as unknown as SessionRow[];
   const messages = getDb(file)
     .prepare(
@@ -144,6 +150,7 @@ export function listSessions(file: string): Session[] {
     workingDirectory: r.working_directory,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    archived: r.archived === 1,
     toolEvents: [],
     messages: messages
       .filter(m => m.session_id === r.id)
@@ -161,14 +168,28 @@ export function listSessions(file: string): Session[] {
   }));
 }
 
-/** 新建/更新会话行 */
+/** 新建/更新会话行（归档状态只在 setSessionArchived 中变更，此处冲突更新不覆盖 archived） */
 export function upsertSession(file: string, session: Session): void {
   getDb(file)
     .prepare(
-      'INSERT INTO sessions (id, title, working_directory, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ' +
+      'INSERT INTO sessions (id, title, working_directory, created_at, updated_at, archived) VALUES (?, ?, ?, ?, ?, ?) ' +
         'ON CONFLICT(id) DO UPDATE SET title = excluded.title, working_directory = excluded.working_directory, updated_at = excluded.updated_at'
     )
-    .run(session.id, session.title, session.workingDirectory, session.createdAt, session.updatedAt);
+    .run(
+      session.id,
+      session.title,
+      session.workingDirectory,
+      session.createdAt,
+      session.updatedAt,
+      session.archived ? 1 : 0
+    );
+}
+
+/** 归档/恢复会话（同步刷新 updated_at，作为归档时间的排序依据） */
+export function setSessionArchived(file: string, sessionId: string, archived: boolean): void {
+  getDb(file)
+    .prepare('UPDATE sessions SET archived = ?, updated_at = ? WHERE id = ?')
+    .run(archived ? 1 : 0, Date.now(), sessionId);
 }
 
 /** 追加一条消息（幂等：同 id 覆盖；steps 随消息以 JSON 落库） */

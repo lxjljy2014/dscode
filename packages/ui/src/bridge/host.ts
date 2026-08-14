@@ -45,6 +45,7 @@ export interface HostApi {
 
   // ---- 最近项目 / 目录选择 ----
   listRecentProjects: () => Promise<ProjectsListResult>;
+  removeRecentProject: (path: string) => Promise<{ ok: boolean }>;
   pickDirectory: () => Promise<string | null>;
 
   // ---- 供应商校验 ----
@@ -70,6 +71,8 @@ export interface HostApi {
   sessionsList: () => Promise<Session[]>;
   sessionsCreate: (session: Session) => Promise<{ ok: boolean }>;
   sessionsAppend: (sessionId: string, message: Message) => Promise<{ ok: boolean }>;
+  /** 归档/恢复会话（archived=true 归档；false 恢复） */
+  sessionSetArchived: (sessionId: string, archived: boolean) => Promise<{ ok: boolean }>;
 
   // ---- 使用统计 ----
   usageList: () => Promise<UsageRecord[]>;

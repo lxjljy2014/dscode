@@ -10,7 +10,15 @@
   },
   "sidebar": {
     "project": "Projects",
-    "more": "More"
+    "more": "More",
+    "archived": "Archived",
+    "removeProject": "Remove project",
+    "archiveTask": "Archive task",
+    "unarchiveTask": "Unarchive",
+    "emptyArchived": "No archived tasks",
+    "removed": "Project removed",
+    "archivedDone": "Task archived",
+    "restored": "Task restored"
   },
   "session": {
     "new": "New task",
