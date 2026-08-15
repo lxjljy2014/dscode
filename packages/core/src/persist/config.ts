@@ -43,7 +43,14 @@ function isProviderConfig(v: unknown): v is ProviderConfig {
     typeof p['apiKey'] === 'string' &&
     Array.isArray(p['models']) &&
     p['models'].every(m => typeof m === 'string') &&
-    (p['adapter'] === undefined || typeof p['adapter'] === 'string')
+    (p['adapter'] === undefined || typeof p['adapter'] === 'string') &&
+    (p['thinking'] === undefined || typeof p['thinking'] === 'boolean') &&
+    (p['reasoningEffort'] === undefined ||
+      p['reasoningEffort'] === 'off' ||
+      p['reasoningEffort'] === 'high' ||
+      p['reasoningEffort'] === 'max') &&
+    (p['maxTokens'] === undefined ||
+      (typeof p['maxTokens'] === 'number' && Number.isFinite(p['maxTokens']) && p['maxTokens'] > 0))
   );
 }
 
@@ -130,7 +137,9 @@ function normalizeProviders(providers: ProviderConfig[]): ProviderConfig[] {
           ...p,
           // 模型列表以用户配置为准；仅空列表回退预置（首次创建/旧数据缺省兜底，之后允许自定义）
           models: p.models.length > 0 ? p.models : DEEPSEEK_PRESET.models,
-          adapter: p.adapter ?? DEEPSEEK_PRESET.adapter
+          adapter: p.adapter ?? DEEPSEEK_PRESET.adapter,
+          // 输出上限对齐官方默认 256K；旧数据缺省自动补齐（用户显式配置的值保留）
+          maxTokens: p.maxTokens ?? DEEPSEEK_PRESET.maxTokens
         }
       : p
   );

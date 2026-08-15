@@ -22,6 +22,15 @@ export interface ProviderConfig {
   models: string[];
   /** 模型适配器 id（对应 @dscode/core adapters 注册表；缺省回退 openai-compatible） */
   adapter?: string;
+  /**
+   * 推理模式（DeepSeek thinking）：true=显式 thinking enabled，false=显式 disabled，缺省跟随供应商默认。
+   * 与 reasoningEffort 的交互对齐官方 harness：off 强制 disabled，high/max 强制 enabled。
+   */
+  thinking?: boolean;
+  /** 推理档位：off / high / max（DeepSeek reasoning_effort）；缺省跟随供应商默认 */
+  reasoningEffort?: 'off' | 'high' | 'max';
+  /** 单请求输出上限（tokens）；缺省不发（供应商默认）；DeepSeek 预置对齐官方 256K */
+  maxTokens?: number;
 }
 
 /** 用户自定义斜杠命令（/name 展开为 prompt） */
@@ -118,7 +127,9 @@ export const DEEPSEEK_PRESET: ProviderConfig = {
   baseUrl: 'https://api.deepseek.com',
   apiKey: '',
   models: ['deepseek-v4-pro', 'deepseek-v4-flash'],
-  adapter: 'deepseek'
+  adapter: 'deepseek',
+  // 对齐官方 harness 默认输出上限（v4 系列 256K，避免供应商默认过低限制长输出）
+  maxTokens: 256000
 };
 
 /** 内置默认子智能体：首次启动（无自定义）时预置 */

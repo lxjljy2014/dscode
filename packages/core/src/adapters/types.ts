@@ -39,6 +39,12 @@ export interface ChatRequestInput {
   messages: unknown[];
   /** 工具 schema 数组（调用方提供，适配器原样放入请求体） */
   tools: unknown[];
+  /** 推理模式（DeepSeek thinking）：true=thinking enabled，false=disabled，缺省不发（供应商默认） */
+  thinking?: boolean;
+  /** 推理档位（DeepSeek reasoning_effort）：off/high/max；off 强制 thinking disabled，high/max 强制 enabled */
+  reasoningEffort?: 'off' | 'high' | 'max';
+  /** 单请求输出上限（tokens）；缺省不发（供应商默认） */
+  maxTokens?: number;
 }
 
 /** 构造完成的 HTTP 请求 */

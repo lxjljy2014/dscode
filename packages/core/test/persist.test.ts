@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { AssistantStep, Message, Session } from '@dscode/shared';
+import type { AssistantStep, Message, ProviderConfig, Session } from '@dscode/shared';
 import { defaultSettings, loadSettings, saveSettings } from '../src/persist/config';
 import type { SettingsCrypto } from '../src/persist/config';
 import {
@@ -93,19 +93,63 @@ describe('config 持久化', () => {
 
   it('deepseek 供应商 adapter 兜底、模型列表保留用户配置（空列表回退预置）', () => {
     const empty = saveSettings(file, home, {
-      providers: [
-        { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', apiKey: '', models: [] }
-      ]
+      providers: [{ id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', apiKey: '', models: [] }]
     });
     expect(empty.providers[0]?.models).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash']);
     expect(empty.providers[0]?.adapter).toBe('deepseek');
 
     const custom = saveSettings(file, home, {
       providers: [
-        { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', apiKey: '', models: ['deepseek-reasoner'] }
+        {
+          id: 'deepseek',
+          name: 'DeepSeek',
+          baseUrl: 'https://api.deepseek.com',
+          apiKey: '',
+          models: ['deepseek-reasoner']
+        }
       ]
     });
     expect(custom.providers[0]?.models).toEqual(['deepseek-reasoner']);
+  });
+
+  it('供应商推理/输出字段（thinking/reasoningEffort/maxTokens）落库读回', () => {
+    saveSettings(file, home, {
+      providers: [
+        {
+          id: 'p',
+          name: 'P',
+          baseUrl: 'https://x',
+          apiKey: 'k',
+          models: ['m1'],
+          thinking: false,
+          reasoningEffort: 'high',
+          maxTokens: 256000
+        }
+      ]
+    });
+    const loaded = loadSettings(file, home);
+    expect(loaded.providers[0]?.thinking).toBe(false);
+    expect(loaded.providers[0]?.reasoningEffort).toBe('high');
+    expect(loaded.providers[0]?.maxTokens).toBe(256000);
+  });
+
+  it('供应商非法推理字段回退（畸形供应商整条被过滤）', () => {
+    saveSettings(file, home, {
+      providers: [
+        {
+          id: 'p',
+          name: 'P',
+          baseUrl: 'https://x',
+          apiKey: 'k',
+          models: ['m1'],
+          thinking: 'yes',
+          reasoningEffort: 'ultra',
+          maxTokens: -5
+        } as unknown as ProviderConfig
+      ]
+    });
+    const loaded = loadSettings(file, home);
+    expect(loaded.providers).toHaveLength(0);
   });
 
   it('commands 落库读回并过滤非法项', () => {
@@ -250,7 +294,17 @@ describe('sessions 持久化', () => {
     const steps: AssistantStep[] = [
       { kind: 'reasoning', content: '先看看文件结构' },
       { kind: 'tool', event: { id: 'e1', name: 'read_file', args: '{"path":"a.ts"}', status: 'done', createdAt: 1 } },
-      { kind: 'tool', event: { id: 'e2', name: 'write_file', args: '{"path":"b.ts"}', status: 'done', summary: '已写入', createdAt: 2 } },
+      {
+        kind: 'tool',
+        event: {
+          id: 'e2',
+          name: 'write_file',
+          args: '{"path":"b.ts"}',
+          status: 'done',
+          summary: '已写入',
+          createdAt: 2
+        }
+      },
       { kind: 'text', content: '已完成' }
     ];
     upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: '已完成', steps, createdAt: 3 });
@@ -272,8 +326,21 @@ describe('sessions 持久化', () => {
     initSessions(file);
     upsertSession(file, makeSession('s1', 'a'));
     const steps: AssistantStep[] = [
-      { kind: 'tool', event: { id: 'e1', name: 'run_command', args: '{"command":"x"}', status: 'running', createdAt: 1 } },
-      { kind: 'tool', event: { id: 'e2', name: 'edit_file', args: '{"path":"y"}', status: 'confirming', error: '用户未响应', createdAt: 2 } }
+      {
+        kind: 'tool',
+        event: { id: 'e1', name: 'run_command', args: '{"command":"x"}', status: 'running', createdAt: 1 }
+      },
+      {
+        kind: 'tool',
+        event: {
+          id: 'e2',
+          name: 'edit_file',
+          args: '{"path":"y"}',
+          status: 'confirming',
+          error: '用户未响应',
+          createdAt: 2
+        }
+      }
     ];
     upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: '', steps, createdAt: 3 });
     const msg = listSessions(file)[0]?.messages[0];
@@ -341,7 +408,13 @@ describe('sessions 持久化', () => {
     initSessions(file);
     upsertSession(file, makeSession('s1', 'a'));
     // 中断场景：无 token 用量
-    upsertMessage(file, 's1', { id: 'm1', role: 'assistant', content: 'x', stats: { startAt: 1, endAt: 900 }, createdAt: 1 });
+    upsertMessage(file, 's1', {
+      id: 'm1',
+      role: 'assistant',
+      content: 'x',
+      stats: { startAt: 1, endAt: 900 },
+      createdAt: 1
+    });
     const msg = listSessions(file)[0]?.messages[0];
     expect(msg?.stats).toEqual({ startAt: 1, endAt: 900 });
   });

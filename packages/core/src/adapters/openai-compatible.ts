@@ -50,12 +50,25 @@ export function parseOpenAiDelta(parsed: unknown): NormalizedDelta | undefined {
   return out;
 }
 
+/**
+ * DeepSeek 推理语义（对齐官方 harness serialize.ts 的 resolveThinking）：
+ * - effort off → thinking disabled（reasoning_effort 不上线，模型不推理）
+ * - effort high/max → thinking enabled + reasoning_effort
+ * - 显式 thinking 值直接生效；均缺省时什么都不发（跟随供应商默认）
+ */
+function resolveThinking(input: ChatRequestInput): 'enabled' | 'disabled' | undefined {
+  if (input.reasoningEffort === 'off') return 'disabled';
+  if (input.reasoningEffort === 'high' || input.reasoningEffort === 'max') return 'enabled';
+  return input.thinking === undefined ? undefined : input.thinking ? 'enabled' : 'disabled';
+}
+
 /** 默认适配器：OpenAI 兼容协议（POST {baseUrl}/chat/completions，SSE 流式） */
 export const openAiCompatibleAdapter: ModelAdapter = {
   id: 'openai-compatible',
   createChatRequest(input: ChatRequestInput): ChatRequest {
     const url = new URL(input.baseUrl);
     url.pathname = url.pathname.replace(/\/+$/, '') + '/chat/completions';
+    const thinking = resolveThinking(input);
     return {
       url: url.toString(),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${input.apiKey}` },
@@ -65,7 +78,13 @@ export const openAiCompatibleAdapter: ModelAdapter = {
         tools: input.tools,
         stream: true,
         // 流式默认不返回 usage，需显式请求；流末尾会带 usage 帧供用量统计
-        stream_options: { include_usage: true }
+        stream_options: { include_usage: true },
+        // DeepSeek 推理模式与输出上限（对齐官方默认；未配置时省略，供应商默认生效）
+        ...(input.maxTokens !== undefined ? { max_tokens: input.maxTokens } : {}),
+        ...(thinking !== undefined ? { thinking: { type: thinking } } : {}),
+        ...(input.reasoningEffort === 'high' || input.reasoningEffort === 'max'
+          ? { reasoning_effort: input.reasoningEffort }
+          : {})
       })
     };
   },

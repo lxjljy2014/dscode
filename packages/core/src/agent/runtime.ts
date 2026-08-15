@@ -81,6 +81,14 @@ export interface AgentStartInput {
     browsingEnabled?: boolean;
     /** LLM 回复缓存（省成本；命中时重放缓存响应，不调 API） */
     llmCache?: LlmCache;
+    /**
+     * DeepSeek 推理模式覆盖（缺省读第一个 provider 的配置）：
+     * true=thinking enabled，false=disabled，undefined=跟随 provider/供应商默认
+     */
+    thinking?: boolean;
+    reasoningEffort?: 'off' | 'high' | 'max';
+    /** 单请求输出上限（tokens）；缺省读 provider.maxTokens，再缺省不发 */
+    maxTokens?: number;
   };
 }
 
@@ -164,7 +172,14 @@ export class AgentRuntime {
       sessionId,
       config.workingDirectory,
       config.permissionMode,
-      { baseUrl: provider.baseUrl, apiKey: provider.apiKey, adapter: provider.adapter },
+      {
+        baseUrl: provider.baseUrl,
+        apiKey: provider.apiKey,
+        adapter: provider.adapter,
+        thinking: config.thinking ?? provider.thinking,
+        reasoningEffort: config.reasoningEffort ?? provider.reasoningEffort,
+        maxTokens: config.maxTokens ?? provider.maxTokens
+      },
       resolvedModel,
       context,
       config.browsingEnabled !== false,
@@ -190,7 +205,14 @@ export class AgentRuntime {
     sessionId: string,
     cwd: string,
     permissionMode: PermissionMode,
-    provider: { baseUrl: string; apiKey: string; adapter?: string },
+    provider: {
+      baseUrl: string;
+      apiKey: string;
+      adapter?: string;
+      thinking?: boolean;
+      reasoningEffort?: 'off' | 'high' | 'max';
+      maxTokens?: number;
+    },
     model: string,
     messages: unknown[],
     browsingEnabled: boolean,
@@ -221,7 +243,16 @@ export class AgentRuntime {
           let reasoningBuf = '';
           const res = await streamChat(
             resolveAdapter(provider.adapter),
-            { baseUrl: provider.baseUrl, apiKey: provider.apiKey, model, messages, tools },
+            {
+              baseUrl: provider.baseUrl,
+              apiKey: provider.apiKey,
+              model,
+              messages,
+              tools,
+              thinking: provider.thinking,
+              reasoningEffort: provider.reasoningEffort,
+              maxTokens: provider.maxTokens
+            },
             combined,
             text => {
               if (firstTokenMs === null && text.length > 0) firstTokenMs = Date.now() - roundStart;

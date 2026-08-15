@@ -11,11 +11,20 @@ const settingsStore = useSettingsStore();
 const providers = ref<ProviderConfig[]>([]);
 const showKey = ref<Record<string, boolean>>({});
 const newModel = ref<Record<string, string>>({});
+// 推理/输出本地编辑态（select 用字符串表达三态，保存时映射回 boolean/undefined）
+const thinkingSel = ref<Record<string, string>>({});
+const effortSel = ref<Record<string, string>>({});
+const maxTokensSel = ref<Record<string, string>>({});
 
 watch(
   () => settingsStore.settings.providers,
   list => {
     providers.value = list.map(p => ({ ...p, models: [...p.models] }));
+    for (const p of list) {
+      thinkingSel.value[p.id] = p.thinking === undefined ? 'auto' : p.thinking ? 'enabled' : 'disabled';
+      effortSel.value[p.id] = p.reasoningEffort ?? 'auto';
+      maxTokensSel.value[p.id] = p.maxTokens !== undefined ? String(p.maxTokens) : '';
+    }
   },
   { immediate: true, deep: true }
 );
@@ -37,7 +46,20 @@ function removeModel(p: ProviderConfig, name: string) {
 
 async function save() {
   await settingsStore.save({
-    providers: providers.value.map(p => ({ ...p, models: [...p.models], apiKey: p.apiKey.trim() }))
+    providers: providers.value.map(p => {
+      const next: ProviderConfig = { ...p, models: [...p.models], apiKey: p.apiKey.trim() };
+      const th = thinkingSel.value[p.id];
+      if (th === 'enabled') next.thinking = true;
+      else if (th === 'disabled') next.thinking = false;
+      else delete next.thinking;
+      const e = effortSel.value[p.id];
+      if (e === 'off' || e === 'high' || e === 'max') next.reasoningEffort = e;
+      else delete next.reasoningEffort;
+      const mt = (maxTokensSel.value[p.id] ?? '').trim();
+      if (mt !== '' && Number(mt) > 0) next.maxTokens = Number(mt);
+      else delete next.maxTokens;
+      return next;
+    })
   });
 }
 </script>
@@ -62,10 +84,54 @@ async function save() {
           :type="showKey[p.id] ? 'text' : 'password'"
           :placeholder="t('onboarding.apiKeyPlaceholder')"
           :append-inner-icon="showKey[p.id] ? 'i-lucide:eye-off' : 'i-lucide:eye'"
-          density="compact" variant="outlined"
+          density="compact"
+          variant="outlined"
           hide-details
           @click:append-inner="toggleKey(p.id)"
         />
+      </div>
+
+      <div class="mt-3.5 border-t border-line pt-3.5">
+        <div class="mb-2 text-sm font-medium">{{ t('settingsPage.model.thinkingLabel') }}</div>
+        <div class="text-xs leading-5 text-muted">{{ t('settingsPage.model.thinkingHint') }}</div>
+        <div class="mt-2 flex flex-wrap items-center gap-3">
+          <VSelect
+            v-model="thinkingSel[p.id]"
+            :items="[
+              { title: t('settingsPage.model.thinkingAuto'), value: 'auto' },
+              { title: t('settingsPage.model.thinkingEnabled'), value: 'enabled' },
+              { title: t('settingsPage.model.thinkingDisabled'), value: 'disabled' }
+            ]"
+            density="compact"
+            variant="outlined"
+            hide-details
+            class="min-w-36 max-w-44"
+          />
+          <VSelect
+            v-model="effortSel[p.id]"
+            :items="[
+              { title: t('settingsPage.model.effortAuto'), value: 'auto' },
+              { title: t('settingsPage.model.effortOff'), value: 'off' },
+              { title: t('settingsPage.model.effortHigh'), value: 'high' },
+              { title: t('settingsPage.model.effortMax'), value: 'max' }
+            ]"
+            density="compact"
+            variant="outlined"
+            hide-details
+            class="min-w-36 max-w-44"
+          />
+          <VTextField
+            v-model="maxTokensSel[p.id]"
+            type="number"
+            density="compact"
+            variant="outlined"
+            hide-details
+            :label="t('settingsPage.model.maxTokensLabel')"
+            :hint="t('settingsPage.model.maxTokensHint')"
+            persistent-hint
+            class="max-w-56"
+          />
+        </div>
       </div>
 
       <div class="mt-3.5 border-t border-line pt-3.5">
@@ -78,7 +144,8 @@ async function save() {
         <div class="mt-2 flex items-center gap-2">
           <VTextField
             v-model="newModel[p.id]"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             :placeholder="t('settingsPage.model.modelPlaceholder')"
             hide-details
             class="flex-1"
@@ -91,10 +158,7 @@ async function save() {
       </div>
     </VCard>
 
-    <div
-      v-if="!providers.length"
-      class="flex flex-col items-center justify-center gap-2 py-16 text-faint select-none"
-    >
+    <div v-if="!providers.length" class="flex flex-col items-center justify-center gap-2 py-16 text-faint select-none">
       <span class="i-lucide:server text-8" />
       <div class="text-sm">{{ t('settingsPage.model.empty') }}</div>
     </div>

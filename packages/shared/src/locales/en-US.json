@@ -250,7 +250,19 @@
       "apiKey": "API Key",
       "models": "Models",
       "addModel": "Add model",
-      "modelPlaceholder": "Model id, e.g. deepseek-reasoner"
+      "modelPlaceholder": "Model id, e.g. deepseek-reasoner",
+      "thinkingLabel": "Thinking mode (DeepSeek)",
+      "thinkingHint": "Effort off forces thinking disabled; high/max forces it enabled with an effort.",
+      "thinkingAuto": "Provider default",
+      "thinkingEnabled": "Enabled",
+      "thinkingDisabled": "Disabled",
+      "effortLabel": "Reasoning effort",
+      "effortAuto": "Provider default",
+      "effortOff": "Off (no thinking)",
+      "effortHigh": "High",
+      "effortMax": "Max",
+      "maxTokensLabel": "Max output tokens",
+      "maxTokensHint": "Clear to restore the 256K default (aligned with official)"
     },
     "commands": {
       "desc": "Custom slash commands: typing /name expands into a prompt.",

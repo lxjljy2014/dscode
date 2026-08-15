@@ -250,7 +250,19 @@
       "apiKey": "API Key",
       "models": "模型列表",
       "addModel": "添加模型",
-      "modelPlaceholder": "模型标识，如 deepseek-reasoner"
+      "modelPlaceholder": "模型标识，如 deepseek-reasoner",
+      "thinkingLabel": "推理模式（DeepSeek thinking）",
+      "thinkingHint": "off 档位会强制关闭推理；high/max 强制开启并附带推理档位。",
+      "thinkingAuto": "跟随默认",
+      "thinkingEnabled": "开启",
+      "thinkingDisabled": "关闭",
+      "effortLabel": "推理档位",
+      "effortAuto": "跟随默认",
+      "effortOff": "关闭（不推理）",
+      "effortHigh": "High",
+      "effortMax": "Max",
+      "maxTokensLabel": "输出上限（tokens）",
+      "maxTokensHint": "清空恢复默认 256K（对齐官方）"
     },
     "commands": {
       "desc": "自定义斜杠命令：在输入框输入 /名称 可展开为提示词。",
