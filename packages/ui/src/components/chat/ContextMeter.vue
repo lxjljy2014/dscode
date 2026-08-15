@@ -60,12 +60,12 @@ const tooltip = computed(() => {
       <VProgressCircular
         v-bind="tipProps"
         :model-value="percent"
-        :size="26"
-        :width="2.5"
+        :size="20"
+        :width="2"
         :color="color"
         class="mx-1 shrink-0"
       >
-        <span class="text-[9px] font-medium text-muted">{{ percent }}%</span>
+        <span class="text-[8px] font-medium text-muted">{{ percent }}%</span>
       </VProgressCircular>
     </template>
   </VTooltip>
