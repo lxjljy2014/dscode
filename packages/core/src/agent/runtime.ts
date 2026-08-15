@@ -241,11 +241,12 @@ export class AgentRuntime {
           const cached = await llmCache.get(key);
           if (cached) {
             cacheHit = true;
+            // 命中不调用 API：节省量记入缓存统计，但真实用量为 0（不上报虚高的 tokens）
             await llmCache.recordHit(model, cached.promptTokens, cached.completionTokens);
             if (cached.reasoning) sink.delta(sessionId, 'reasoning', cached.reasoning);
             if (cached.content) sink.delta(sessionId, 'content', cached.content);
             toolCalls = cached.toolCalls;
-            usage = { promptTokens: cached.promptTokens, completionTokens: cached.completionTokens };
+            usage = undefined;
           } else {
             await llmCache.recordMiss(model);
             const res = await requestOnce();
