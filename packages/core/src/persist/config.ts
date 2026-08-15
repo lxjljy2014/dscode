@@ -50,7 +50,9 @@ function isProviderConfig(v: unknown): v is ProviderConfig {
       p['reasoningEffort'] === 'high' ||
       p['reasoningEffort'] === 'max') &&
     (p['maxTokens'] === undefined ||
-      (typeof p['maxTokens'] === 'number' && Number.isFinite(p['maxTokens']) && p['maxTokens'] > 0))
+      (typeof p['maxTokens'] === 'number' && Number.isFinite(p['maxTokens']) && p['maxTokens'] > 0)) &&
+    (p['contextWindow'] === undefined ||
+      (typeof p['contextWindow'] === 'number' && Number.isFinite(p['contextWindow']) && p['contextWindow'] > 0))
   );
 }
 
@@ -139,7 +141,9 @@ function normalizeProviders(providers: ProviderConfig[]): ProviderConfig[] {
           models: p.models.length > 0 ? p.models : DEEPSEEK_PRESET.models,
           adapter: p.adapter ?? DEEPSEEK_PRESET.adapter,
           // 输出上限对齐官方默认 256K；旧数据缺省自动补齐（用户显式配置的值保留）
-          maxTokens: p.maxTokens ?? DEEPSEEK_PRESET.maxTokens
+          maxTokens: p.maxTokens ?? DEEPSEEK_PRESET.maxTokens,
+          // 上下文窗口对齐官方默认 1M；旧数据缺省自动补齐
+          contextWindow: p.contextWindow ?? DEEPSEEK_PRESET.contextWindow
         }
       : p
   );

@@ -50,6 +50,7 @@
       "llm": "LLM",
       "tool": "工具调用",
       "firstToken": "首 token 平均",
+      "context": "上下文 {percent}%（{used}/{total}）",
       "cacheHit": "缓存命中",
       "input": "输入",
       "output": "输出",
@@ -262,7 +263,9 @@
       "effortHigh": "High",
       "effortMax": "Max",
       "maxTokensLabel": "输出上限（tokens）",
-      "maxTokensHint": "清空恢复默认 256K（对齐官方）"
+      "maxTokensHint": "清空恢复默认 256K（对齐官方）",
+      "contextWindowLabel": "上下文窗口（tokens）",
+      "contextWindowHint": "清空恢复默认 1M（对齐官方）；用于上下文占用展示"
     },
     "commands": {
       "desc": "自定义斜杠命令：在输入框输入 /名称 可展开为提示词。",

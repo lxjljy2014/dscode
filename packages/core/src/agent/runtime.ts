@@ -323,6 +323,9 @@ export class AgentRuntime {
         // 前缀缓存（API 侧 context caching）：cached 部分打折计费，未命中部分全价
         s.cacheHitTokens += usage?.cachedPromptTokens ?? 0;
         s.cacheMissTokens += (usage?.promptTokens ?? 0) - (usage?.cachedPromptTokens ?? 0);
+        // 当前上下文占用：最近一轮请求的完整 prompt 大小（含缓存命中，与官方 pressureTokens 语义一致）；
+        // 缓存命中轮不调 API（usage 缺省），上下文未变，沿用上轮值
+        if (usage) s.contextTokens = usage.promptTokens;
         if (cacheHit) s.cacheHits += 1;
         else s.cacheMisses += 1;
         if (toolCalls.length === 0) {

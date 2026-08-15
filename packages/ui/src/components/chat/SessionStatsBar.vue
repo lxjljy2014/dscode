@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAgentStore } from '../../stores/agent';
 import { useSessionStore } from '../../stores/session';
+import { useSettingsStore } from '../../stores/settings';
 
 /**
  * 会话统计条（仿 Claude Code）：输入卡片下方一行 `|` 分隔的指标。
@@ -12,6 +13,7 @@ import { useSessionStore } from '../../stores/session';
 const { t } = useI18n();
 const agentStore = useAgentStore();
 const sessionStore = useSessionStore();
+const settingsStore = useSettingsStore();
 
 const stats = computed(() => agentStore.sessionStats);
 
@@ -70,6 +72,19 @@ const cacheRate = computed(() => {
   if (!st || total === 0) return null;
   return `${Math.round((st.cacheHitTokens / total) * 100)}%`;
 });
+
+/** 上下文窗口（tokens）：第一个供应商的配置，缺省对齐官方 1M */
+const contextWindow = computed(() => {
+  const w = settingsStore.settings.providers[0]?.contextWindow;
+  return typeof w === 'number' && w > 0 ? w : 1000000;
+});
+
+/** 上下文占用百分比：最近请求 prompt（含缓存命中）/ 上下文窗口，与官方 pressureTokens 语义一致 */
+const contextPercent = computed(() => {
+  const st = stats.value;
+  if (!st?.contextTokens || st.contextTokens <= 0) return null;
+  return Math.min(100, Math.round((st.contextTokens / contextWindow.value) * 100));
+});
 </script>
 
 <template>
@@ -86,6 +101,18 @@ const cacheRate = computed(() => {
     <template v-if="firstTokenAvg || tokPerSec">
       <span class="text-faint" aria-hidden="true">|</span>
       <span>{{ t('chat.sessionStats.firstToken') }} {{ firstTokenAvg ?? '—' }} · {{ tokPerSec ?? '—' }}</span>
+    </template>
+    <template v-if="contextPercent !== null && contextPercent !== undefined">
+      <span class="text-faint" aria-hidden="true">|</span>
+      <span>
+        {{
+          t('chat.sessionStats.context', {
+            percent: contextPercent,
+            used: formatTokens(stats.contextTokens ?? 0),
+            total: formatTokens(contextWindow)
+          })
+        }}
+      </span>
     </template>
     <template v-if="cacheRate">
       <span class="text-faint" aria-hidden="true">|</span>

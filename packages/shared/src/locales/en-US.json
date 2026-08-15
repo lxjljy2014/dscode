@@ -50,6 +50,7 @@
       "llm": "LLM",
       "tool": "Tool calls",
       "firstToken": "First token avg",
+      "context": "Context {percent}% ({used}/{total})",
       "cacheHit": "Cache hits",
       "input": "In",
       "output": "Out",
@@ -262,7 +263,9 @@
       "effortHigh": "High",
       "effortMax": "Max",
       "maxTokensLabel": "Max output tokens",
-      "maxTokensHint": "Clear to restore the 256K default (aligned with official)"
+      "maxTokensHint": "Clear to restore the 256K default (aligned with official)",
+      "contextWindowLabel": "Context window (tokens)",
+      "contextWindowHint": "Clear to restore the 1M default (aligned with official); used for context occupancy"
     },
     "commands": {
       "desc": "Custom slash commands: typing /name expands into a prompt.",

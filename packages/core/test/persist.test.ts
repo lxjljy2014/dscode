@@ -123,7 +123,8 @@ describe('config 持久化', () => {
           models: ['m1'],
           thinking: false,
           reasoningEffort: 'high',
-          maxTokens: 256000
+          maxTokens: 256000,
+          contextWindow: 1000000
         }
       ]
     });
@@ -131,6 +132,7 @@ describe('config 持久化', () => {
     expect(loaded.providers[0]?.thinking).toBe(false);
     expect(loaded.providers[0]?.reasoningEffort).toBe('high');
     expect(loaded.providers[0]?.maxTokens).toBe(256000);
+    expect(loaded.providers[0]?.contextWindow).toBe(1000000);
   });
 
   it('供应商非法推理字段回退（畸形供应商整条被过滤）', () => {

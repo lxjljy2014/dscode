@@ -33,6 +33,8 @@ export interface SessionStats {
   cacheHitTokens: number;
   /** 未命中缓存的 prompt token 数 */
   cacheMissTokens: number;
+  /** 当前上下文占用（tokens）：最近一轮请求的完整 prompt 大小（含缓存命中；缓存命中轮沿用上轮值） */
+  contextTokens?: number;
 }
 
 /** LLM 回复缓存统计（使用统计版块展示命中率与节省量） */

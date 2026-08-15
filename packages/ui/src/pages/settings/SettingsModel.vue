@@ -15,6 +15,7 @@ const newModel = ref<Record<string, string>>({});
 const thinkingSel = ref<Record<string, string>>({});
 const effortSel = ref<Record<string, string>>({});
 const maxTokensSel = ref<Record<string, string>>({});
+const contextWinSel = ref<Record<string, string>>({});
 
 watch(
   () => settingsStore.settings.providers,
@@ -24,6 +25,7 @@ watch(
       thinkingSel.value[p.id] = p.thinking === undefined ? 'auto' : p.thinking ? 'enabled' : 'disabled';
       effortSel.value[p.id] = p.reasoningEffort ?? 'auto';
       maxTokensSel.value[p.id] = p.maxTokens !== undefined ? String(p.maxTokens) : '';
+      contextWinSel.value[p.id] = p.contextWindow !== undefined ? String(p.contextWindow) : '';
     }
   },
   { immediate: true, deep: true }
@@ -58,6 +60,9 @@ async function save() {
       const mt = (maxTokensSel.value[p.id] ?? '').trim();
       if (mt !== '' && Number(mt) > 0) next.maxTokens = Number(mt);
       else delete next.maxTokens;
+      const cw = (contextWinSel.value[p.id] ?? '').trim();
+      if (cw !== '' && Number(cw) > 0) next.contextWindow = Number(cw);
+      else delete next.contextWindow;
       return next;
     })
   });
@@ -128,6 +133,17 @@ async function save() {
             hide-details
             :label="t('settingsPage.model.maxTokensLabel')"
             :hint="t('settingsPage.model.maxTokensHint')"
+            persistent-hint
+            class="max-w-56"
+          />
+          <VTextField
+            v-model="contextWinSel[p.id]"
+            type="number"
+            density="compact"
+            variant="outlined"
+            hide-details
+            :label="t('settingsPage.model.contextWindowLabel')"
+            :hint="t('settingsPage.model.contextWindowHint')"
             persistent-hint
             class="max-w-56"
           />
