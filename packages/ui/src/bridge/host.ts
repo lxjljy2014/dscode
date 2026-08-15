@@ -20,6 +20,7 @@ import type {
   ProjectsListResult,
   ProviderVerifyResult,
   Session,
+  SessionStats,
   SettingsPatch,
   TerminalDataEvent,
   TerminalEnsureResult,
@@ -68,6 +69,8 @@ export interface HostApi {
   onAgentTool: (cb: (ev: { sessionId: string; event: AgentToolEvent }) => void) => () => void;
   onAgentConfirm: (cb: (ev: AgentConfirmRequest) => void) => () => void;
   onAgentDone: (cb: (ev: { sessionId: string }) => void) => () => void;
+  /** 订阅会话级运行统计（输入卡片下方统计条） */
+  onSessionStats: (cb: (ev: { sessionId: string; stats: SessionStats }) => void) => () => void;
   onAgentError: (cb: (ev: AgentErrorEvent) => void) => () => void;
   /** 订阅 agent token 用量事件（回复底部统计：首token/token 速率） */
   onAgentUsage: (cb: (ev: AgentUsageEvent) => void) => () => void;

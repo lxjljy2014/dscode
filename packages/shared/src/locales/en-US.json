@@ -44,6 +44,17 @@
       "second": "s",
       "millisecond": "ms"
     },
+    "sessionStats": {
+      "rounds": "rounds",
+      "steps": "steps",
+      "llm": "LLM",
+      "tool": "Tool calls",
+      "firstToken": "First token avg",
+      "cacheHit": "Cache hits",
+      "input": "In",
+      "output": "Out",
+      "tok": "tok/s"
+    },
     "greeting": {
       "morning": "Good morning. How can I help?",
       "noon": "Good afternoon. Fancy a break?",

@@ -44,6 +44,17 @@
       "second": "秒",
       "millisecond": "毫秒"
     },
+    "sessionStats": {
+      "rounds": "轮",
+      "steps": "步",
+      "llm": "LLM",
+      "tool": "工具调用",
+      "firstToken": "首 token 平均",
+      "cacheHit": "缓存命中",
+      "input": "输入",
+      "output": "输出",
+      "tok": "tok/s"
+    },
     "greeting": {
       "morning": "早上好，有什么可以帮你？",
       "noon": "中午好呀，要不要先休息一下",

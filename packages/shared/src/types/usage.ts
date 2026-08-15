@@ -9,6 +9,28 @@ export interface UsageRecord {
   createdAt: number;
 }
 
+/**
+ * 会话级运行统计（输入卡片下方的统计条展示，仿 Claude Code）。
+ * 按 sessionId 跨多次运行累计；每次运行结束时由运行时推送全量。
+ */
+export interface SessionStats {
+  /** LLM 请求轮次累计（含缓存命中轮） */
+  rounds: number;
+  /** LLM 请求总耗时（毫秒） */
+  llmMs: number;
+  /** 工具调用总耗时（毫秒） */
+  toolMs: number;
+  /** 首 token 耗时累计（毫秒）与样本数（求平均用；缓存命中轮记 0） */
+  firstTokenMsSum: number;
+  firstTokenCount: number;
+  /** 输入/输出 token 累计 */
+  promptTokens: number;
+  completionTokens: number;
+  /** 缓存命中/未命中次数（该会话内） */
+  cacheHits: number;
+  cacheMisses: number;
+}
+
 /** LLM 回复缓存统计（使用统计版块展示命中率与节省量） */
 export interface LlmCacheStats {
   /** 缓存命中请求数 */

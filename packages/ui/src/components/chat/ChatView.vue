@@ -6,6 +6,7 @@ import { useSessionStore } from '../../stores/session';
 import { useAgentStore } from '../../stores/agent';
 import ChatInput from './ChatInput.vue';
 import ConfirmOverlay from './ConfirmOverlay.vue';
+import SessionStatsBar from './SessionStatsBar.vue';
 import MessageItem from './MessageItem.vue';
 
 const { t } = useI18n();
@@ -58,12 +59,14 @@ watch(activeSession, scrollToBottom, { flush: 'post' });
         </div>
       </div>
 
-      <div class="shrink-0 px-6 pb-4 pt-1">
+      <div class="shrink-0 px-6 pb-3 pt-1">
         <div class="relative mx-auto max-w-200">
           <ChatInput :generating="generating" @send="agentStore.sendMessage" @stop="agentStore.stopGenerating" />
           <!-- 工具确认卡片：覆盖在输入卡片上 -->
           <ConfirmOverlay />
         </div>
+        <!-- 会话统计条（仿 Claude Code）：输入卡片下方 -->
+        <SessionStatsBar class="mx-auto max-w-200" />
       </div>
     </template>
 

@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import type { AgentToolEvent, ChatMessagePayload, ConfirmDecision, DiffFile, Message, Session } from '@dscode/shared';
+import type {
+  AgentToolEvent,
+  ChatMessagePayload,
+  ConfirmDecision,
+  DiffFile,
+  Message,
+  Session,
+  SessionStats
+} from '@dscode/shared';
 import { host } from '../bridge/host';
 import { useSessionStore } from './session';
 
@@ -47,6 +55,13 @@ export const useAgentStore = defineStore('agent', () => {
       ...(s.completionTokens !== undefined ? { completionTokens: s.completionTokens } : {})
     };
   }
+
+  /** 会话级运行统计（输入卡片下方统计条；运行时每次运行结束推送全量；响应式对象供 computed 追踪） */
+  const sessionStatsBySession = ref<Record<string, SessionStats>>({});
+  const sessionStats = computed<SessionStats | null>(() => {
+    const id = sessionStore.activeSessionId;
+    return id ? (sessionStatsBySession.value[id] ?? null) : null;
+  });
 
   /** 各会话的 diff 结果（主进程 workspace:diff 推送，按 sessionId 缓存） */
   const diffBySession = new Map<string, DiffFile[]>();
@@ -264,6 +279,11 @@ export const useAgentStore = defineStore('agent', () => {
     diffBySession.set(ev.sessionId, ev.files);
   }
 
+  function onSessionStats(ev: { sessionId: string; stats: SessionStats }) {
+    // 整体替换触发响应式（computed 依赖 sessionStatsBySession.value）
+    sessionStatsBySession.value = { ...sessionStatsBySession.value, [ev.sessionId]: ev.stats };
+  }
+
   let subscribed = false;
   function subscribeEvents(): void {
     if (!host || subscribed) return;
@@ -275,9 +295,10 @@ export const useAgentStore = defineStore('agent', () => {
     host.onAgentError(onError);
     host.onAgentUsage(onUsage);
     host.onWorkspaceDiff(onWorkspaceDiff);
+    host.onSessionStats(onSessionStats);
   }
 
   subscribeEvents();
 
-  return { generating, pendingConfirm, diffFiles, sendMessage, stopGenerating, respondConfirm };
+  return { generating, pendingConfirm, diffFiles, sessionStats, sendMessage, stopGenerating, respondConfirm };
 });

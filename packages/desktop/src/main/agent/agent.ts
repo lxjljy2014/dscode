@@ -57,6 +57,7 @@ function createSink(win: BrowserWindow, hooks: Hook[], cwd: string, model: strin
       send('agent:done', { sessionId });
       fireHooks(hooks, 'session_end', cwd);
     },
+    sessionStats: (sessionId, stats) => send('agent:session-stats', { sessionId, stats }),
     error: (sessionId, code, detail) => {
       send('agent:error', { sessionId, code, ...(detail ? { detail } : {}) });
       fireHooks(hooks, 'session_end', cwd);

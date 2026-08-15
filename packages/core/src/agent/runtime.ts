@@ -4,7 +4,8 @@ import type {
   ChatMessagePayload,
   ConfirmDecision,
   PermissionMode,
-  ProviderConfig
+  ProviderConfig,
+  SessionStats
 } from '@dscode/shared';
 import { ApiError, resolveAdapter, streamChat } from '../adapters';
 import type { ChatUsage } from '../adapters/types';
@@ -96,9 +97,31 @@ export class AgentRuntime {
   private toolSeq = 0;
   /** 本会话免问：sessionId → 已放行的工具签名集合 */
   private sessionApprovals = new Map<string, Set<string>>();
+  /** 会话级运行统计（输入卡片下方统计条；跨多次运行累计，每次运行结束推送全量） */
+  private sessionStats = new Map<string, SessionStats>();
 
   private nextToolId(): string {
     return `t-${Date.now()}-${this.toolSeq++}`;
+  }
+
+  /** 会话统计空值起点（跨运行累计） */
+  private statsEntry(sessionId: string): SessionStats {
+    let s = this.sessionStats.get(sessionId);
+    if (!s) {
+      s = {
+        rounds: 0,
+        llmMs: 0,
+        toolMs: 0,
+        firstTokenMsSum: 0,
+        firstTokenCount: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        cacheHits: 0,
+        cacheMisses: 0
+      };
+      this.sessionStats.set(sessionId, s);
+    }
+    return s;
   }
 
   /** 启动一次 agent 运行（同会话已在运行则先中止旧运行再启动，适配渲染端状态丢失后的重发） */
@@ -179,6 +202,9 @@ export class AgentRuntime {
       let totalCompletion = 0;
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const combined = AbortSignal.any([signal, AbortSignal.timeout(ROUND_TIMEOUT_MS)]);
+        const roundStart = Date.now();
+        // 首 token 耗时（首个非空正文增量；缓存命中轮保持 null 不计数）
+        let firstTokenMs: number | null = null;
         // 一次 LLM 请求（聚合流式文本，供缓存写入）
         const tools = toolSchemas(browsingEnabled);
         const requestOnce = async (): Promise<{
@@ -194,6 +220,7 @@ export class AgentRuntime {
             { baseUrl: provider.baseUrl, apiKey: provider.apiKey, model, messages, tools },
             combined,
             text => {
+              if (firstTokenMs === null && text.length > 0) firstTokenMs = Date.now() - roundStart;
               contentBuf += text;
               sink.delta(sessionId, 'content', text);
             },
@@ -208,10 +235,12 @@ export class AgentRuntime {
         // LLM 回复缓存：命中则重放（文本/思维链按流式推送，工具调用进入正常循环），不调 API
         let toolCalls: { id: string; name: AgentToolName; arguments: string }[];
         let usage: ChatUsage | undefined;
+        let cacheHit = false;
         if (llmCache) {
           const key = llmCache.key(model, messages, tools);
           const cached = await llmCache.get(key);
           if (cached) {
+            cacheHit = true;
             await llmCache.recordHit(model, cached.promptTokens, cached.completionTokens);
             if (cached.reasoning) sink.delta(sessionId, 'reasoning', cached.reasoning);
             if (cached.content) sink.delta(sessionId, 'content', cached.content);
@@ -240,6 +269,18 @@ export class AgentRuntime {
           totalPrompt += usage.promptTokens;
           totalCompletion += usage.completionTokens;
         }
+        // 会话统计累计（每轮：LLM 耗时/首 token/tokens/缓存命中）
+        const s = this.statsEntry(sessionId);
+        s.rounds += 1;
+        s.llmMs += Date.now() - roundStart;
+        if (firstTokenMs !== null) {
+          s.firstTokenMsSum += firstTokenMs;
+          s.firstTokenCount += 1;
+        }
+        s.promptTokens += usage?.promptTokens ?? 0;
+        s.completionTokens += usage?.completionTokens ?? 0;
+        if (cacheHit) s.cacheHits += 1;
+        else s.cacheMisses += 1;
         if (toolCalls.length === 0) {
           sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion });
           sink.done(sessionId);
@@ -316,7 +357,9 @@ export class AgentRuntime {
             sink.tool(sessionId, { ...event, status: 'running' });
           }
 
+          const toolStart = Date.now();
           const result = await executeTool(t.name, t.arguments, cwd);
+          this.statsEntry(sessionId).toolMs += Date.now() - toolStart;
           if (result.ok) {
             sink.tool(sessionId, { ...event, status: 'done', summary: result.content.slice(0, 200) });
             toolResultContent = result.content;
@@ -347,6 +390,10 @@ export class AgentRuntime {
         // 真正未知的异常（代码 bug 等）不再伪装成 network，便于排障
         sink.error(sessionId, 'unknown', e instanceof Error ? e.message : String(e));
       }
+    } finally {
+      // 运行结束（正常/错误/中止）推送会话统计全量，渲染端展示输入卡片下方的统计条
+      const s = this.sessionStats.get(sessionId);
+      if (s) sink.sessionStats(sessionId, { ...s });
     }
   }
 

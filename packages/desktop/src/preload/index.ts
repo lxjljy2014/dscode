@@ -19,6 +19,7 @@ import type {
   ProjectsListResult,
   ProviderVerifyResult,
   Session,
+  SessionStats,
   SettingsPatch,
   TerminalDataEvent,
   TerminalEnsureResult,
@@ -100,6 +101,13 @@ const api = {
     subscribe('agent:confirm', cb, raw => hasSessionId(raw) && typeof raw['toolEventId'] === 'string'),
   /** 订阅 agent 完成事件 */
   onAgentDone: (cb: (ev: { sessionId: string }) => void): (() => void) => subscribe('agent:done', cb, hasSessionId),
+  /** 订阅会话级运行统计（输入卡片下方统计条） */
+  onSessionStats: (cb: (ev: { sessionId: string; stats: SessionStats }) => void): (() => void) =>
+    subscribe(
+      'agent:session-stats',
+      cb,
+      raw => hasSessionId(raw) && typeof raw['stats'] === 'object' && raw['stats'] !== null
+    ),
   /** 订阅 agent token 用量事件（回复底部统计；usage 为 { promptTokens, completionTokens }） */
   onAgentUsage: (
     cb: (ev: { sessionId: string; usage: { promptTokens: number; completionTokens: number } }) => void

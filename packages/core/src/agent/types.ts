@@ -1,4 +1,4 @@
-import type { AgentErrorEvent, AgentToolEvent, AgentToolName, DiffFile } from '@dscode/shared';
+import type { AgentErrorEvent, AgentToolEvent, AgentToolName, DiffFile, SessionStats } from '@dscode/shared';
 import type { ChatUsage } from '../adapters/types';
 
 /**
@@ -18,6 +18,8 @@ export interface AgentEventSink {
   done(sessionId: string): void;
   /** 运行错误 */
   error(sessionId: string, code: AgentErrorEvent['code'], detail?: string): void;
+  /** 会话级运行统计（每次运行结束推送全量，渲染端累计展示） */
+  sessionStats(sessionId: string, stats: SessionStats): void;
   /** 写/执行工具后的 diff 推送 */
   diff(sessionId: string, files: DiffFile[]): void;
 }
