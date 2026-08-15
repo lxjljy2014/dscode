@@ -45,6 +45,8 @@ export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' 
 /** 工具事件（聊天流中与消息交错展示） */
 export interface AgentToolEvent {
   id: string;
+  /** 模型 tool call id（历史重建时对齐运行时上下文，保持前缀缓存稳定；旧数据缺省） */
+  toolCallId?: string;
   name: AgentToolName;
   /** 参数 JSON 字符串（原样展示） */
   args: string;
@@ -65,6 +67,8 @@ export type AssistantStep =
 export interface ChatMessagePayload {
   role: 'user' | 'assistant';
   content: string;
+  /** assistant 带工具调用时重建（与运行时上下文结构一致，保证前缀缓存稳定） */
+  tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
 }
 
 /** agent:error 事件负载 */

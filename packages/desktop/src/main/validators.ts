@@ -12,11 +12,20 @@ export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
 
-/** 校验 agent:start 传入的历史消息（公共边界的强类型收窄） */
+/** 校验 agent:start 传入的历史消息（公共边界的强类型收窄；assistant 可带 tool_calls 重建结构） */
 export function isChatMessagePayload(v: unknown): v is ChatMessagePayload {
   if (!isRecord(v)) return false;
   const r = v as Record<string, unknown>;
-  return (r['role'] === 'user' || r['role'] === 'assistant') && isString(r['content']);
+  if (r['role'] !== 'user' && r['role'] !== 'assistant') return false;
+  if (!isString(r['content'])) return false;
+  if (r['tool_calls'] === undefined) return true;
+  if (!Array.isArray(r['tool_calls'])) return false;
+  return r['tool_calls'].every(t => {
+    if (!isRecord(t)) return false;
+    const tc = t as Record<string, unknown>;
+    const fn = isRecord(tc['function']) ? (tc['function'] as Record<string, unknown>) : null;
+    return isString(tc['id']) && tc['type'] === 'function' && !!fn && isString(fn['name']) && isString(fn['arguments']);
+  });
 }
 
 const TOOL_NAMES = new Set(['read_file', 'list_dir', 'search', 'run_command', 'write_file', 'edit_file', 'browse']);
@@ -34,6 +43,7 @@ function isToolEvent(v: unknown): v is AgentToolEvent {
     isString(r['status']) &&
     TOOL_STATUSES.has(r['status']) &&
     typeof r['createdAt'] === 'number' &&
+    (r['toolCallId'] === undefined || isString(r['toolCallId'])) &&
     (r['summary'] === undefined || isString(r['summary'])) &&
     (r['error'] === undefined || isString(r['error']))
   );

@@ -25,6 +25,34 @@ describe('isChatMessagePayload', () => {
     expect(isChatMessagePayload(null)).toBe(false);
     expect(isChatMessagePayload('x')).toBe(false);
   });
+
+  it('接受 assistant 带 tool_calls 的重建结构（前缀缓存对齐）', () => {
+    expect(
+      isChatMessagePayload({
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read_file', arguments: '{"path":"a.ts"}' } }]
+      })
+    ).toBe(true);
+  });
+
+  it('拒绝畸形 tool_calls', () => {
+    expect(
+      isChatMessagePayload({
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: 1, type: 'function', function: { name: 'x', arguments: '{}' } }]
+      })
+    ).toBe(false);
+    expect(isChatMessagePayload({ role: 'assistant', content: '', tool_calls: 'nope' })).toBe(false);
+    expect(
+      isChatMessagePayload({
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: 'a', type: 'wrong', function: { name: 'x', arguments: '{}' } }]
+      })
+    ).toBe(false);
+  });
 });
 
 describe('isMessage', () => {
@@ -36,7 +64,10 @@ describe('isMessage', () => {
   it('合法 steps（reasoning/text/tool 交错）通过', () => {
     const steps = [
       { kind: 'reasoning', content: '先想一下' },
-      { kind: 'tool', event: { id: 'e1', name: 'write_file', args: '{}', status: 'done', createdAt: 1, summary: 'ok' } },
+      {
+        kind: 'tool',
+        event: { id: 'e1', name: 'write_file', args: '{}', status: 'done', createdAt: 1, summary: 'ok' }
+      },
       { kind: 'text', content: '完成了' }
     ];
     expect(isMessage({ id: 'm1', role: 'assistant', content: 'x', createdAt: 1, steps })).toBe(true);
@@ -45,9 +76,24 @@ describe('isMessage', () => {
 
   it('拒绝非法 steps（未知工具/坏状态/缺字段）', () => {
     const base = { id: 'm1', role: 'assistant' as const, content: 'x', createdAt: 1 };
-    expect(isMessage({ ...base, steps: [{ kind: 'tool', event: { id: 'e', name: 'evil', args: '{}', status: 'done', createdAt: 1 } }] })).toBe(false);
-    expect(isMessage({ ...base, steps: [{ kind: 'tool', event: { id: 'e', name: 'write_file', args: '{}', status: 'hacked', createdAt: 1 } }] })).toBe(false);
-    expect(isMessage({ ...base, steps: [{ kind: 'tool', event: { id: 'e', name: 'write_file', args: 1, status: 'done', createdAt: 1 } }] })).toBe(false);
+    expect(
+      isMessage({
+        ...base,
+        steps: [{ kind: 'tool', event: { id: 'e', name: 'evil', args: '{}', status: 'done', createdAt: 1 } }]
+      })
+    ).toBe(false);
+    expect(
+      isMessage({
+        ...base,
+        steps: [{ kind: 'tool', event: { id: 'e', name: 'write_file', args: '{}', status: 'hacked', createdAt: 1 } }]
+      })
+    ).toBe(false);
+    expect(
+      isMessage({
+        ...base,
+        steps: [{ kind: 'tool', event: { id: 'e', name: 'write_file', args: 1, status: 'done', createdAt: 1 } }]
+      })
+    ).toBe(false);
     expect(isMessage({ ...base, steps: [{ kind: 'text', content: 1 }] })).toBe(false);
     expect(isMessage({ ...base, steps: [{ kind: 'other', content: 'x' }] })).toBe(false);
     expect(isMessage({ ...base, steps: 'not-array' })).toBe(false);

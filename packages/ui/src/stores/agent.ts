@@ -113,9 +113,24 @@ export const useAgentStore = defineStore('agent', () => {
     generating.value = true;
 
     // 真实 agent：历史取非流式消息（含刚发送的用户消息）
+    // 关键：assistant 带工具调用的消息重建为与运行时上下文一致的结构（content 空 + tool_calls），
+    // 否则重建历史与首次运行的 messages 序列不同，会破坏 DeepSeek 前缀缓存的稳定性。
     const history: ChatMessagePayload[] = session.messages
       .filter(m => !m.streaming)
-      .map(m => ({ role: m.role, content: m.content }));
+      .map(m => {
+        if (m.role === 'user') return { role: 'user' as const, content: m.content };
+        const toolSteps = (m.steps ?? []).filter(s => s.kind === 'tool');
+        if (toolSteps.length === 0) return { role: 'assistant' as const, content: m.content };
+        return {
+          role: 'assistant' as const,
+          content: '',
+          tool_calls: toolSteps.map(s => ({
+            id: s.event.toolCallId ?? s.event.id,
+            type: 'function' as const,
+            function: { name: s.event.name, arguments: s.event.args }
+          }))
+        };
+      });
     let r: { ok: boolean; error?: string };
     try {
       r = await host.agentStart(session.id, model, history, subagentId);

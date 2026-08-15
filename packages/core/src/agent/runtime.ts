@@ -310,6 +310,8 @@ export class AgentRuntime {
           const toolEventId = this.nextToolId();
           const event: AgentToolEvent = {
             id: toolEventId,
+            // 模型 tool call id：渲染端历史重建时靠它对齐运行时上下文，保持前缀缓存稳定
+            toolCallId: t.id,
             name: t.name,
             args: t.arguments,
             status: needsConfirm(t.name, permissionMode) ? 'confirming' : 'running',
