@@ -44,13 +44,15 @@
       "second": "s",
       "millisecond": "ms"
     },
+    "contextMeter": {
+      "tooltip": "Context {percent}% ({used}/{total})"
+    },
     "sessionStats": {
       "rounds": "rounds",
       "steps": "steps",
       "llm": "LLM",
       "tool": "Tool calls",
       "firstToken": "First token avg",
-      "context": "Context {percent}% ({used}/{total})",
       "cacheHit": "Cache hits",
       "input": "In",
       "output": "Out",

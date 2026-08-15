@@ -44,13 +44,15 @@
       "second": "秒",
       "millisecond": "毫秒"
     },
+    "contextMeter": {
+      "tooltip": "上下文 {percent}%（{used}/{total}）"
+    },
     "sessionStats": {
       "rounds": "轮",
       "steps": "步",
       "llm": "LLM",
       "tool": "工具调用",
       "firstToken": "首 token 平均",
-      "context": "上下文 {percent}%（{used}/{total}）",
       "cacheHit": "缓存命中",
       "input": "输入",
       "output": "输出",

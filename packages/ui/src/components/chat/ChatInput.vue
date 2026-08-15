@@ -7,6 +7,7 @@ import { usePluginsStore } from '../../stores/plugins';
 import GitBranchMenu from '../git/GitBranchMenu.vue';
 import PermissionSelector from './PermissionSelector.vue';
 import ProjectPicker from './ProjectPicker.vue';
+import ContextMeter from './ContextMeter.vue';
 
 const props = defineProps<{ generating: boolean }>();
 const emit = defineEmits<{
@@ -184,12 +185,7 @@ function onKeydown(e: KeyboardEvent) {
                 <VIcon v-if="!subagentId" icon="i-lucide:check" size="16" />
               </template>
             </VListItem>
-            <VListItem
-              v-for="s in subagents"
-              :key="s.id"
-              :active="subagentId === s.id"
-              @click="subagentId = s.id"
-            >
+            <VListItem v-for="s in subagents" :key="s.id" :active="subagentId === s.id" @click="subagentId = s.id">
               <VListItemTitle class="text-sm">{{ s.name }}</VListItemTitle>
               <VListItemSubtitle v-if="s.description" class="text-xs">{{ s.description }}</VListItemSubtitle>
               <template #append>
@@ -222,6 +218,9 @@ function onKeydown(e: KeyboardEvent) {
             </VListItem>
           </VList>
         </VMenu>
+
+        <!-- 上下文占用环形进度（发送按钮左侧） -->
+        <ContextMeter />
 
         <VTooltip :text="generating ? t('chat.stop') : t('chat.send')" location="top">
           <template #activator="{ props: tipProps }">
