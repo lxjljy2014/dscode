@@ -24,6 +24,27 @@ describe('parseOpenAiDelta', () => {
     const d = parseOpenAiDelta({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 50 } });
     expect(d?.usage).toEqual({ promptTokens: 100, completionTokens: 50 });
   });
+
+  it('解析前缀缓存命中 tokens（prompt_tokens_details.cached_tokens）', () => {
+    const d = parseOpenAiDelta({
+      choices: [],
+      usage: { prompt_tokens: 100, completion_tokens: 50, prompt_tokens_details: { cached_tokens: 80 } }
+    });
+    expect(d?.usage).toEqual({ promptTokens: 100, completionTokens: 50, cachedPromptTokens: 80 });
+  });
+
+  it('解析 DeepSeek 旧字段 prompt_cache_hit_tokens', () => {
+    const d = parseOpenAiDelta({
+      choices: [],
+      usage: { prompt_tokens: 100, completion_tokens: 50, prompt_cache_hit_tokens: 90 }
+    });
+    expect(d?.usage?.cachedPromptTokens).toBe(90);
+  });
+
+  it('无缓存字段时 cachedPromptTokens 缺省', () => {
+    const d = parseOpenAiDelta({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 50 } });
+    expect(d?.usage?.cachedPromptTokens).toBeUndefined();
+  });
 });
 
 describe('deepseekAdapter', () => {

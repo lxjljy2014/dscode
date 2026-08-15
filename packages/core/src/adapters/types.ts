@@ -12,6 +12,8 @@ export interface AccumulatedToolCall {
 export interface ChatUsage {
   promptTokens: number;
   completionTokens: number;
+  /** 前缀缓存命中的 prompt token 数（DeepSeek/OpenAI context caching；缺省表示供应商未返回） */
+  cachedPromptTokens?: number;
 }
 
 /** 归一化流增量：各家格式统一映射为通用事件 */

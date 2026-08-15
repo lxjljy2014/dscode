@@ -7,13 +7,29 @@ import type { ChatRequest, ChatRequestInput, ModelAdapter, NormalizedDelta } fro
 export function parseOpenAiDelta(parsed: unknown): NormalizedDelta | undefined {
   const obj = parsed as {
     choices?: Array<{ delta?: Record<string, unknown> }>;
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      prompt_cache_hit_tokens?: number;
+      prompt_tokens_details?: { cached_tokens?: number };
+    };
   };
   const delta = obj.choices?.[0]?.delta;
   const out: NormalizedDelta = {};
   const u = obj.usage;
   if (u && typeof u.prompt_tokens === 'number' && typeof u.completion_tokens === 'number') {
-    out.usage = { promptTokens: u.prompt_tokens, completionTokens: u.completion_tokens };
+    // 前缀缓存命中（context caching）：DeepSeek 旧字段 prompt_cache_hit_tokens，OpenAI/新 DeepSeek 用 prompt_tokens_details.cached_tokens
+    const cached =
+      typeof u.prompt_cache_hit_tokens === 'number'
+        ? u.prompt_cache_hit_tokens
+        : typeof u.prompt_tokens_details?.cached_tokens === 'number'
+          ? u.prompt_tokens_details.cached_tokens
+          : undefined;
+    out.usage = {
+      promptTokens: u.prompt_tokens,
+      completionTokens: u.completion_tokens,
+      ...(cached !== undefined ? { cachedPromptTokens: cached } : {})
+    };
   }
   if (delta) {
     if (typeof delta['content'] === 'string' && delta['content'].length > 0) out.content = delta['content'];

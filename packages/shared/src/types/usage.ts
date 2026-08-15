@@ -26,9 +26,13 @@ export interface SessionStats {
   /** 输入/输出 token 累计 */
   promptTokens: number;
   completionTokens: number;
-  /** 缓存命中/未命中次数（该会话内） */
+  /** 缓存命中/未命中次数（该会话内，应用层完整请求缓存） */
   cacheHits: number;
   cacheMisses: number;
+  /** 前缀缓存命中的 prompt token 数（API 侧 context caching；同一仓库连续工作时随前缀稳定而升高） */
+  cacheHitTokens: number;
+  /** 未命中缓存的 prompt token 数 */
+  cacheMissTokens: number;
 }
 
 /** LLM 回复缓存统计（使用统计版块展示命中率与节省量） */

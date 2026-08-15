@@ -117,7 +117,9 @@ export class AgentRuntime {
         promptTokens: 0,
         completionTokens: 0,
         cacheHits: 0,
-        cacheMisses: 0
+        cacheMisses: 0,
+        cacheHitTokens: 0,
+        cacheMissTokens: 0
       };
       this.sessionStats.set(sessionId, s);
     }
@@ -280,6 +282,9 @@ export class AgentRuntime {
         }
         s.promptTokens += usage?.promptTokens ?? 0;
         s.completionTokens += usage?.completionTokens ?? 0;
+        // 前缀缓存（API 侧 context caching）：cached 部分打折计费，未命中部分全价
+        s.cacheHitTokens += usage?.cachedPromptTokens ?? 0;
+        s.cacheMissTokens += (usage?.promptTokens ?? 0) - (usage?.cachedPromptTokens ?? 0);
         if (cacheHit) s.cacheHits += 1;
         else s.cacheMisses += 1;
         if (toolCalls.length === 0) {

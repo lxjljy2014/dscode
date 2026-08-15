@@ -62,10 +62,13 @@ const tokPerSec = computed(() => {
   return `${Math.round(st.completionTokens / (st.llmMs / 1000))} ${t('chat.sessionStats.tok')}`;
 });
 
+// 缓存命中率 = 前缀缓存（API context caching）命中 token 占比：
+// 同一仓库连续工作时历史前缀稳定，命中率会随上下文累积而升高（cached 部分打折计费）
 const cacheRate = computed(() => {
   const st = stats.value;
-  if (!st || st.cacheHits + st.cacheMisses === 0) return null;
-  return `${Math.round((st.cacheHits / (st.cacheHits + st.cacheMisses)) * 100)}%`;
+  const total = (st?.cacheHitTokens ?? 0) + (st?.cacheMissTokens ?? 0);
+  if (!st || total === 0) return null;
+  return `${Math.round((st.cacheHitTokens / total) * 100)}%`;
 });
 </script>
 
