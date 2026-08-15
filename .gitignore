@@ -10,3 +10,7 @@ release
 .idea/
 .playwright-mcp/
 .pnpm-store
+
+# deepseek-harness 源码分析临时克隆
+.tmp-deepseek-harness/
+.cdp*.cjs 

@@ -53,6 +53,8 @@ export interface AgentToolEvent {
   status: 'running' | 'done' | 'error' | 'confirming' | 'denied';
   /** 结果摘要（截断后的开头部分） */
   summary?: string;
+  /** 工具全量输出（仅 done 终态携带；渲染端落库供跨运行历史重建，保持与运行时上下文一致） */
+  content?: string;
   error?: string;
   createdAt: number;
 }
@@ -63,12 +65,17 @@ export type AssistantStep =
   | { kind: 'text'; content: string }
   | { kind: 'tool'; event: AgentToolEvent };
 
-/** agent:start 传入的消息历史（渲染端 → 主进程） */
+/** agent:start 传入的消息历史（渲染端 → 主进程；与运行时上下文逐字节一致以保证前缀缓存稳定） */
 export interface ChatMessagePayload {
-  role: 'user' | 'assistant';
+  /** tool = 工具执行结果（role:'tool' + tool_call_id，DeepSeek wire 语义） */
+  role: 'user' | 'assistant' | 'tool';
   content: string;
-  /** assistant 带工具调用时重建（与运行时上下文结构一致，保证前缀缓存稳定） */
+  /** assistant 带工具调用时重建（content 空串 + tool_calls，与运行时结构一致） */
   tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
+  /** tool 消息：对应模型 tool call id */
+  tool_call_id?: string;
+  /** assistant 工具调用回合回传思维链（DeepSeek thinking passback 规则：仅 tool-call 回合带，纯文本回合省 token 不带） */
+  reasoning_content?: string;
 }
 
 /** agent:error 事件负载 */

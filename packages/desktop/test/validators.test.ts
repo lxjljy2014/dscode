@@ -36,6 +36,31 @@ describe('isChatMessagePayload', () => {
     ).toBe(true);
   });
 
+  it('接受 tool 结果消息（role:tool + tool_call_id + content）与 reasoning_content 回传', () => {
+    expect(
+      isChatMessagePayload({
+        role: 'tool',
+        content: '文件内容...',
+        tool_call_id: 'call_1'
+      })
+    ).toBe(true);
+    expect(
+      isChatMessagePayload({
+        role: 'assistant',
+        content: '',
+        reasoning_content: '先搜索文件再修改',
+        tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read_file', arguments: '{"path":"a.ts"}' } }]
+      })
+    ).toBe(true);
+  });
+
+  it('拒绝 tool 消息畸形字段（缺 content / 坏 tool_call_id / 坏 reasoning_content）', () => {
+    expect(isChatMessagePayload({ role: 'tool', tool_call_id: 'c1' })).toBe(false);
+    expect(isChatMessagePayload({ role: 'tool', content: 'x', tool_call_id: 1 })).toBe(false);
+    expect(isChatMessagePayload({ role: 'assistant', content: '', reasoning_content: 1 })).toBe(false);
+    expect(isChatMessagePayload({ role: 'tool', content: 'x' })).toBe(true); // tool_call_id 可选不强制
+  });
+
   it('拒绝畸形 tool_calls', () => {
     expect(
       isChatMessagePayload({
@@ -66,7 +91,15 @@ describe('isMessage', () => {
       { kind: 'reasoning', content: '先想一下' },
       {
         kind: 'tool',
-        event: { id: 'e1', name: 'write_file', args: '{}', status: 'done', createdAt: 1, summary: 'ok' }
+        event: {
+          id: 'e1',
+          name: 'write_file',
+          args: '{}',
+          status: 'done',
+          createdAt: 1,
+          summary: 'ok',
+          content: '全量结果'
+        }
       },
       { kind: 'text', content: '完成了' }
     ];

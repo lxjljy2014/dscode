@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import type {
   AgentToolEvent,
+  AssistantStep,
   ChatMessagePayload,
   ConfirmDecision,
   DiffFile,
@@ -15,6 +16,16 @@ import { useSessionStore } from './session';
 let idSeq = 0;
 function nextId(prefix: string): string {
   return `${prefix}-${Date.now()}-${idSeq++}`;
+}
+
+/**
+ * 工具结果内容（跨运行历史重建用，与运行时 push 的 role:'tool' 消息逐字节一致）：
+ * done 用全量输出（旧数据缺省回退摘要），error 用与运行时一致的失败文案，其余（denied/未完成）给占位。
+ */
+function toolResultContent(e: AgentToolEvent): string {
+  if (e.status === 'done') return e.content ?? e.summary ?? '(no output)';
+  if (e.status === 'error') return `执行失败：${e.error ?? '未知错误'}`;
+  return '已拒绝执行';
 }
 
 /**
@@ -112,25 +123,62 @@ export const useAgentStore = defineStore('agent', () => {
     session.messages.push(reply);
     generating.value = true;
 
-    // 真实 agent：历史取非流式消息（含刚发送的用户消息）
-    // 关键：assistant 带工具调用的消息重建为与运行时上下文一致的结构（content 空 + tool_calls），
-    // 否则重建历史与首次运行的 messages 序列不同，会破坏 DeepSeek 前缀缓存的稳定性。
-    const history: ChatMessagePayload[] = session.messages
-      .filter(m => !m.streaming)
-      .map(m => {
-        if (m.role === 'user') return { role: 'user' as const, content: m.content };
-        const toolSteps = (m.steps ?? []).filter(s => s.kind === 'tool');
-        if (toolSteps.length === 0) return { role: 'assistant' as const, content: m.content };
-        return {
-          role: 'assistant' as const,
+    // 真实 agent：历史取非流式消息（含刚发送的用户消息），重建为与运行时上下文逐字节一致的结构，
+    // 保证跨运行请求前缀缓存稳定（DeepSeek 前缀缓存按 token 序列命中）：
+    // - user 消息原样
+    // - assistant 带工具调用：按轮分组（reasoning 开启新组、tool 归入当前组、text 跳过——运行时纯文本轮不进上下文），
+    //   每组重建 { role:'assistant', content:'', reasoning_content?, tool_calls:[...] }，
+    //   随后逐条补 { role:'tool', tool_call_id, content } 结果消息，与运行时 loop 内 push 的序列一致
+    // - assistant 纯文本（无工具调用）：content 原样
+    const history: ChatMessagePayload[] = [];
+    for (const m of session.messages) {
+      if (m.streaming) continue;
+      if (m.role === 'user') {
+        history.push({ role: 'user', content: m.content });
+        continue;
+      }
+      const steps = m.steps ?? [];
+      const toolSteps = steps.filter(s => s.kind === 'tool');
+      if (toolSteps.length === 0) {
+        history.push({ role: 'assistant', content: m.content });
+        continue;
+      }
+      // 按轮分组（一个 assistant 回复可能含多轮工具循环）
+      const groups: Array<{ reasoning: string; tools: Array<Extract<AssistantStep, { kind: 'tool' }>> }> = [];
+      let current: (typeof groups)[number] | null = null;
+      for (const s of steps) {
+        if (s.kind === 'reasoning') {
+          current = { reasoning: s.content, tools: [] };
+          groups.push(current);
+        } else if (s.kind === 'tool') {
+          if (!current) {
+            current = { reasoning: '', tools: [] };
+            groups.push(current);
+          }
+          current.tools.push(s);
+        }
+      }
+      for (const g of groups) {
+        if (g.tools.length === 0) continue;
+        history.push({
+          role: 'assistant',
           content: '',
-          tool_calls: toolSteps.map(s => ({
+          ...(g.reasoning.length > 0 ? { reasoning_content: g.reasoning } : {}),
+          tool_calls: g.tools.map(s => ({
             id: s.event.toolCallId ?? s.event.id,
             type: 'function' as const,
             function: { name: s.event.name, arguments: s.event.args }
           }))
-        };
-      });
+        });
+        for (const s of g.tools) {
+          history.push({
+            role: 'tool',
+            tool_call_id: s.event.toolCallId ?? s.event.id,
+            content: toolResultContent(s.event)
+          });
+        }
+      }
+    }
     let r: { ok: boolean; error?: string };
     try {
       r = await host.agentStart(session.id, model, history, subagentId);

@@ -12,12 +12,18 @@ export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
 
-/** 校验 agent:start 传入的历史消息（公共边界的强类型收窄；assistant 可带 tool_calls 重建结构） */
+/**
+ * 校验 agent:start 传入的历史消息（公共边界的强类型收窄）。
+ * user/assistant 可带 tool_calls 重建结构；tool 为执行结果（tool_call_id + content）；
+ * assistant 工具调用回合可带 reasoning_content（DeepSeek thinking passback）。
+ */
 export function isChatMessagePayload(v: unknown): v is ChatMessagePayload {
   if (!isRecord(v)) return false;
   const r = v as Record<string, unknown>;
-  if (r['role'] !== 'user' && r['role'] !== 'assistant') return false;
+  if (r['role'] !== 'user' && r['role'] !== 'assistant' && r['role'] !== 'tool') return false;
   if (!isString(r['content'])) return false;
+  if (r['reasoning_content'] !== undefined && !isString(r['reasoning_content'])) return false;
+  if (r['tool_call_id'] !== undefined && !isString(r['tool_call_id'])) return false;
   if (r['tool_calls'] === undefined) return true;
   if (!Array.isArray(r['tool_calls'])) return false;
   return r['tool_calls'].every(t => {
@@ -45,6 +51,7 @@ function isToolEvent(v: unknown): v is AgentToolEvent {
     typeof r['createdAt'] === 'number' &&
     (r['toolCallId'] === undefined || isString(r['toolCallId'])) &&
     (r['summary'] === undefined || isString(r['summary'])) &&
+    (r['content'] === undefined || isString(r['content'])) &&
     (r['error'] === undefined || isString(r['error']))
   );
 }

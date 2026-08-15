@@ -155,7 +155,9 @@ export class AgentRuntime {
 
     const context: unknown[] = [
       { role: 'system', content: config.systemPrompt ?? SYSTEM_PROMPT },
-      ...rawMessages.map(m => ({ role: m.role, content: m.content }))
+      // 原样透传渲染端重建的历史（user/assistant tool_calls/tool 结果），
+      // 与运行时 loop 内 push 的消息结构一致，保证跨运行请求前缀字节级稳定
+      ...rawMessages
     ];
 
     run.done = this.runLoop(
@@ -238,6 +240,8 @@ export class AgentRuntime {
         let toolCalls: { id: string; name: AgentToolName; arguments: string }[];
         let usage: ChatUsage | undefined;
         let cacheHit = false;
+        // 本轮思维链：入 assistant 上下文做 thinking passback（DeepSeek 规则：工具调用回合必须回传 reasoning_content）
+        let reasoning = '';
         if (llmCache) {
           const key = llmCache.key(model, messages, tools);
           const cached = await llmCache.get(key);
@@ -248,11 +252,13 @@ export class AgentRuntime {
             if (cached.reasoning) sink.delta(sessionId, 'reasoning', cached.reasoning);
             if (cached.content) sink.delta(sessionId, 'content', cached.content);
             toolCalls = cached.toolCalls;
+            reasoning = cached.reasoning ?? '';
             usage = undefined;
           } else {
             await llmCache.recordMiss(model);
             const res = await requestOnce();
             toolCalls = res.toolCalls;
+            reasoning = res.reasoning;
             usage = res.usage;
             // 只缓存成功响应；异常（throw）时不会走到这里
             await llmCache.set(key, {
@@ -266,6 +272,7 @@ export class AgentRuntime {
         } else {
           const res = await requestOnce();
           toolCalls = res.toolCalls;
+          reasoning = res.reasoning;
           usage = res.usage;
         }
         if (usage) {
@@ -293,10 +300,12 @@ export class AgentRuntime {
           return;
         }
 
-        // 本轮 assistant 消息（含文本与工具调用）入上下文
+        // 本轮 assistant 消息（含文本与工具调用）入上下文；
+        // reasoning_content 仅工具调用回合回传（DeepSeek thinking passback），纯文本回合不带省 token
         messages.push({
           role: 'assistant',
           content: '',
+          ...(reasoning.length > 0 ? { reasoning_content: reasoning } : {}),
           tool_calls: toolCalls.map(t => ({
             id: t.id,
             type: 'function',
@@ -369,7 +378,13 @@ export class AgentRuntime {
           const result = await executeTool(t.name, t.arguments, cwd);
           this.statsEntry(sessionId).toolMs += Date.now() - toolStart;
           if (result.ok) {
-            sink.tool(sessionId, { ...event, status: 'done', summary: result.content.slice(0, 200) });
+            // content 全量结果：渲染端 steps 落库，跨运行历史重建 role:'tool' 消息时与运行时上下文逐字节一致
+            sink.tool(sessionId, {
+              ...event,
+              status: 'done',
+              summary: result.content.slice(0, 200),
+              content: result.content
+            });
             toolResultContent = result.content;
             // 写/执行成功后重算快照 diff 并推送（写/编辑按变更路径增量，run_command 退化为全量）
             if (toolPermission(t.name) !== 'read') {
