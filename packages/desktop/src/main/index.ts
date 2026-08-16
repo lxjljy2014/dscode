@@ -5,7 +5,7 @@ import { disposeAgents, stopWindowAgents } from './agent/agent';
 import { migrateLegacyData } from './data-dir';
 import { disposeTerminals, killWindowTerminals } from './shell/terminal';
 import { createTray, destroyTray } from './tray';
-import { initAutoUpdater } from './updater';
+import { initAutoUpdater, scheduleAutoCheck } from './updater';
 
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
@@ -142,8 +142,13 @@ app.whenReady().then(() => {
     }
   });
 
+  // Windows 系统通知需要 AUMID（免安装版/dev 下 electron-builder 未注入）
+  if (isWindows) app.setAppUserModelId('com.dscode.app');
+
   // 自动更新（electron-updater）：托盘「检查更新」触发；静默下载 + 下载完成提示重启安装
   initAutoUpdater(() => mainWindow);
+  // 启动后延迟自动检查更新（静默：仅在有新版本下载完成时才打扰用户）
+  scheduleAutoCheck();
 
   // 系统托盘：窗口「关闭」后驻留后台，可从托盘恢复窗口、执行常用操作或退出应用
   createTray({
