@@ -21,12 +21,13 @@ function toggle(): void {
 /** 工具 → 行首灰色线性图标（运行中替换为转圈） */
 const TOOL_ICON: Record<string, string> = {
   read_file: 'i-lucide:file-text',
-  list_dir: 'i-lucide:folder',
+  list_dir: 'i-lucide:search',
   search: 'i-lucide:search',
   run_command: 'i-lucide:terminal',
   write_file: 'i-lucide:pencil',
   edit_file: 'i-lucide:pencil',
-  browse: 'i-lucide:globe'
+  browse: 'i-lucide:globe',
+  skill: 'i-lucide:sparkles'
 };
 
 /** 右侧状态图标（done 不显示、running 由行首转圈表达，与图片风格一致） */
@@ -104,7 +105,8 @@ const PRIMARY_ARG: Record<string, string> = {
   run_command: 'command',
   search: 'query',
   list_dir: 'path',
-  browse: 'url'
+  browse: 'url',
+  skill: 'name'
 };
 
 const primaryValue = computed(() => {
@@ -173,6 +175,67 @@ const fileDiff = computed(() => {
   // diff 路径为工作目录相对路径；模型传绝对路径时用去前缀后的相对路径兜底匹配
   return store.diffFiles.find(f => f.path === p) ?? store.diffFiles.find(f => f.path === fileSplit.value?.rel) ?? null;
 });
+
+/** 事件携带的结构化内容块（工具返回的 blocks，UI 按类型渲染；缺省回退现有文本/diff 逻辑） */
+const contentBlocks = computed(() => props.event.blocks ?? []);
+
+/** 主行可见的 meta 徽章：run_command 退出码（0 绿 / 非 0 红）、read_file 行数 */
+const metaBadge = computed(() => {
+  const m = props.event.meta;
+  if (!m) return null;
+  if (props.event.name === 'run_command') {
+    const code = m['exitCode'];
+    if (typeof code === 'number') {
+      return code === 0
+        ? { text: '✓ 0', cls: 'text-diff-add' }
+        : { text: '✗ ' + code, cls: 'text-diff-del' };
+    }
+    if (m['killed'] === true) return { text: '⏱ 超时', cls: 'text-warning' };
+  }
+  if (props.event.name === 'read_file' && typeof m['lineCount'] === 'number') {
+    return { text: m['lineCount'] + ' 行', cls: 'text-faint' };
+  }
+  return null;
+});
+
+/** blocks 中的 json 块格式化展示 */
+const prettyJsonBlocks = computed(() => {
+  const b = contentBlocks.value.find(x => x.type === 'json');
+  if (!b) return '';
+  try {
+    return JSON.stringify(b.value, null, 2);
+  } catch {
+    return String(b.value);
+  }
+});
+
+/** blocks 中的 text 块内容（技能指令全文等，展开时展示） */
+const textBlockContent = computed(() => {
+  const b = contentBlocks.value.find(x => x.type === 'text');
+  return b ? b.text : '';
+});
+
+/** blocks 中的 diff 块（写/编辑工具携带，展开时优先展示） */
+const blockDiff = computed(() => {
+  const b = contentBlocks.value.find(x => x.type === 'diff');
+  if (!b) return null;
+  // 无旧内容（新建/覆盖）：直接展示新内容
+  const oldLines = b.oldText ? b.oldText.split('\n') : [];
+  const newLines = b.newText.split('\n');
+  const lines: Array<{ type: 'add' | 'del' | 'context'; content: string }> = [];
+  const max = Math.max(oldLines.length, newLines.length);
+  for (let i = 0; i < max; i++) {
+    const o = oldLines[i];
+    const n = newLines[i];
+    if (o !== undefined && n === undefined) lines.push({ type: 'del', content: o });
+    else if (o === undefined && n !== undefined) lines.push({ type: 'add', content: n });
+    else if (o !== n) {
+      lines.push({ type: 'del', content: o ?? '' });
+      lines.push({ type: 'add', content: n ?? '' });
+    } else lines.push({ type: 'context', content: o ?? '' });
+  }
+  return { path: b.path, lines };
+});
 </script>
 
 <template>
@@ -211,6 +274,7 @@ const fileDiff = computed(() => {
         <span v-if="fileDiff.additions > 0" class="text-diff-add">+{{ fileDiff.additions }}</span>
         <span v-if="fileDiff.deletions > 0" class="ml-1.5 text-diff-del">-{{ fileDiff.deletions }}</span>
       </span>
+      <span v-if="metaBadge" class="shrink-0 font-mono text-xs" :class="metaBadge.cls">{{ metaBadge.text }}</span>
       <span v-if="statusIcon" class="shrink-0 text-3.5" :class="[statusIcon, statusCls]" />
       <span
         class="shrink-0 cursor-pointer text-3.5 text-faint transition-opacity"
@@ -226,9 +290,40 @@ const fileDiff = computed(() => {
       {{ t('agent.status.confirming') }}
     </div>
 
-    <!-- 展开：文件工具显示 diff，其余显示参数/结果 -->
+    <!-- 展开：结构化 blocks 优先（diff/file/json/text），无 blocks 时回退现有 diff/参数/结果 -->
     <div v-if="expanded" class="mt-1.5 border-l border-line pl-2.5">
-      <div v-if="fileDiff" class="font-mono text-xs leading-[22px]">
+      <!-- blocks: diff 块（写/编辑工具的结果级内联 diff） -->
+      <div v-if="blockDiff" class="font-mono text-xs leading-[22px]">
+        <div class="mb-1 text-[11px] text-faint">{{ blockDiff.path }}</div>
+        <template v-for="(line, i) in blockDiff.lines" :key="i">
+          <div class="flex" :class="{ 'bg-diff-add/12': line.type === 'add', 'bg-diff-del/12': line.type === 'del' }">
+            <span
+              class="w-4 shrink-0 select-none text-center"
+              :class="{
+                'text-diff-add': line.type === 'add',
+                'text-diff-del': line.type === 'del',
+                'text-faint': line.type === 'context'
+              }"
+            >
+              {{ line.type === 'add' ? '+' : line.type === 'del' ? '-' : '' }}
+            </span>
+            <span class="whitespace-pre-wrap pr-3 text-fg">{{ line.content }}</span>
+          </div>
+        </template>
+      </div>
+      <!-- blocks: file 块（read_file 的代码视图） -->
+      <div v-else-if="contentBlocks.some(x => x.type === 'file')" class="font-mono text-xs leading-relaxed text-fg">
+        <pre class="max-h-56 overflow-auto whitespace-pre-wrap">{{ event.content }}</pre>
+      </div>
+      <!-- blocks: json 块 -->
+      <!-- blocks: text 块（如 skill 的指令全文、run_command 的输出） -->
+      <div v-else-if="contentBlocks.some(x => x.type === 'text')" class="font-mono text-xs leading-relaxed text-fg">
+        <pre class="max-h-56 overflow-auto whitespace-pre-wrap">{{ textBlockContent }}</pre>
+      </div>
+      <div v-else-if="contentBlocks.some(x => x.type === 'json')" class="font-mono text-xs text-fg">
+        <pre class="max-h-56 overflow-auto whitespace-pre-wrap">{{ prettyJsonBlocks }}</pre>
+      </div>
+      <div v-else-if="fileDiff" class="font-mono text-xs leading-[22px]">
         <template v-for="(line, i) in fileDiff.lines" :key="i">
           <div v-if="line.type === 'hunk'" class="text-faint select-none">{{ line.content }}</div>
           <div

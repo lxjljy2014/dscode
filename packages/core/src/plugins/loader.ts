@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import type { Plugin } from '@dscode/shared';
 
 /**
- * 插件系统（最小实现）：扫描 userData/plugins 目录下的 .mjs 模块，
+ * 插件系统（最小实现）：扫描 ~/.dscode/plugins 目录下的 .mjs 模块，
  * 动态 import 其默认导出，校验后作为插件集合返回。插件可贡献斜杠命令。
  * 加载失败/非法插件仅告警，不阻断主流程。
  */

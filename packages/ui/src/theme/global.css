@@ -113,6 +113,78 @@ html {
   animation: ds-breathe 1.6s ease-in-out infinite;
 }
 
+/* ---- 思考块（reasoning）：与工具卡左缘对齐的折叠行 + 展开卡片 ----
+   主行 flex 结构与 ToolEventCard 对齐（gap 6px、图标 16px、无 padding），
+   颜色走主题变量：强调线用 primary 的透明度，背景用 surface-variant 的淡化层 */
+.ds-thought {
+  border-radius: 10px;
+}
+/* 折叠行：脑图标 + 摘要 + 展开箭头；与工具卡主行同结构（无 padding，图标顶格左对齐） */
+.ds-thought > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.ds-thought > summary::-webkit-details-marker {
+  display: none;
+}
+/* 图标：无背景，跟随摘要文本色（思考中旋转 loading，完成显示大脑；尺寸对齐工具卡图标 16px） */
+.ds-thought-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: rgb(var(--v-theme-on-surface-variant));
+}
+.ds-thought-icon .i-lucide-brain,
+.ds-thought-icon .i-lucide-brain-circuit {
+  font-size: 16px;
+}
+/* 摘要文本：正常 muted，悬停加深 */
+.ds-thought-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: rgb(var(--v-theme-on-surface-variant));
+  transition: color 0.15s ease;
+}
+.ds-thought:hover .ds-thought-summary {
+  color: rgb(var(--v-theme-on-surface));
+}
+/* 展开箭头：折叠时朝右，展开时朝下 */
+.ds-thought-chevron {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: rgb(var(--v-theme-on-surface-variant));
+  transition: transform 0.2s ease;
+}
+.ds-thought[open] .ds-thought-chevron {
+  transform: rotate(90deg);
+}
+/* 展开内容：左渐变强调线 + 淡色背景卡片 */
+.ds-thought-body {
+  margin-top: 4px;
+  margin-left: 6px;
+  border-left: 2px solid rgb(var(--v-theme-primary), 0.35);
+  border-radius: 0 10px 10px 0;
+  background: rgb(var(--v-theme-surface-variant), 0.35);
+  padding: 10px 14px;
+  max-height: 320px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgb(var(--v-theme-on-surface-variant));
+}
+
 /* ---- 面板抽屉：关闭尺寸过渡 ----
    Vuetify 默认给 .v-navigation-drawer 加了 width/height/top/left/right/bottom 的 0.2s 过渡，
    拖拽 resize 时尺寸会追着指针慢半拍、显得卡顿；这里只保留 transform/visibility 的滑入滑出动画。 */

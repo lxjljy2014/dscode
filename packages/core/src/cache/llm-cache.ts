@@ -78,6 +78,14 @@ export function buildCacheKey(model: string, messages: unknown[], tools: unknown
   return `llm:${model}:${digest}`;
 }
 
+/** 从缓存 key 前缀 llm:{model}:{digest} 解析模型名（模型名不含冒号；异常返回空串） */
+function parseModelFromKey(key: string): string {
+  if (!key.startsWith('llm:')) return '';
+  const rest = key.slice(4);
+  const end = rest.indexOf(':');
+  return end > 0 ? rest.slice(0, end) : '';
+}
+
 /** 创建 sqlite 版 LLM 缓存（node:sqlite，无原生依赖） */
 export function createSqliteLlmCache(file: string, maxEntries = MAX_ENTRIES): LlmCache {
   return {
@@ -111,7 +119,8 @@ export function createSqliteLlmCache(file: string, maxEntries = MAX_ENTRIES): Ll
         'INSERT OR REPLACE INTO llm_cache_entries (key, model, content, reasoning, tool_calls, prompt_tokens, completion_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       ).run(
         key,
-        '',
+        // 从 key 前缀 llm:{model}:{digest} 解析真实模型落库（历史数据缺省空串）
+        parseModelFromKey(key),
         entry.content,
         entry.reasoning,
         JSON.stringify(entry.toolCalls),
@@ -175,4 +184,16 @@ export function createSqliteLlmCache(file: string, maxEntries = MAX_ENTRIES): Ll
 /** 初始化缓存文件（建表） */
 export function initLlmCache(file: string): void {
   getDb(file);
+}
+
+/** 关闭指定数据文件的连接（测试清理/重建用；Windows 下不关闭连接会占用文件句柄导致目录删除失败） */
+export function closeCacheDb(file: string): void {
+  dbs.get(file)?.close();
+  dbs.delete(file);
+}
+
+/** 关闭全部连接（应用退出/测试收尾） */
+export function closeCacheDbs(): void {
+  for (const db of dbs.values()) db.close();
+  dbs.clear();
 }

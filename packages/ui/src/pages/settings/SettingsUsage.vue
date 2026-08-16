@@ -17,6 +17,18 @@ const hitRateText = computed(() => {
   return (c.hitRate * 100).toFixed(1) + '%';
 });
 
+/** API 前缀缓存聚合：只统计已记录缓存统计的记录（cacheTracked），历史无统计记录不参与命中率 */
+const apiCache = computed(() => {
+  const tracked = records.value.filter(r => r.cacheTracked);
+  const prompt = tracked.reduce((s, r) => s + r.promptTokens, 0);
+  const cached = tracked.reduce((s, r) => s + (r.cachedPromptTokens ?? 0), 0);
+  return { prompt, cached, miss: Math.max(prompt - cached, 0), rate: prompt > 0 ? cached / prompt : 0, sampled: tracked.length };
+});
+const apiCacheRateText = computed(() => {
+  if (apiCache.value.sampled === 0) return '—';
+  return (apiCache.value.rate * 100).toFixed(1) + '%';
+});
+
 const totals = computed(() => {
   const prompt = records.value.reduce((s, r) => s + r.promptTokens, 0);
   const completion = records.value.reduce((s, r) => s + r.completionTokens, 0);
@@ -69,38 +81,62 @@ onMounted(load);
       </VCard>
     </div>
 
-    <!-- LLM 回复缓存：命中率与节省量（省成本） -->
-    <VCard class="px-4 py-3.5">
-      <div class="flex items-center justify-between">
-        <div class="text-sm font-medium">{{ t('settingsPage.usage.cacheTitle') }}</div>
-        <VBtn size="small" variant="text" color="error" :loading="clearing" @click="clearCache">
-          {{ t('settingsPage.usage.cacheClear') }}
-        </VBtn>
-      </div>
-      <div v-if="!cache" class="mt-2 text-xs text-faint">{{ t('settingsPage.usage.cacheEmpty') }}</div>
-      <div v-else class="mt-3 grid grid-cols-4 gap-4">
-        <div>
-          <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheHitRate') }}</div>
-          <div class="mt-1 text-xl font-semibold">{{ hitRateText }}</div>
-        </div>
-        <div>
-          <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheHits') }}</div>
-          <div class="mt-1 text-xl font-semibold">{{ cache.hits }}</div>
-          <div class="text-xs text-faint">{{ t('settingsPage.usage.cacheMisses') }} {{ cache.misses }}</div>
-        </div>
-        <div>
-          <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheSaved') }}</div>
-          <div class="mt-1 text-xl font-semibold">
-            {{ formatNumber(cache.savedPromptTokens + cache.savedCompletionTokens) }}
+    <!-- 缓存统计：API 前缀缓存（按前缀打折计费） + 本地重放缓存（相同请求重放） -->
+    <div class="grid gap-4 sm:grid-cols-2">
+      <!-- API 前缀缓存：来自每次请求的 usage（DeepSeek 上下文缓存，命中部分打折计费） -->
+      <VCard class="px-4 py-3.5">
+        <div class="text-sm font-medium">{{ t('settingsPage.usage.apiCacheTitle') }}</div>
+        <div class="mt-3 grid grid-cols-2 gap-4">
+          <div>
+            <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheHitRate') }}</div>
+            <div class="mt-1 text-xl font-semibold">{{ apiCacheRateText }}</div>
           </div>
-          <div class="text-xs text-faint">{{ t('settingsPage.usage.tokens') }}</div>
+          <div>
+            <div class="text-xs text-muted">{{ t('settingsPage.usage.apiCacheHitTokens') }}</div>
+            <div class="mt-1 text-xl font-semibold">{{ formatNumber(apiCache.cached) }}</div>
+            <div class="text-xs text-faint">
+            <div class="text-xs text-faint">{{ t('settingsPage.usage.apiCacheSamples') }} {{ apiCache.sampled }}</div>
+              {{ t('settingsPage.usage.apiCacheMissTokens') }} {{ formatNumber(apiCache.miss) }}
+            </div>
+          </div>
         </div>
-        <div>
-          <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheEntries') }}</div>
-          <div class="mt-1 text-xl font-semibold">{{ cache.entries }}</div>
+        <div class="mt-3 text-xs leading-5 text-faint">{{ t('settingsPage.usage.apiCacheHint') }}</div>
+      </VCard>
+
+      <!-- 本地重放缓存：相同请求（中断重试/重复提问）直接重放，省 API 调用 -->
+      <VCard class="px-4 py-3.5">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-medium">{{ t('settingsPage.usage.localCacheTitle') }}</div>
+          <VBtn size="small" variant="text" color="error" :loading="clearing" @click="clearCache">
+            {{ t('settingsPage.usage.cacheClear') }}
+          </VBtn>
         </div>
-      </div>
-    </VCard>
+        <div v-if="!cache" class="mt-2 text-xs text-faint">{{ t('settingsPage.usage.cacheEmpty') }}</div>
+        <div v-else class="mt-3 grid grid-cols-2 gap-4">
+          <div>
+            <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheHitRate') }}</div>
+            <div class="mt-1 text-xl font-semibold">{{ hitRateText }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheHits') }}</div>
+            <div class="mt-1 text-xl font-semibold">{{ cache.hits }}</div>
+            <div class="text-xs text-faint">{{ t('settingsPage.usage.cacheMisses') }} {{ cache.misses }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheSaved') }}</div>
+            <div class="mt-1 text-xl font-semibold">
+              {{ formatNumber(cache.savedPromptTokens + cache.savedCompletionTokens) }}
+            </div>
+            <div class="text-xs text-faint">{{ t('settingsPage.usage.tokens') }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">{{ t('settingsPage.usage.cacheEntries') }}</div>
+            <div class="mt-1 text-xl font-semibold">{{ cache.entries }}</div>
+          </div>
+        </div>
+        <div class="mt-3 text-xs leading-5 text-faint">{{ t('settingsPage.usage.localCacheHint') }}</div>
+      </VCard>
+    </div>
 
     <VCard class="px-4 py-3.5">
       <div class="flex items-center justify-between">
@@ -127,6 +163,9 @@ onMounted(load);
             <span class="text-muted">{{ r.promptTokens }}</span>
             <span class="mx-1 text-faint">/</span>
             <span>{{ r.completionTokens }}</span>
+            <span v-if="r.cacheTracked && r.promptTokens > 0" class="ml-2 shrink-0 text-xs text-tool-read">
+              缓存 {{ ((r.cachedPromptTokens ?? 0) / r.promptTokens * 100).toFixed(0) }}%
+            </span>
           </div>
         </div>
       </div>

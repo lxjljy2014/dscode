@@ -25,6 +25,7 @@ import {
   scanTree,
   searchIndex,
   setSessionArchived,
+  setSessionStats,
   touchProject,
   upsertMessage,
   upsertSession,
@@ -33,7 +34,8 @@ import {
 import { resolveConfirm, startAgent, stopAgent } from './agent/agent';
 import { loadAppSettings, saveAppSettings } from './settings';
 import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './shell/terminal';
-import { isMessage, isSession, isString, parseTerminalSize } from './validators';
+import { isMessage, isSession, isSessionStats, isString, parseTerminalSize } from './validators';
+import { getConfigDir, getDbFile, getPluginsDir, getSessionsDir } from './data-dir';
 
 /**
  * 业务 IPC 注册（ipcMain.handle / ipcRenderer.invoke；终端输入/尺寸为 ipcMain.on 单向通道）。
@@ -52,35 +54,33 @@ function withMainWindow<E extends Electron.IpcMainEvent | Electron.IpcMainInvoke
 }
 
 export function registerIpcHandlers(): void {
-  const settingsFile = app.getPath('userData') + '/settings.json';
-  const projectsFile = app.getPath('userData') + '/projects.db';
-  const sessionsFile = app.getPath('userData') + '/sessions.db';
-  const usageFile = app.getPath('userData') + '/usage.db';
-  const pluginsDir = app.getPath('userData') + '/plugins';
-  const indexFile = app.getPath('userData') + '/index.db';
+  const settingsDir = getConfigDir();
+  // 关系型数据统一一个库（dscode.db，按表组织）；会话为 JSONL 文件
+  const dbFile = getDbFile();
+  const sessionsRoot = getSessionsDir();
+  const pluginsDir = getPluginsDir();
   const homeDir = app.getPath('home');
-  initProjects(projectsFile);
-  initSessions(sessionsFile);
-  initUsage(usageFile);
-  initIndex(indexFile);
-  // 旧数据迁移：无工作空间归属的会话回填到当前工作目录
-  backfillSessions(sessionsFile, loadAppSettings(settingsFile, homeDir).workingDirectory);
+  initProjects(dbFile);
+  initSessions(sessionsRoot);
+  initUsage(dbFile);
+  initIndex(dbFile);
+  backfillSessions(sessionsRoot, loadAppSettings(settingsDir, homeDir).workingDirectory);
 
   // ---- settings ----
   ipcMain.handle(
     'settings:get',
-    withMainWindow(() => loadAppSettings(settingsFile, homeDir))
+    withMainWindow(() => loadAppSettings(settingsDir, homeDir))
   );
 
   ipcMain.handle(
     'settings:set',
     withMainWindow((_win, patch: unknown) => {
-      if (typeof patch !== 'object' || patch === null) return loadAppSettings(settingsFile, homeDir);
+      if (typeof patch !== 'object' || patch === null) return loadAppSettings(settingsDir, homeDir);
       const record = patch as Record<string, unknown>;
-      const next = saveAppSettings(settingsFile, homeDir, record as SettingsPatch);
+      const next = saveAppSettings(settingsDir, homeDir, record as SettingsPatch);
       // 工作目录变化且不是家目录 → 记入最近项目
       if (typeof record['workingDirectory'] === 'string' && record['workingDirectory'] !== homeDir) {
-        touchProject(projectsFile, record['workingDirectory'] as string);
+        touchProject(dbFile, record['workingDirectory'] as string);
       }
       return next;
     })
@@ -89,13 +89,13 @@ export function registerIpcHandlers(): void {
   // ---- 最近项目 ----
   ipcMain.handle(
     'projects:list',
-    withMainWindow(() => listProjectsWithHome(projectsFile, homeDir))
+    withMainWindow(() => listProjectsWithHome(dbFile, homeDir))
   );
   ipcMain.handle(
     'projects:remove',
     withMainWindow((_win, path: unknown) => {
       if (!isString(path)) return { ok: false as const, error: 'invalid path' };
-      removeProject(projectsFile, path);
+      removeProject(dbFile, path);
       return { ok: true as const };
     })
   );
@@ -121,19 +121,18 @@ export function registerIpcHandlers(): void {
   // ---- 使用统计 ----
   ipcMain.handle(
     'usage:list',
-    withMainWindow(() => listUsage(usageFile))
+    withMainWindow(() => listUsage(dbFile))
   );
 
   // ---- LLM 回复缓存（省成本；命中率在「使用统计」页展示） ----
-  const cacheFile = app.getPath('userData') + '/cache.db';
-  initLlmCache(cacheFile);
+  initLlmCache(dbFile);
   ipcMain.handle(
     'usage:cache-stats',
-    withMainWindow(() => createSqliteLlmCache(cacheFile).stats())
+    withMainWindow(() => createSqliteLlmCache(dbFile).stats())
   );
   ipcMain.handle(
     'usage:cache-clear',
-    withMainWindow(() => createSqliteLlmCache(cacheFile).clear())
+    withMainWindow(() => createSqliteLlmCache(dbFile).clear())
   );
 
   // ---- MCP ----
@@ -161,15 +160,15 @@ export function registerIpcHandlers(): void {
   // ---- 代码索引 ----
   ipcMain.handle(
     'index:stats',
-    withMainWindow(() => indexStats(indexFile))
+    withMainWindow(() => indexStats(dbFile))
   );
   ipcMain.handle(
     'index:build',
-    withMainWindow(() => buildIndex(loadAppSettings(settingsFile, homeDir).workingDirectory, indexFile))
+    withMainWindow(() => buildIndex(loadAppSettings(settingsDir, homeDir).workingDirectory, dbFile))
   );
   ipcMain.handle(
     'index:search',
-    withMainWindow((_win, query: unknown) => (isString(query) ? searchIndex(indexFile, query) : []))
+    withMainWindow((_win, query: unknown) => (isString(query) ? searchIndex(dbFile, query) : []))
   );
 
   // ---- 浏览器（测试抓取） ----
@@ -208,12 +207,12 @@ export function registerIpcHandlers(): void {
   // ---- 工作区（异步扫描/读取，避免阻塞主进程） ----
   ipcMain.handle(
     'workspace:tree',
-    withMainWindow(async () => scanTree(loadAppSettings(settingsFile, homeDir).workingDirectory))
+    withMainWindow(async () => scanTree(loadAppSettings(settingsDir, homeDir).workingDirectory))
   );
   ipcMain.handle(
     'workspace:read-file',
     withMainWindow(async (_win, relPath: unknown) => {
-      const cwd = loadAppSettings(settingsFile, homeDir).workingDirectory;
+      const cwd = loadAppSettings(settingsDir, homeDir).workingDirectory;
       return isString(relPath) ? readWorkspaceFile(cwd, relPath) : { ok: false, error: 'invalid path' };
     })
   );
@@ -221,13 +220,13 @@ export function registerIpcHandlers(): void {
   // ---- 会话持久化 ----
   ipcMain.handle(
     'sessions:list',
-    withMainWindow(() => listSessions(sessionsFile))
+    withMainWindow(() => listSessions(sessionsRoot))
   );
   ipcMain.handle(
     'sessions:create',
     withMainWindow((_win, session: unknown) => {
       if (!isSession(session)) return { ok: false, error: 'invalid session' };
-      upsertSession(sessionsFile, session);
+      upsertSession(sessionsRoot, session);
       return { ok: true };
     })
   );
@@ -235,7 +234,7 @@ export function registerIpcHandlers(): void {
     'sessions:append',
     withMainWindow((_win, sessionId: unknown, message: unknown) => {
       if (!isString(sessionId) || !isMessage(message)) return { ok: false, error: 'invalid args' };
-      upsertMessage(sessionsFile, sessionId, message);
+      upsertMessage(sessionsRoot, sessionId, message);
       return { ok: true };
     })
   );
@@ -243,12 +242,21 @@ export function registerIpcHandlers(): void {
     'sessions:archive',
     withMainWindow((_win, sessionId: unknown, archived: unknown) => {
       if (!isString(sessionId) || typeof archived !== 'boolean') return { ok: false, error: 'invalid args' };
-      setSessionArchived(sessionsFile, sessionId, archived);
+      setSessionArchived(sessionsRoot, sessionId, archived);
       return { ok: true };
     })
   );
 
   // ---- git ----
+
+  ipcMain.handle(
+    'sessions:stats',
+    withMainWindow((_win, sessionId: unknown, stats: unknown) => {
+      if (!isString(sessionId) || !isSessionStats(stats)) return { ok: false, error: 'invalid args' };
+      setSessionStats(sessionsRoot, sessionId, stats);
+      return { ok: true };
+    })
+  );
   ipcMain.handle(
     'git:list-branches',
     withMainWindow((_win, cwd: unknown) => (isString(cwd) ? listBranches(cwd) : { ok: false, error: 'invalid cwd' }))

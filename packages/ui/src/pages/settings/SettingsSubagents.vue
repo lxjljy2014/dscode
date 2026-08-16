@@ -71,21 +71,26 @@ async function persist() {
       </VBtn>
     </div>
 
-    <VCard v-for="s in subagents" :key="s.id" class="px-4 py-3">
+    <VCard
+      v-for="s in subagents"
+      :key="s.id"
+      class="cursor-pointer px-4 py-3 transition-colors hover:bg-elevated"
+      @click="openEdit(s)"
+    >
       <div class="flex items-start justify-between gap-4">
-        <button class="min-w-0 flex-1 cursor-pointer text-left" @click="openEdit(s)">
+        <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">{{ s.name }}</span>
             <span class="truncate text-sm text-muted">{{ s.description }}</span>
           </div>
           <div class="mt-1.5 truncate text-xs leading-5 text-muted">{{ s.systemPrompt }}</div>
-        </button>
+        </div>
         <VBtn
           icon="i-lucide:trash-2"
           variant="text"
           size="small"
           class="shrink-0 text-muted"
-          @click="removeSubagent(s.id)"
+          @click.stop="removeSubagent(s.id)"
         />
       </div>
     </VCard>
@@ -103,21 +108,24 @@ async function persist() {
             v-model="draft.name"
             :label="t('settingsPage.subagents.name')"
             :placeholder="t('settingsPage.subagents.namePlaceholder')"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             class="mb-3"
             hide-details
           />
           <VTextField
             v-model="draft.description"
             :label="t('settingsPage.subagents.description')"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             class="mb-3"
             hide-details
           />
           <VTextarea
             v-model="draft.systemPrompt"
             :label="t('settingsPage.subagents.systemPrompt')"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             rows="5"
             auto-grow
             hide-details

@@ -13,5 +13,15 @@
       "@dscode/ui/global.css": ["packages/ui/src/theme/global.css"]
     }
   },
-  "include": ["electron.vite.config.ts", "uno.config.ts", "src/main/**/*", "src/preload/**/*"]
+    "include": [
+    "electron.vite.config.ts",
+    "uno.config.ts",
+    "src/main/**/*",
+    "src/preload/**/*",
+    // workspace 源码列入文件列表：main/preload 经路径别名引用 @dscode/core/@dscode/shared，
+    // uno.config 引用 @dscode/ui/tokens；composite 项目要求被引用文件在 include 内（否则 TS6307）
+    "../core/src/**/*.ts",
+    "../shared/src/**/*.ts",
+    "../ui/src/theme/tokens.ts"
+  ]
 }

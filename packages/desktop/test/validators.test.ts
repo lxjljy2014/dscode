@@ -170,4 +170,18 @@ describe('parseTerminalSize', () => {
     expect(parseTerminalSize('80', 24)).toBeNull();
     expect(parseTerminalSize(80, '24')).toBeNull();
   });
+
+describe('isMessage 工具事件步骤', () => {
+  it('接受 run_code / skill 工具事件（历史重建不被拒绝）', () => {
+    const base = { id: 'm1', role: 'assistant', content: '', createdAt: 1 };
+    const mk = (name: string) => ({
+      ...base,
+      steps: [{ kind: 'tool', event: {
+        id: 't1', name, args: '{}', status: 'done', createdAt: 1, content: 'x'
+      } }]
+    });
+    expect(isMessage(mk('run_code'))).toBe(true);
+    expect(isMessage(mk('skill'))).toBe(true);
+  });
+});
 });

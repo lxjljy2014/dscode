@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 // 经子路径出口导入运行时值：主进程外部化 @dscode/shared 后由 Node 直接加载，
 // 主入口 index.ts 的目录 re-export（./types）在 Node ESM 下不可解析
-import { DEFAULT_SUBAGENTS, DEEPSEEK_PRESET } from '@dscode/shared/settings';
+import { DEFAULT_SKILLS, DEFAULT_SUBAGENTS, DEEPSEEK_PRESET } from '@dscode/shared/settings';
 import type {
   AppSettings,
   Command,
@@ -17,8 +18,10 @@ import type {
 } from '@dscode/shared';
 
 /**
- * 应用设置的 JSON 持久化（userData/settings.json）。
+ * 应用设置的 JSON 持久化（~/.dscode/config 目录，按域拆分）。
  * 工作目录、权限模式、AI 供应商配置与引导状态随应用重启保留。
+ * 每个配置域一个 JSON 文件（general/providers/memory/skills/commands/hooks/subagents/mcp），
+ * 便于用户按域编辑与备份；旧版单文件 settings.json 首次加载时自动迁移为拆分文件。
  * 通过可选 crypto 钩子支持 apiKey 静态加密（Electron safeStorage 由 desktop 层注入，core 保持无 Electron 依赖）。
  */
 
@@ -27,6 +30,18 @@ export interface SettingsCrypto {
   encrypt(plaintext: string): string;
   decrypt(ciphertext: string): string;
 }
+
+/** 配置域 → 文件名 + 归属字段（providers 独立文件，便于 apiKey 加密管理） */
+export const CONFIG_DOMAINS: ReadonlyArray<{ file: string; fields: (keyof AppSettings)[] }> = [
+  { file: 'general.json', fields: ['workingDirectory', 'permissionMode', 'onboardingDone', 'browsingEnabled'] },
+  { file: 'providers.json', fields: ['providers'] },
+  { file: 'memory.json', fields: ['memory'] },
+  { file: 'skills.json', fields: ['skills'] },
+  { file: 'commands.json', fields: ['commands'] },
+  { file: 'hooks.json', fields: ['hooks'] },
+  { file: 'subagents.json', fields: ['subagents'] },
+  { file: 'mcp.json', fields: ['mcpServers'] }
+];
 
 function isPermissionMode(v: unknown): v is PermissionMode {
   return v === 'confirm' || v === 'auto-edit' || v === 'plan' || v === 'full-access';
@@ -56,7 +71,6 @@ function isProviderConfig(v: unknown): v is ProviderConfig {
   );
 }
 
-/** 斜杠命令收窄：字段齐全且类型正确才保留 */
 /** 记忆条目收窄 */
 function isMemoryEntry(v: unknown): v is MemoryEntry {
   if (typeof v !== 'object' || v === null) return false;
@@ -171,6 +185,51 @@ function encryptProviders(providers: ProviderConfig[], crypto?: SettingsCrypto):
   });
 }
 
+/** 单字段归一化：非法值回退 fallback（fallback 来自默认设置或当前值） */
+function normalizeField(field: keyof AppSettings, value: unknown, fallback: unknown): unknown {
+  switch (field) {
+    case 'workingDirectory':
+      return typeof value === 'string' ? value : fallback;
+    case 'permissionMode':
+      return isPermissionMode(value) ? value : fallback;
+    case 'onboardingDone':
+      return typeof value === 'boolean' ? value : fallback;
+    case 'browsingEnabled':
+      return typeof value === 'boolean' ? value : fallback;
+    case 'providers':
+      return normalizeProviders(Array.isArray(value) ? value.filter(isProviderConfig) : (fallback as ProviderConfig[]));
+    case 'memory':
+      return Array.isArray(value) ? value.filter(isMemoryEntry) : fallback;
+    case 'skills':
+      // 文件缺失（undefined）回退内置技能；显式空数组尊重用户删除
+      return Array.isArray(value) ? value.filter(isSkill) : fallback;
+    case 'commands':
+      return Array.isArray(value) ? value.filter(isCommand) : fallback;
+    case 'hooks':
+      return Array.isArray(value) ? value.filter(isHook) : fallback;
+    case 'subagents': {
+      // 与旧行为一致：用户清空子智能体列表时回退内置默认
+      const list = Array.isArray(value) ? value.filter(isSubagent) : [];
+      return list.length > 0 ? list : fallback;
+    }
+    case 'mcpServers':
+      return Array.isArray(value) ? value.filter(isMcpServer) : fallback;
+    default:
+      return fallback;
+  }
+}
+
+/** 读取 JSON 文件为对象（缺失/损坏返回空对象） */
+function readJsonFile(file: string): Record<string, unknown> {
+  try {
+    if (!existsSync(file)) return {};
+    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 export function defaultSettings(homeDir: string): AppSettings {
   return {
     workingDirectory: homeDir,
@@ -179,7 +238,7 @@ export function defaultSettings(homeDir: string): AppSettings {
     onboardingDone: false,
     commands: [],
     memory: [],
-    skills: [],
+    skills: [...DEFAULT_SKILLS],
     hooks: [],
     subagents: [...DEFAULT_SUBAGENTS],
     mcpServers: [],
@@ -187,72 +246,73 @@ export function defaultSettings(homeDir: string): AppSettings {
   };
 }
 
-/** 加载 + 归一化 + 解密：非法字段回退默认值 */
-export function loadSettings(file: string, homeDir: string, crypto?: SettingsCrypto): AppSettings {
-  const defaults = defaultSettings(homeDir);
+/**
+ * 旧版单文件迁移：config 目录下存在 settings.json 且尚无拆分文件时，
+ * 读旧文件 → 按域归一化 → 写拆分文件 → 旧文件改名 .bak。
+ * 幂等：迁移后 settings.json 消失，下次不再触发。
+ */
+function migrateLegacySettingsFile(configDir: string, homeDir: string): void {
+  const legacy = join(configDir, 'settings.json');
+  if (!existsSync(legacy)) return;
+  if (CONFIG_DOMAINS.some(d => existsSync(join(configDir, d.file)))) return;
   try {
-    if (!existsSync(file)) return defaults;
-    const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
-    const workingDirectory =
-      typeof raw['workingDirectory'] === 'string' ? raw['workingDirectory'] : defaults.workingDirectory;
-    const permissionMode = isPermissionMode(raw['permissionMode']) ? raw['permissionMode'] : defaults.permissionMode;
-    const providers = normalizeProviders(
-      Array.isArray(raw['providers']) ? raw['providers'].filter(isProviderConfig) : defaults.providers
-    );
-    const onboardingDone = typeof raw['onboardingDone'] === 'boolean' ? raw['onboardingDone'] : defaults.onboardingDone;
-    const commands = Array.isArray(raw['commands']) ? raw['commands'].filter(isCommand) : [];
-    const memory = Array.isArray(raw['memory']) ? raw['memory'].filter(isMemoryEntry) : [];
-    const skills = Array.isArray(raw['skills']) ? raw['skills'].filter(isSkill) : [];
-    const hooks = Array.isArray(raw['hooks']) ? raw['hooks'].filter(isHook) : [];
-    const rawSubagents = Array.isArray(raw['subagents']) ? raw['subagents'].filter(isSubagent) : [];
-    const subagents = rawSubagents.length > 0 ? rawSubagents : defaults.subagents;
-    const mcpServers = Array.isArray(raw['mcpServers']) ? raw['mcpServers'].filter(isMcpServer) : [];
-    const browsingEnabled = typeof raw['browsingEnabled'] === 'boolean' ? raw['browsingEnabled'] : true;
-    return {
-      workingDirectory,
-      permissionMode,
-      providers: decryptProviders(providers, crypto),
-      onboardingDone,
-      commands,
-      memory,
-      skills,
-      hooks,
-      subagents,
-      mcpServers,
-      browsingEnabled
-    };
+    const raw = readJsonFile(legacy);
+    const defaults = defaultSettings(homeDir);
+    for (const domain of CONFIG_DOMAINS) {
+      const out: Record<string, unknown> = {};
+      for (const field of domain.fields) {
+        // 旧文件 providers 已加密，原样搬运到拆分文件（loadSettings 统一解密）
+        out[field as string] = normalizeField(field, raw[field as string], defaults[field]);
+      }
+      writeFileSync(join(configDir, domain.file), JSON.stringify(out, null, 2), 'utf8');
+    }
+    renameSync(legacy, legacy + '.bak');
   } catch {
-    return defaults;
+    // 旧文件损坏：忽略，各域走默认值
   }
 }
 
-/** 合并 patch、加密 apiKey 后落盘，返回最新设置（返回值为解密后的明文，供调用方使用） */
+/** 加载 + 归一化 + 解密：按域合并配置文件，非法字段回退默认值 */
+export function loadSettings(configDir: string, homeDir: string, crypto?: SettingsCrypto): AppSettings {
+  mkdirSync(configDir, { recursive: true });
+  migrateLegacySettingsFile(configDir, homeDir);
+  const defaults = defaultSettings(homeDir);
+  const result: AppSettings = { ...defaults };
+  for (const domain of CONFIG_DOMAINS) {
+    const raw = readJsonFile(join(configDir, domain.file));
+    for (const field of domain.fields) {
+      (result as unknown as Record<string, unknown>)[field] = normalizeField(field, raw[field as string], defaults[field]);
+    }
+  }
+  result.providers = decryptProviders(result.providers, crypto);
+  return result;
+}
+
+/** 合并 patch、加密 apiKey 后按域落盘，返回最新设置（返回值为解密后的明文，供调用方使用） */
 export function saveSettings(
-  file: string,
+  configDir: string,
   homeDir: string,
   patch: SettingsPatch,
   crypto?: SettingsCrypto
 ): AppSettings {
-  const current = loadSettings(file, homeDir, crypto);
-  const next: AppSettings = {
-    workingDirectory:
-      typeof patch.workingDirectory === 'string' && patch.workingDirectory.length > 0
-        ? patch.workingDirectory
-        : current.workingDirectory,
-    permissionMode: isPermissionMode(patch.permissionMode) ? patch.permissionMode : current.permissionMode,
-    providers: normalizeProviders(
-      Array.isArray(patch.providers) ? patch.providers.filter(isProviderConfig) : current.providers
-    ),
-    onboardingDone: typeof patch.onboardingDone === 'boolean' ? patch.onboardingDone : current.onboardingDone,
-    commands: Array.isArray(patch.commands) ? patch.commands.filter(isCommand) : current.commands,
-    memory: Array.isArray(patch.memory) ? patch.memory.filter(isMemoryEntry) : current.memory,
-    skills: Array.isArray(patch.skills) ? patch.skills.filter(isSkill) : current.skills,
-    hooks: Array.isArray(patch.hooks) ? patch.hooks.filter(isHook) : current.hooks,
-    subagents: Array.isArray(patch.subagents) ? patch.subagents.filter(isSubagent) : current.subagents,
-    mcpServers: Array.isArray(patch.mcpServers) ? patch.mcpServers.filter(isMcpServer) : current.mcpServers,
-    browsingEnabled: typeof patch.browsingEnabled === 'boolean' ? patch.browsingEnabled : current.browsingEnabled
-  };
-  const persisted: AppSettings = { ...next, providers: encryptProviders(next.providers, crypto) };
-  writeFileSync(file, JSON.stringify(persisted, null, 2), 'utf8');
+  mkdirSync(configDir, { recursive: true });
+  const current = loadSettings(configDir, homeDir, crypto);
+  const next: AppSettings = { ...current };
+  const changed = new Set<keyof AppSettings>();
+  for (const key of Object.keys(patch) as (keyof AppSettings)[]) {
+    const value = (patch as Record<string, unknown>)[key];
+    (next as unknown as Record<string, unknown>)[key] = normalizeField(key, value, current[key]);
+    changed.add(key);
+  }
+  // 只写有变更的域文件（其他域不动，避免无谓写入）
+  for (const domain of CONFIG_DOMAINS) {
+    if (!domain.fields.some(f => changed.has(f))) continue;
+    const out: Record<string, unknown> = {};
+    for (const field of domain.fields) out[field as string] = next[field];
+    if (out['providers'] !== undefined) {
+      out['providers'] = encryptProviders(out['providers'] as ProviderConfig[], crypto);
+    }
+    writeFileSync(join(configDir, domain.file), JSON.stringify(out, null, 2), 'utf8');
+  }
   return next;
 }

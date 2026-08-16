@@ -122,13 +122,13 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 - 安全设置：`contextIsolation: true`、`nodeIntegration: false`、`sandbox: false`；外部链接一律 `shell.openExternal`，`window.open` 被 deny。
 - preload 只暴露 `window.dscode`（platform、versions、setTitleBarOverlay + 业务 IPC 封装），即 `@dscode/ui` HostApi 桥接的 Electron 实现。
 - **业务 IPC 通道**（全部 `ipcMain.handle` / `ipcRenderer.invoke`，定义在 `desktop/src/main/ipc.ts`，渲染端类型见 `@dscode/ui` 的 `host.ts`）：
-  - `settings:get` / `settings:set` —— 工作目录 + 权限模式（`userData/settings.json` 持久化；set 时工作目录变化自动记入最近项目）
-  - `projects:list` —— 最近项目（`node:sqlite`，`userData/projects.db`，无原生依赖）
+  - `settings:get` / `settings:set` —— 工作目录 + 权限模式（`~/.dscode/config/` 下按域拆分的 JSON 持久化（general/providers/skills 等）；set 时工作目录变化自动记入最近项目）
+  - `projects:list` —— 最近项目（`node:sqlite`，`~/.dscode/db/dscode.db`（usage/cache/projects/index 共用一库，按表组织），无原生依赖）
   - `dialog:pick-directory` —— 选择工作目录（取消返回 null）
   - `provider:verify` —— API key 校验（主进程 fetch `GET {baseUrl}/models`）
   - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（运行时在 `@dscode/core`（SSE 流式 + 工具循环 + 门控 + 模型适配，事件经 AgentEventSink 上抛），`desktop/src/main/agent/agent.ts` 实现 sink 映射到 IPC；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求；渲染端在输入框上弹出三选项确认卡片，响应为 ConfirmDecision：allow-once/allow-session/deny，allow-session 会话内免问，deny 由运行时中止整个任务，120s 超时自动拒绝）/ `agent:done` / `agent:session-stats`（会话运行统计：轮数/LLM与工具耗时/首token/tokens/缓存命中率，输入卡片下方统计条展示）/ `agent:error`（code: no-api-key/api/network/aborted/running/unknown；unknown 等携带 detail 真实原因，渲染端随错误气泡展示），均带 sessionId；同会话重复 `agent:start` 会先中止旧运行再启动新运行（窗口重载后重发不报错）；窗口关闭时其发起的运行被回收（见 `stopWindowAgents`）
   - `workspace:tree` / `workspace:read-file` —— 真实文件树扫描与文件读取（路径限定工作目录内）；`workspace:diff` 事件 —— 写/执行工具后主进程按「agent 启动快照 vs 当前内容」LCS 行级 diff 推送
-  - `sessions:list` / `sessions:create` / `sessions:append` —— 会话持久化（`node:sqlite`，`userData/sessions.db`；消息的 steps（思维链/正文/工具调用交错的有序步骤）以 JSON 存 `messages.steps` 列，重启后按此恢复折叠块与工具卡；旧消息无 steps 走正文兜底；会话级 toolEvents 数组仍为瞬态不落库）
+  - `sessions:list` / `sessions:create` / `sessions:append` —— 会话持久化（JSONL 文件：`~/.dscode/sessions/<workspace-slug>/<session-id>/{meta.json, session.jsonl}`，每会话独立文件、追加式日志；消息的 steps（思维链/正文/工具调用交错的有序步骤）以 JSON 行随消息落库，重启后按此恢复折叠块与工具卡；旧消息无 steps 走正文兜底；旧 sqlite sessions.db 首次启动自动迁移；会话级 toolEvents 数组仍为瞬态不落库）
   - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` —— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合
   - `terminal:ensure` / `terminal:write` / `terminal:resize` / `terminal:kill` —— 集成终端（主进程 node-pty，多会话按渲染端生成的 sessionId 管理、按窗口归属统一回收，见 `main/shell/terminal.ts`）；pty 输出经 `terminal:data` / `terminal:exit` 事件（带 sessionId）推给渲染端，write/resize 为高频单向 `on` 通道
   - 每个 handler 校验 sender 属于主窗口 + 参数类型；新增业务 IPC 沿用此模式

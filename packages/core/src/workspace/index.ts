@@ -85,3 +85,15 @@ export function indexStats(file: string): IndexStats {
   const meta = db.prepare("SELECT value FROM index_meta WHERE key = 'built_at'").get() as { value: string } | undefined;
   return { fileCount, termCount, builtAt: meta ? Number(meta.value) : 0 };
 }
+
+/** 关闭指定数据文件的连接（测试清理/重建用；Windows 下不关闭连接会占用文件句柄导致目录删除失败） */
+export function closeIndexDb(file: string): void {
+  dbs.get(file)?.close();
+  dbs.delete(file);
+}
+
+/** 关闭全部连接（应用退出/测试收尾） */
+export function closeIndexDbs(): void {
+  for (const db of dbs.values()) db.close();
+  dbs.clear();
+}

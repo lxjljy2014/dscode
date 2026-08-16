@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildCacheKey, createSqliteLlmCache, initLlmCache } from '../src/cache/llm-cache';
+import { buildCacheKey, closeCacheDbs, createSqliteLlmCache, initLlmCache } from '../src/cache/llm-cache';
 
 /**
  * LLM 回复缓存单测：key 确定性、sqlite 落库往返、命中/未命中统计、容量控制。
@@ -41,8 +41,9 @@ describe('createSqliteLlmCache', () => {
   let dir: string;
   let file: string;
   afterEach(async () => {
-    // 尽力清理临时目录（Windows 下偶发 EBUSY 为预存 flake，不影响断言结果）
-    await rm(dir, { recursive: true, force: true }).catch(() => {});
+    // 先关闭 sqlite 连接再删目录：Windows 下未关闭的文件句柄会使 rm 失败（文件级测试失败的真凶）
+    closeCacheDbs();
+    await rm(dir, { recursive: true, force: true });
   });
 
   async function fresh(): Promise<string> {
@@ -77,6 +78,17 @@ describe('createSqliteLlmCache', () => {
     expect(await cache.get('llm:none')).toBeNull();
   });
 
+
+  it('set 时按 key 前缀落库真实模型（不再写空串）', async () => {
+    await fresh();
+    const cache = createSqliteLlmCache(file);
+    const key = cache.key('deepseek-v4-pro', [{ role: 'user', content: 'x' }], []);
+    await cache.set(key, { content: 'c', reasoning: '', toolCalls: [], promptTokens: 1, completionTokens: 1 });
+    const db = new (require('node:sqlite').DatabaseSync)(file);
+    const row = db.prepare('SELECT model FROM llm_cache_entries WHERE key = ?').get(key) as { model: string };
+    db.close();
+    expect(row.model).toBe('deepseek-v4-pro');
+  });
   it('命中/未命中统计：hitRate 与节省 token 正确', async () => {
     await fresh();
     const cache = createSqliteLlmCache(file);

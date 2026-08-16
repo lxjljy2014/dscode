@@ -1,4 +1,4 @@
-import type { AgentToolEvent, AssistantStep, ChatMessagePayload, Message, Session } from '@dscode/shared';
+import type { AgentToolEvent, AssistantStep, ChatMessagePayload, Message, Session, SessionStats } from '@dscode/shared';
 
 /**
  * IPC 参数校验的共享收窄函数。
@@ -34,7 +34,7 @@ export function isChatMessagePayload(v: unknown): v is ChatMessagePayload {
   });
 }
 
-const TOOL_NAMES = new Set(['read_file', 'list_dir', 'search', 'run_command', 'write_file', 'edit_file', 'browse']);
+const TOOL_NAMES = new Set(['read_file', 'list_dir', 'search', 'run_command', 'write_file', 'edit_file', 'browse', 'run_code', 'skill']);
 const TOOL_STATUSES = new Set(['running', 'done', 'error', 'confirming', 'denied']);
 
 /** 校验工具事件（required 字段 + 可选 summary/error 的类型） */
@@ -97,6 +97,18 @@ export function isMessage(v: unknown): v is Message {
 }
 
 /** 校验会话行（toolEvents/messages 由渲染端置空后落库，这里不校验其内容；archived 可选，缺省未归档） */
+/** 会话运行统计收窄（输入卡片下方统计条；字段不全拒绝） */
+export function isSessionStats(v: unknown): v is SessionStats {
+  if (!isRecord(v)) return false;
+  const s = v as Record<string, unknown>;
+  return (
+    typeof s['rounds'] === 'number' &&
+    typeof s['llmMs'] === 'number' &&
+    typeof s['toolMs'] === 'number' &&
+    (s['contextTokens'] === undefined || typeof s['contextTokens'] === 'number')
+  );
+}
+
 export function isSession(v: unknown): v is Session {
   if (!isRecord(v)) return false;
   const r = v as Record<string, unknown>;

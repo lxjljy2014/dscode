@@ -2,6 +2,7 @@ export * from './types';
 export * from './openai-compatible';
 export * from './deepseek';
 export * from './stream';
+export * from './retry';
 
 import { deepseekAdapter } from './deepseek';
 import { openAiCompatibleAdapter } from './openai-compatible';

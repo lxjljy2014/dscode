@@ -78,9 +78,14 @@ async function persist() {
       </VBtn>
     </div>
 
-    <VCard v-for="h in hooks" :key="h.id" class="px-4 py-3">
+    <VCard
+      v-for="h in hooks"
+      :key="h.id"
+      class="cursor-pointer px-4 py-3 transition-colors hover:bg-elevated"
+      @click="openEdit(h)"
+    >
       <div class="flex items-start justify-between gap-4">
-        <button class="min-w-0 flex-1 cursor-pointer text-left" @click="openEdit(h)">
+        <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">{{ h.name }}</span>
             <span class="rounded bg-elevated px-1.5 py-0.5 text-xs text-muted">
@@ -88,8 +93,14 @@ async function persist() {
             </span>
           </div>
           <div class="mt-1.5 truncate font-mono text-xs leading-5 text-muted">{{ h.command }}</div>
-        </button>
-        <VBtn icon="i-lucide:trash-2" variant="text" size="small" class="shrink-0 text-muted" @click="removeHook(h.id)" />
+        </div>
+        <VBtn
+          icon="i-lucide:trash-2"
+          variant="text"
+          size="small"
+          class="shrink-0 text-muted"
+          @click.stop="removeHook(h.id)"
+        />
       </div>
     </VCard>
 
@@ -105,7 +116,8 @@ async function persist() {
           <VTextField
             v-model="draft.name"
             :label="t('settingsPage.hooks.name')"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             class="mb-3"
             hide-details
           />
@@ -115,7 +127,8 @@ async function persist() {
             :items="triggerItems"
             item-title="title"
             item-value="value"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             class="mb-3"
             hide-details
           />
@@ -123,7 +136,8 @@ async function persist() {
             v-model="draft.command"
             :label="t('settingsPage.hooks.command')"
             :placeholder="t('settingsPage.hooks.commandPlaceholder')"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             hide-details
           />
         </VCardText>

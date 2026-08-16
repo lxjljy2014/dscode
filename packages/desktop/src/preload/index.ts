@@ -24,6 +24,7 @@ import type {
   TerminalDataEvent,
   TerminalEnsureResult,
   TerminalExitInfo,
+  TrayAction,
   UsageRecord
 } from '@dscode/shared';
 
@@ -132,6 +133,8 @@ const api = {
     ipcRenderer.invoke('sessions:append', sessionId, message),
   sessionSetArchived: (sessionId: string, archived: boolean): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('sessions:archive', sessionId, archived),
+  sessionsStats: (sessionId: string, stats: SessionStats): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('sessions:stats', sessionId, stats),
 
   // ---- 使用统计 ----
   usageList: (): Promise<UsageRecord[]> => ipcRenderer.invoke('usage:list'),
@@ -199,6 +202,18 @@ const api = {
     };
     ipcRenderer.on('terminal:exit', listener);
     return () => ipcRenderer.removeListener('terminal:exit', listener);
+  },
+
+  // ---- 系统托盘 ----
+  /** 订阅托盘菜单动作（新建会话/打开设置/切换工作空间），返回取消订阅函数 */
+  onTrayAction: (cb: (ev: TrayAction) => void): (() => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, ev: unknown): void => {
+      if (typeof ev === 'object' && ev !== null && typeof (ev as Record<string, unknown>)['action'] === 'string') {
+        cb(ev as TrayAction);
+      }
+    };
+    ipcRenderer.on('tray:action', listener);
+    return () => ipcRenderer.removeListener('tray:action', listener);
   }
 };
 

@@ -15,6 +15,8 @@ export * from './persist/sessions';
 export * from './persist/usage';
 export * from './plugins/loader';
 export * from './tools';
+export * from './code-run/run-code';
+export { createRunCodeWorker } from './code-run/worker';
 export * from './tools/types';
 export * from './workspace/diff';
 export * from './workspace/paths';

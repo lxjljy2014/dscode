@@ -21,7 +21,9 @@ asarUnpack:
   - '**/node_modules/node-pty/**'
 
 # 用 electron-builder 自带的 rebuild 把 node-pty 对齐 Electron ABI（需要本机有编译工具链）
-npmRebuild: true
+# node-pty 1.x 基于 node-addon-api（N-API，ABI 稳定），现有 prebuilds 直接兼容 Electron，无需重编译；
+# 本机 VS2022 缺 Spectre-mitigated libraries 组件，node-gyp 重建会失败（MSB8040）
+npmRebuild: false
 
 mac:
   icon: icon.png

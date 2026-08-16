@@ -2,7 +2,9 @@ import { join } from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { registerIpcHandlers } from './ipc';
 import { disposeAgents, stopWindowAgents } from './agent/agent';
+import { migrateLegacyData } from './data-dir';
 import { disposeTerminals, killWindowTerminals } from './shell/terminal';
+import { createTray, destroyTray } from './tray';
 
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
@@ -18,6 +20,11 @@ const WINDOW_ICON = join(__dirname, '../../resources/icon-win.png');
 
 // 允许交给系统浏览器打开的协议白名单
 const ALLOWED_OPEN_PROTOCOLS = ['https:', 'http:'];
+
+// 当前主窗口引用（窗口销毁后置空），供托盘恢复窗口与 macOS activate 使用
+let mainWindow: BrowserWindow | null = null;
+// 是否为真正退出：托盘「退出」/系统关机时置位，放行窗口 close（否则一律隐藏到托盘）
+let isQuitting = false;
 
 /** 校验后把 http(s) 链接交给系统浏览器打开，其余协议一律忽略 */
 function openExternalIfAllowed(url: string): void {
@@ -63,9 +70,21 @@ function createWindow(): void {
     win.show();
   });
 
-  // 窗口关闭时回收其全部终端会话与该窗口发起的 agent 运行
+  // 关闭按钮（系统标题栏 / macOS 红绿灯）→ 隐藏到托盘驻留后台；
+  // 仅托盘「退出」或系统退出（before-quit 置位 isQuitting）时真正关闭
+  win.on('close', event => {
+    if (!isQuitting) {
+      event.preventDefault();
+      win.hide();
+    }
+  });
+
+  // 窗口真正销毁时回收其全部终端会话与该窗口发起的 agent 运行
+  // 捕获窗口 webContents id：closed 事件触发时窗口已销毁，不能再访问 win.webContents
+  const webContentsId = win.webContents.id;
   win.on('closed', () => {
-    killWindowTerminals(win);
+    if (mainWindow === win) mainWindow = null;
+    killWindowTerminals(webContentsId);
     stopWindowAgents(win);
   });
 
@@ -88,9 +107,13 @@ function createWindow(): void {
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'));
   }
+
+  mainWindow = win;
 }
 
 app.whenReady().then(() => {
+  // 先把旧 userData 位置的应用数据迁到 ~/.dscode（必须在任何数据库/设置被打开之前）
+  migrateLegacyData();
   // 业务 IPC（settings / 最近项目 / 目录选择 / git）
   registerIpcHandlers();
 
@@ -118,11 +141,30 @@ app.whenReady().then(() => {
     }
   });
 
+  // 系统托盘：窗口「关闭」后驻留后台，可从托盘恢复窗口、执行常用操作或退出应用
+  createTray({
+    getMainWindow: () => mainWindow,
+    // 托盘动作时窗口已销毁（macOS 全关窗口）则重建
+    ensureWindow: () => createWindow()
+  });
+
   createWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    // macOS：点击 Dock 图标恢复隐藏的窗口；窗口已销毁（退出流程后）则重建
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createWindow();
+    }
   });
+});
+
+// 真正退出（托盘「退出」菜单或系统关机）：置位放行窗口 close，并销毁托盘
+app.on('before-quit', () => {
+  isQuitting = true;
+  destroyTray();
 });
 
 app.on('window-all-closed', () => {

@@ -135,21 +135,23 @@
   "agent": {
     "tool": {
       "read_file": "读取文件",
-      "list_dir": "列出目录",
+      "list_dir": "探索目录",
       "search": "搜索",
       "run_command": "执行命令",
       "write_file": "写入文件",
       "edit_file": "编辑文件",
-      "browse": "浏览网页"
+      "browse": "浏览网页",
+      "skill": "加载技能"
     },
     "verb": {
       "read_file": "读取",
-      "list_dir": "列出",
+      "list_dir": "探索",
       "search": "搜索",
       "run_command": "执行",
       "write_file": "写入",
       "edit_file": "编辑",
-      "browse": "浏览"
+      "browse": "浏览",
+      "skill": "加载技能"
     },
     "status": {
       "running": "执行中",
@@ -288,14 +290,21 @@
       "placeholder": "例如：本项目使用 pnpm，提交信息用中文"
     },
     "skills": {
-      "desc": "技能是注入系统提示词的能力说明，agent 会按需调用其指令。",
+      "desc": "技能是能力指令：系统提示词只注入目录（名称+说明），任务相关时 agent 自动调用 skill 工具加载完整指令再执行。",
       "add": "添加技能",
       "edit": "编辑技能",
       "empty": "尚无技能",
       "name": "技能名",
       "namePlaceholder": "例如 code-review",
       "description": "一句话说明",
-      "instructions": "指令内容"
+      "instructions": "指令内容",
+      "builtin": "内置",
+      "restore": "恢复内置",
+      "builtinSection": "内置技能（可直接添加使用，也可编辑后加入我的技能）",
+      "customSection": "我的技能",
+      "added": "已添加",
+      "addBuiltin": "添加",
+      "viewDetailHint": "查看详情"
     },
     "hooks": {
       "desc": "在会话开始/结束或工具完成后执行 shell 命令（工作目录为当前项目）。",
@@ -329,7 +338,14 @@
       "refresh": "刷新",
       "empty": "暂无用量记录",
       "model": "模型",
-      "time": "时间"
+      "time": "时间",
+      "apiCacheTitle": "API 前缀缓存（上下文缓存）",
+      "apiCacheHitTokens": "命中 tokens",
+      "apiCacheMissTokens": "未命中",
+      "apiCacheHint": "DeepSeek 上下文缓存：同一会话内每轮请求命中共享前缀，命中部分按折扣计费。命中率仅统计启用缓存统计后的记录；历史记录（无缓存数据）不参与计算。",
+      "localCacheTitle": "本地重放缓存（相同请求）",
+      "localCacheHint": "仅相同请求（如中断后重试、重复提问）会命中并重放；日常对话每轮上下文都不同，命中率低属正常。",
+      "apiCacheSamples": "已统计记录"
     },
     "subagents": {
       "desc": "定义可切换的专用 agent 人设，选定后对话以其系统提示词运行。",
@@ -356,7 +372,7 @@
       "noTools": "点击「列出工具」查看"
     },
     "plugins": {
-      "desc": "将 .mjs 插件放到 userData/plugins 目录，重启后即可贡献斜杠命令。",
+      "desc": "将 .mjs 插件放到 ~/.dscode/plugins 目录，重启后即可贡献斜杠命令。",
       "empty": "尚未安装插件"
     },
     "index": {

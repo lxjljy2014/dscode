@@ -72,21 +72,26 @@ async function persist() {
       </VBtn>
     </div>
 
-    <VCard v-for="c in commands" :key="c.id" class="px-4 py-3">
+    <VCard
+      v-for="c in commands"
+      :key="c.id"
+      class="cursor-pointer px-4 py-3 transition-colors hover:bg-elevated"
+      @click="openEdit(c)"
+    >
       <div class="flex items-start justify-between gap-4">
-        <button class="min-w-0 flex-1 cursor-pointer text-left" @click="openEdit(c)">
+        <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <code class="rounded bg-elevated px-1.5 py-0.5 text-xs font-mono">/{{ c.name }}</code>
             <span class="truncate text-sm">{{ c.description }}</span>
           </div>
           <div class="mt-1.5 truncate text-xs leading-5 text-muted">{{ c.prompt }}</div>
-        </button>
+        </div>
         <VBtn
           icon="i-lucide:trash-2"
           variant="text"
           size="small"
           class="shrink-0 text-muted"
-          @click="removeCommand(c.id)"
+          @click.stop="removeCommand(c.id)"
         />
       </div>
     </VCard>
@@ -104,14 +109,16 @@ async function persist() {
             v-model="draft.name"
             :label="t('settingsPage.commands.name')"
             :placeholder="t('settingsPage.commands.namePlaceholder')"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             class="mb-3"
             hide-details
           />
           <VTextField
             v-model="draft.description"
             :label="t('settingsPage.commands.description')"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             class="mb-3"
             hide-details
           />
@@ -119,7 +126,8 @@ async function persist() {
             v-model="draft.prompt"
             :label="t('settingsPage.commands.prompt')"
             :placeholder="t('settingsPage.commands.promptPlaceholder')"
-            density="compact" variant="outlined"
+            density="compact"
+            variant="outlined"
             rows="4"
             auto-grow
             hide-details

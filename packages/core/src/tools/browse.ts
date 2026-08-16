@@ -1,6 +1,6 @@
 import { MAX_OUTPUT_CHARS } from '../constants';
-import { strArg } from './types';
-import type { Tool } from './types';
+import { defineTool } from './schema';
+import type { ToolResult } from './types';
 
 const MAX_WEB_BYTES = 2 * 1024 * 1024;
 
@@ -35,18 +35,16 @@ export async function fetchWebPage(url: string): Promise<string> {
   return text.length > MAX_OUTPUT_CHARS ? text.slice(0, MAX_OUTPUT_CHARS) + '…(已截断)' : text;
 }
 
-export const browseTool: Tool = {
+export const browseTool = defineTool({
   name: 'browse',
   permission: 'read',
+  concurrency: 'parallel',
   description: '抓取一个网页 URL 并返回其可读文本内容（用于查阅文档/资料）。仅支持 http/https。',
   parameters: {
-    type: 'object',
-    properties: { url: { type: 'string', description: '要抓取的完整 URL（http/https）' } },
-    required: ['url']
+    url: { type: 'string', description: '要抓取的完整 URL（http/https）', required: true },
   },
-  async execute(args) {
-    const url = strArg(args, 'url');
-    if (!url) return { ok: false, error: '缺少 url 参数' };
+  async execute(args, _ctx): Promise<ToolResult> {
+    const url = args.url;
     let parsed: URL;
     try {
       parsed = new URL(url);
@@ -57,9 +55,10 @@ export const browseTool: Tool = {
       return { ok: false, error: '仅支持 http/https' };
     }
     try {
-      return { ok: true, content: await fetchWebPage(url) };
+      const text = await fetchWebPage(url);
+      return { ok: true, content: text, meta: { url, chars: text.length } };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
-  }
-};
+  },
+});

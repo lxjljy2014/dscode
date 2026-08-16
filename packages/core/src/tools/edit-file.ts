@@ -1,30 +1,29 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
 import { resolveSafePath } from '../workspace/paths';
-import { STRING, strArg } from './types';
-import type { Tool, ToolContext, ToolResult } from './types';
+import { defineTool } from './schema';
+import type { ToolResult } from './types';
 
-export const editFileTool: Tool = {
+export const editFileTool = defineTool({
   name: 'edit_file',
   permission: 'write',
   description: '精确替换文件中唯一出现的一段内容（old_string 必须恰好匹配一次）',
-  parameters: {
-    type: 'object',
-    properties: {
-      path: { ...STRING, description: '相对工作目录的文件路径' },
-      old_string: { ...STRING, description: '要被替换的原内容（需唯一匹配）' },
-      new_string: { ...STRING, description: '替换后的新内容' }
-    },
-    required: ['path', 'old_string', 'new_string']
+  presentation: {
+    presentCall: (args) => ({
+      card: 'diff',
+      title: '编辑文件',
+      path: typeof args.path === 'string' ? args.path : '',
+      oldText: typeof args.old_string === 'string' ? args.old_string : '',
+      newText: typeof args.new_string === 'string' ? args.new_string : '',
+    }),
   },
-  async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
-    const p = strArg(args, 'path');
-    const oldString = args['old_string'];
-    const newString = args['new_string'];
-    if (!p) return { ok: false, error: '缺少参数 path' };
-    if (typeof oldString !== 'string' || typeof newString !== 'string') {
-      return { ok: false, error: '缺少参数 old_string / new_string' };
-    }
+  parameters: {
+    path: { type: 'string', description: '相对工作目录的文件路径', required: true },
+    old_string: { type: 'string', description: '要被替换的原内容（需唯一匹配）', required: true },
+    new_string: { type: 'string', description: '替换后的新内容', required: true },
+  },
+  async execute(args, ctx): Promise<ToolResult> {
+    const { path: p, old_string: oldString, new_string: newString } = args;
     const target = await resolveSafePath(ctx.cwd, p);
     if (!target) return { ok: false, error: '路径不在工作目录内' };
     let original: string;
@@ -39,9 +38,15 @@ export const editFileTool: Tool = {
     try {
       await writeFile(target, original.replace(oldString, newString), 'utf8');
       const rel = relative(ctx.cwd, target);
-      return { ok: true, content: `已替换 ${rel} 中的 1 处匹配`, changedPaths: [rel] };
+      return {
+        ok: true,
+        content: `已替换 ${rel} 中的 1 处匹配`,
+        changedPaths: [rel],
+        meta: { path: rel, replaced: 1 },
+        blocks: [{ type: 'diff', path: rel, oldText: original, newText: original.replace(oldString, newString) }]
+      };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
-  }
-};
+  },
+});

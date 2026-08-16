@@ -4,6 +4,7 @@ import {
   disposeAgents,
   recordUsage,
   resolveConfirm,
+  skillCatalogSection,
   startAgent as startAgentCore,
   stopAgent as stopAgentCore,
   SYSTEM_PROMPT
@@ -11,6 +12,7 @@ import {
 import type { Hook } from '@dscode/shared';
 import type { AgentEventSink, AgentStartResult, LlmCache } from '@dscode/core';
 import { loadAppSettings } from '../settings';
+import { getConfigDir, getDbFile } from '../data-dir';
 import { isChatMessagePayload } from '../validators';
 import { fireHooks } from '../hooks';
 
@@ -23,10 +25,10 @@ import { fireHooks } from '../hooks';
 /** 运行发起窗口归属（事件只推给发起窗口；窗口关闭时回收其运行，避免孤儿运行烧 token） */
 const winBySession = new Map<string, BrowserWindow>();
 
-/** LLM 回复缓存（userData/cache.db，懒初始化；命中时重放响应省 token） */
+/** LLM 回复缓存（~/.dscode/db/cache.db，懒初始化；命中时重放响应省 token） */
 let llmCache: LlmCache | null = null;
 function getLlmCache(): LlmCache {
-  if (!llmCache) llmCache = createSqliteLlmCache(app.getPath('userData') + '/cache.db');
+  if (!llmCache) llmCache = createSqliteLlmCache(getDbFile());
   return llmCache;
 }
 
@@ -49,6 +51,7 @@ function createSink(win: BrowserWindow, hooks: Hook[], cwd: string, model: strin
         sessionId,
         model,
         promptTokens: usage.promptTokens,
+        cachedPromptTokens: usage.cachedPromptTokens,
         completionTokens: usage.completionTokens,
         createdAt: Date.now()
       });
@@ -81,7 +84,7 @@ export async function startAgent(
   if (!Array.isArray(rawMessages) || !rawMessages.every(isChatMessagePayload)) {
     return { ok: false, error: 'invalid-args' };
   }
-  const settings = loadAppSettings(app.getPath('userData') + '/settings.json', app.getPath('home'));
+  const settings = loadAppSettings(getConfigDir(), app.getPath('home'));
   // 子智能体人设：命中则替换默认系统提示词，记忆/技能仍叠加
   const subagent = subagentId ? settings.subagents.find(s => s.id === subagentId) : undefined;
   const basePrompt = subagent ? subagent.systemPrompt : SYSTEM_PROMPT;
@@ -91,24 +94,27 @@ export async function startAgent(
       ? '\n\n用户长期记忆（回答时优先参考，若与当前任务无关可忽略）：\n' +
         settings.memory.map((m, i) => `${i + 1}. ${m.content}`).join('\n')
       : '';
-  const skillSection =
-    settings.skills.length > 0
-      ? '\n\n可用技能（按需调用其说明执行）：\n' +
-        settings.skills.map((s, i) => i + 1 + '. ' + s.name + '：' + s.description + '\n' + s.instructions).join('\n')
-      : '';
+  // 技能只注入目录（名称 + 一句话说明），模型判断任务相关时先调用 skill 工具加载完整指令再执行
+  // （借鉴官方 harness：目录进提示词 + 按需加载正文，避免全量指令占上下文）
+  const skillSection = skillCatalogSection(settings.skills);
   // 会话开始钩子
   fireHooks(settings.hooks, 'session_start', settings.workingDirectory);
   const result = await startAgentCore({
     sessionId,
     model,
     rawMessages,
-    sink: createSink(win, settings.hooks, settings.workingDirectory, model, app.getPath('userData') + '/usage.db'),
+    sink: createSink(win, settings.hooks, settings.workingDirectory, model, getDbFile()),
     config: {
       workingDirectory: settings.workingDirectory,
+      // 启动快照兜底；动态 source 让运行中切换权限模式对下一轮工具调用立即生效
       permissionMode: settings.permissionMode,
+      // 每次工具轮询前重读最新 settings.json：输入卡片切换权限模式 → 主进程落盘 → 此处取到新值
+      permissionModeSource: () =>
+        loadAppSettings(getConfigDir(), app.getPath('home')).permissionMode,
       providers: settings.providers,
       systemPrompt: basePrompt + memorySection + skillSection,
       browsingEnabled: settings.browsingEnabled,
+      skills: settings.skills,
       llmCache: getLlmCache()
     }
   });

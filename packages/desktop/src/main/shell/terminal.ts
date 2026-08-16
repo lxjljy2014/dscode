@@ -15,15 +15,15 @@ import type { TerminalEnsureResult } from '@dscode/shared';
 const sessions = new Map<string, IPty>();
 const windowSessions = new Map<number, Set<string>>();
 
-function track(win: BrowserWindow, sessionId: string): void {
-  const id = win.webContents.id;
-  let set = windowSessions.get(id);
-  if (!set) windowSessions.set(id, (set = new Set()));
+function track(wcId: number, sessionId: string): void {
+  let set = windowSessions.get(wcId);
+  if (!set) windowSessions.set(wcId, (set = new Set()));
+  set.add(sessionId);
   set.add(sessionId);
 }
 
-function untrack(win: BrowserWindow, sessionId: string): void {
-  windowSessions.get(win.webContents.id)?.delete(sessionId);
+function untrack(wcId: number, sessionId: string): void {
+  windowSessions.get(wcId)?.delete(sessionId);
 }
 
 /** shell 启动参数：Unix 用 $SHELL + 登录壳参数，Windows 用 %COMSPEC% */
@@ -51,6 +51,7 @@ export function ensureTerminal(win: BrowserWindow, sessionId: string, cwd: strin
   if (existing) return { ok: true, sessionId, pid: existing.pid };
   try {
     const { file, args } = shellSpec();
+    const wcId = win.webContents.id;
     const term = pty.spawn(file, args, {
       name: 'xterm-256color',
       cwd: resolveCwd(cwd),
@@ -61,11 +62,11 @@ export function ensureTerminal(win: BrowserWindow, sessionId: string, cwd: strin
     });
     term.onExit(({ exitCode }) => {
       sessions.delete(sessionId);
-      untrack(win, sessionId);
+      untrack(wcId, sessionId);
       if (!win.isDestroyed()) win.webContents.send('terminal:exit', { sessionId, exitCode });
     });
     sessions.set(sessionId, term);
-    track(win, sessionId);
+    track(wcId, sessionId);
     return { ok: true, sessionId, pid: term.pid };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
@@ -99,7 +100,7 @@ export function killTerminal(win: BrowserWindow, sessionId: string): void {
   const term = sessions.get(sessionId);
   if (!term) return;
   sessions.delete(sessionId);
-  untrack(win, sessionId);
+  untrack(win.webContents.id, sessionId);
   try {
     term.kill();
   } catch {
@@ -108,10 +109,21 @@ export function killTerminal(win: BrowserWindow, sessionId: string): void {
 }
 
 /** 窗口关闭时回收该窗口的全部会话 */
-export function killWindowTerminals(win: BrowserWindow): void {
-  const ids = windowSessions.get(win.webContents.id);
+/** 窗口关闭时回收该窗口的全部会话（wcId 须在窗口销毁前捕获；closed 事件里访问 win.webContents 会抛 Object has been destroyed） */
+export function killWindowTerminals(wcId: number): void {
+  const ids = windowSessions.get(wcId);
   if (!ids) return;
-  for (const sessionId of new Set(ids)) killTerminal(win, sessionId);
+  for (const sessionId of new Set(ids)) {
+    const term = sessions.get(sessionId);
+    if (!term) continue;
+    sessions.delete(sessionId);
+    untrack(wcId, sessionId);
+    try {
+      term.kill();
+    } catch {
+      // 已退出
+    }
+  }
 }
 
 /** 应用退出时回收全部会话 */

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildIndex, indexStats, initIndex, searchIndex } from '../src/workspace/index';
+import { buildIndex, closeIndexDbs, indexStats, initIndex, searchIndex } from '../src/workspace/index';
 
 let dir: string;
 let cwd: string;
@@ -18,6 +18,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // 先关闭 sqlite 连接再删目录：Windows 下未关闭的文件句柄会使 rm 失败（文件级测试失败的真凶）
+  closeIndexDbs();
   await rm(dir, { recursive: true, force: true });
 });
 

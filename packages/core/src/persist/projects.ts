@@ -3,7 +3,7 @@ import type { ProjectsListResult, RecentProject } from '@dscode/shared';
 
 /**
  * 最近打开的工作空间（node:sqlite 内置驱动，无原生依赖）。
- * 数据文件：userData/projects.db，表 recent_projects。
+ * 数据文件：~/.dscode/projects.db，表 recent_projects。
  */
 
 /** 按数据文件路径隔离连接（此前为模块级单例，file 参数在首次初始化后被忽略，复用多库会写错文件） */
@@ -78,4 +78,16 @@ export function removeProject(file: string, path: string): void {
 
 export function listProjectsWithHome(file: string, homeDir: string): ProjectsListResult {
   return { projects: listProjects(file), removed: listRemovedProjects(file), homeDir };
+}
+
+/** 关闭指定数据文件的连接（测试清理/重建用；Windows 下不关闭连接会占用文件句柄导致目录删除失败） */
+export function closeProjectsDb(file: string): void {
+  dbs.get(file)?.close();
+  dbs.delete(file);
+}
+
+/** 关闭全部连接（应用退出/测试收尾） */
+export function closeProjectsDbs(): void {
+  for (const db of dbs.values()) db.close();
+  dbs.clear();
 }

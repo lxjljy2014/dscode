@@ -128,20 +128,17 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
         <!-- eslint-disable vue/no-v-html -->
         <template v-if="message.steps && message.steps.length">
           <template v-for="(step, i) in message.steps" :key="i">
-            <!-- 思考（默认折叠；当前轮思考中带呼吸） -->
-            <details v-if="step.kind === 'reasoning'" class="mb-3">
-              <summary
-                class="cursor-pointer select-none text-sm text-muted hover:text-fg"
-                :class="{ 'ds-breathe': isCurrentReasoning(i) }"
-              >
-                <span class="i-lucide:brain mr-1 align-middle text-3.5" />
-                {{ reasoningLabel(step.content, isCurrentReasoning(i)) }}
+            <!-- 思考（默认折叠；思考中显示旋转 loading 图标，完成显示大脑图标，无背景） -->
+            <details v-if="step.kind === 'reasoning'" class="ds-thought mb-3">
+              <summary :class="{ 'ds-breathe': isCurrentReasoning(i) }">
+                <span class="ds-thought-icon">
+                  <span v-if="isCurrentReasoning(i)" class="i-lucide:brain-circuit ds-spin" />
+                  <span v-else class="i-lucide:brain" />
+                </span>
+                <span class="ds-thought-summary">{{ reasoningLabel(step.content, isCurrentReasoning(i)) }}</span>
+                <span class="ds-thought-chevron i-lucide:chevron-right" />
               </summary>
-              <div
-                class="mt-1.5 max-h-64 overflow-y-auto whitespace-pre-wrap border-l border-line pl-2.5 text-xs leading-relaxed text-muted"
-              >
-                {{ step.content }}
-              </div>
+              <div class="ds-thought-body">{{ step.content }}</div>
             </details>
             <!-- 正文（说话/总结） -->
             <div v-else-if="step.kind === 'text'" class="ds-md" v-html="renderMarkdown(step.content)" />

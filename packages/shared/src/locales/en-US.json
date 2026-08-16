@@ -135,21 +135,23 @@
   "agent": {
     "tool": {
       "read_file": "Read file",
-      "list_dir": "List directory",
+      "list_dir": "Explore directory",
       "search": "Search",
       "run_command": "Run command",
       "write_file": "Write file",
       "edit_file": "Edit file",
-      "browse": "Browse web"
+      "browse": "Browse web",
+      "skill": "Load skill"
     },
     "verb": {
       "read_file": "Read",
-      "list_dir": "List",
+      "list_dir": "Explore",
       "search": "Search",
       "run_command": "Run",
       "write_file": "Write",
       "edit_file": "Edit",
-      "browse": "Browse"
+      "browse": "Browse",
+      "skill": "Load"
     },
     "status": {
       "running": "Running",
@@ -288,14 +290,21 @@
       "placeholder": "e.g. This project uses pnpm, commit messages in Chinese"
     },
     "skills": {
-      "desc": "Skills are capability instructions injected into the system prompt; the agent invokes them as needed.",
+      "desc": "Skills are capability instructions: only a catalog (name + description) is injected into the system prompt; when a task matches, the agent automatically calls the skill tool to load the full instructions before executing.",
       "add": "Add skill",
       "edit": "Edit skill",
       "empty": "No skills yet",
       "name": "Skill name",
       "namePlaceholder": "e.g. code-review",
       "description": "One-line description",
-      "instructions": "Instructions"
+      "instructions": "Instructions",
+      "builtin": "Built-in",
+      "restore": "Restore built-ins",
+      "builtinSection": "Built-in skills (add and use directly, or edit a copy into My skills)",
+      "customSection": "My skills",
+      "added": "Added",
+      "addBuiltin": "Add",
+      "viewDetailHint": "View details"
     },
     "hooks": {
       "desc": "Run a shell command on session start/end or after a tool completes (working directory is the project).",
@@ -329,7 +338,14 @@
       "refresh": "Refresh",
       "empty": "No usage yet",
       "model": "Model",
-      "time": "Time"
+      "time": "Time",
+      "apiCacheTitle": "API prefix cache (context caching)",
+      "apiCacheHitTokens": "Hit tokens",
+      "apiCacheMissTokens": "Miss",
+      "apiCacheHint": "DeepSeek context caching: each round in a session hits the shared prefix and the hit portion is billed at a discount. The rate covers only records created after cache tracking was enabled; legacy records (no cache data) are excluded.",
+      "localCacheTitle": "Local replay cache (identical requests)",
+      "localCacheHint": "Only identical requests (e.g. retry after interruption, repeated question) hit and replay; every round in normal chat has a different context, so a low hit rate is expected.",
+      "apiCacheSamples": "Tracked records"
     },
     "subagents": {
       "desc": "Define switchable agent personas; selecting one runs the conversation with its system prompt.",
@@ -356,7 +372,7 @@
       "noTools": "Click 'List tools' to inspect"
     },
     "plugins": {
-      "desc": "Drop .mjs plugins into the userData/plugins directory; they contribute slash commands after restart.",
+      "desc": "Drop .mjs plugins into the ~/.dscode/plugins directory; they contribute slash commands after restart.",
       "empty": "No plugins installed"
     },
     "index": {

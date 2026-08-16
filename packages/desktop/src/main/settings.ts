@@ -5,7 +5,7 @@ import type { AppSettings, SettingsPatch } from '@dscode/shared';
 
 /**
  * 应用设置的 Electron 封装：为 apiKey 静态加密注入 safeStorage。
- * core 的 config.ts 保持无 Electron 依赖，加密/解密在此层实现。
+ * core 的 config.ts 保持无 Electron 依赖，加密/解密在此层实现。配置目录由 data-dir 提供（~/.dscode/config）。
  */
 
 const ENC_PREFIX = 'enc:v1:';
@@ -29,10 +29,10 @@ function makeCrypto(): SettingsCrypto | undefined {
   };
 }
 
-export function loadAppSettings(file: string, homeDir: string): AppSettings {
-  return loadSettings(file, homeDir, makeCrypto());
+export function loadAppSettings(configDir: string, homeDir: string): AppSettings {
+  return loadSettings(configDir, homeDir, makeCrypto());
 }
 
-export function saveAppSettings(file: string, homeDir: string, patch: SettingsPatch): AppSettings {
-  return saveSettings(file, homeDir, patch, makeCrypto());
+export function saveAppSettings(configDir: string, homeDir: string, patch: SettingsPatch): AppSettings {
+  return saveSettings(configDir, homeDir, patch, makeCrypto());
 }

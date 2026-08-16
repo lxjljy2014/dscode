@@ -1,3 +1,5 @@
+import type { SessionStats } from './usage';
+
 export type MessageRole = 'user' | 'assistant';
 
 export interface Message {
@@ -36,11 +38,18 @@ export interface MessageStats {
 /** agent:usage 事件负载（token 用量，主进程推送） */
 export interface AgentUsageEvent {
   sessionId: string;
-  usage: { promptTokens: number; completionTokens: number };
+  usage: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number };
 }
 
 /** agent 可调用的工具名 */
-export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file' | 'browse';
+export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file' | 'browse' | 'run_code' | 'skill';
+
+/** 工具结果的结构化内容块（借鉴官方 harness 的 ContentBlock 语义，供 UI 按类型渲染；content 字符串仍是模型可见文本） */
+export type ToolContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'json'; value: unknown }
+  | { type: 'file'; path: string; line?: number }
+  | { type: 'diff'; path: string; oldText: string | null; newText: string };
 
 /** 工具事件（聊天流中与消息交错展示） */
 export interface AgentToolEvent {
@@ -55,6 +64,20 @@ export interface AgentToolEvent {
   summary?: string;
   /** 工具全量输出（仅 done 终态携带；渲染端落库供跨运行历史重建，保持与运行时上下文一致） */
   content?: string;
+  /**
+   * 结构化结果块（仅 done 终态携带）：UI 按类型渲染（如 read_file 的行视图、run_command 的终端卡）。
+   * 与 content 并存——content 是给模型/历史重建的文本，blocks 是给 UI 的结构化展示。
+   */
+  blocks?: ToolContentBlock[];
+  /** 工具私有展示元数据（如 run_command 的退出码），透传给 UI 但不进模型上下文 */
+  meta?: Record<string, unknown>;
+  /**
+   * 工具附加给下一步的模型上下文（如写文件后的小结）：运行时注入为 user 消息；
+   * 渲染端落库供跨运行历史重建，保持与运行时上下文一致。
+   */
+  additionalContexts?: string[];
+  /** 工具标记本轮结束（执行完本批工具后不再回模型；如批处理类工具） */
+  concludesTurn?: boolean;
   error?: string;
   createdAt: number;
 }
@@ -113,6 +136,8 @@ export interface Session {
   toolEvents: AgentToolEvent[];
   /** 已归档（侧边栏收进「已归档」区；旧数据无此字段视为未归档） */
   archived?: boolean;
+  /** 会话级运行统计（输入卡片下方统计条；随会话 meta 持久化，重开会话恢复展示） */
+  stats?: SessionStats;
 }
 
 export type DiffLineType = 'add' | 'del' | 'context' | 'hunk';
@@ -147,4 +172,5 @@ export * from './mcp';
 export * from './projects';
 export * from './settings';
 export * from './terminal';
+export * from './tray';
 export * from './usage';

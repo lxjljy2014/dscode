@@ -25,6 +25,7 @@ import type {
   TerminalDataEvent,
   TerminalEnsureResult,
   TerminalExitInfo,
+  TrayAction,
   UsageRecord
 } from '@dscode/shared';
 
@@ -84,6 +85,7 @@ export interface HostApi {
   sessionsList: () => Promise<Session[]>;
   sessionsCreate: (session: Session) => Promise<{ ok: boolean }>;
   sessionsAppend: (sessionId: string, message: Message) => Promise<{ ok: boolean }>;
+  sessionsStats: (sessionId: string, stats: SessionStats) => Promise<{ ok: boolean }>;
   /** 归档/恢复会话（archived=true 归档；false 恢复） */
   sessionSetArchived: (sessionId: string, archived: boolean) => Promise<{ ok: boolean }>;
 
@@ -122,6 +124,10 @@ export interface HostApi {
   /** 订阅终端数据/退出事件（按 sessionId 分发），均返回取消订阅函数 */
   onTerminalData: (cb: (ev: TerminalDataEvent) => void) => () => void;
   onTerminalExit: (cb: (info: TerminalExitInfo) => void) => () => void;
+
+  // ---- 系统托盘 ----
+  /** 订阅托盘菜单动作（新建会话/打开设置/切换工作空间），返回取消订阅函数 */
+  onTrayAction: (cb: (ev: TrayAction) => void) => () => void;
 }
 
 declare global {

@@ -193,6 +193,8 @@ export const useSessionStore = defineStore('session', () => {
   async function persistMessage(session: Session, message: Message): Promise<void> {
     if (!host) return;
     try {
+    // JSONL 会话存储：先确保会话元数据（目录）存在，再追加消息日志
+    await persistSession(session);
       const r = await host.sessionsAppend(session.id, {
         id: message.id,
         role: message.role,
@@ -207,7 +209,6 @@ export const useSessionStore = defineStore('session', () => {
         ...(message.stats ? { stats: JSON.parse(JSON.stringify(message.stats)) as Message['stats'] } : {})
       });
       if (!r.ok) console.warn('[dscode] 消息持久化失败', message.id);
-      await persistSession(session);
     } catch (e) {
       console.warn('[dscode] 消息持久化异常', e);
     }

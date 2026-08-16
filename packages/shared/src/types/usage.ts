@@ -5,6 +5,10 @@ export interface UsageRecord {
   sessionId: string;
   model: string;
   promptTokens: number;
+  /** API 前缀缓存命中的输入 token 数（DeepSeek 上下文缓存；旧数据缺省） */
+  cachedPromptTokens?: number;
+  /** 是否记录了缓存统计（false = 加缓存统计前的历史记录，不参与命中率计算） */
+  cacheTracked?: boolean;
   completionTokens: number;
   createdAt: number;
 }

@@ -68,11 +68,11 @@ export const useAgentStore = defineStore('agent', () => {
   }
 
   /** 会话级运行统计（输入卡片下方统计条；运行时每次运行结束推送全量；响应式对象供 computed 追踪） */
-  const sessionStatsBySession = ref<Record<string, SessionStats>>({});
-  const sessionStats = computed<SessionStats | null>(() => {
-    const id = sessionStore.activeSessionId;
-    return id ? (sessionStatsBySession.value[id] ?? null) : null;
-  });
+/** 输入卡片下方统计条：读当前会话的 stats（随会话 meta.json 持久化，重开恢复；运行中由 session-stats 事件写入） */
+const sessionStats = computed<SessionStats | null>(() => {
+  const active = sessionStore.activeSession;
+  return active?.stats ?? null;
+});
 
   /** 各会话的 diff 结果（主进程 workspace:diff 推送，按 sessionId 缓存） */
   const diffBySession = new Map<string, DiffFile[]>();
@@ -344,7 +344,14 @@ export const useAgentStore = defineStore('agent', () => {
 
   function onSessionStats(ev: { sessionId: string; stats: SessionStats }) {
     // 整体替换触发响应式（computed 依赖 sessionStatsBySession.value）
-    sessionStatsBySession.value = { ...sessionStatsBySession.value, [ev.sessionId]: ev.stats };
+    // 持久化到会话 meta.json：重开/切换会话后统计条仍展示
+    const session = sessionStore.sessions.find(s => s.id === ev.sessionId);
+    if (session) {
+      session.stats = ev.stats;
+      if (host) {
+        host.sessionsStats(ev.sessionId, ev.stats).catch(() => {});
+      }
+  }
   }
 
   let subscribed = false;
