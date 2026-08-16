@@ -105,7 +105,10 @@ export function isSessionStats(v: unknown): v is SessionStats {
     typeof s['rounds'] === 'number' &&
     typeof s['llmMs'] === 'number' &&
     typeof s['toolMs'] === 'number' &&
-    (s['contextTokens'] === undefined || typeof s['contextTokens'] === 'number')
+    (s['contextTokens'] === undefined || typeof s['contextTokens'] === 'number') &&
+    (s['systemTokens'] === undefined || typeof s['systemTokens'] === 'number') &&
+    (s['toolsTokens'] === undefined || typeof s['toolsTokens'] === 'number') &&
+    (s['messagesTokens'] === undefined || typeof s['messagesTokens'] === 'number')
   );
 }
 

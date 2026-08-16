@@ -3,6 +3,7 @@
 export * from './adapters';
 export * from './constants';
 export * from './agent/runtime';
+export * from './agent/token-estimate';
 export * from './cache/llm-cache';
 export * from './agent/types';
 export * from './gate/gate';

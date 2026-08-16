@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import {
   createSqliteLlmCache,
   disposeAgents,
+  getSessionStats,
   recordUsage,
   resolveConfirm,
   skillCatalogSection,
@@ -12,7 +13,7 @@ import {
 import type { Hook } from '@dscode/shared';
 import type { AgentEventSink, AgentStartResult, LlmCache } from '@dscode/core';
 import { loadAppSettings } from '../settings';
-import { getConfigDir, getDbFile } from '../data-dir';
+import { getConfigDir, getDbFile, getSessionsDir } from '../data-dir';
 import { isChatMessagePayload } from '../validators';
 import { fireHooks } from '../hooks';
 
@@ -103,6 +104,8 @@ export async function startAgent(
     sessionId,
     model,
     rawMessages,
+    // 重启后回灌持久化的会话统计（含上下文占用 contextTokens），避免累计值被清零
+    initialStats: getSessionStats(getSessionsDir(), sessionId),
     sink: createSink(win, settings.hooks, settings.workingDirectory, model, getDbFile()),
     config: {
       workingDirectory: settings.workingDirectory,

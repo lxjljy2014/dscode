@@ -13,6 +13,7 @@ import type { LlmCache } from '../cache/llm-cache';
 import { isConfirmDecision } from '../gate/gate';
 import { toolSchemas } from '../tools';
 import { DiffSnapshotStore } from '../workspace/diff';
+import { estimateTokens } from './token-estimate';
 import { executeToolBatch } from './tool-batch';
 import type { AgentEventSink } from './types';
 
@@ -56,6 +57,11 @@ export interface AgentStartInput {
   sessionId: string;
   model: string;
   rawMessages: ChatMessagePayload[];
+  /**
+   * 会话累计运行统计起点（宿主从持久化读回）：重启后启动新运行时回灌，
+   * 让轮次/token/上下文占用（contextTokens）等累计值继续累积，而不是从零清零。
+   */
+  initialStats?: SessionStats;
   /** 事件接收方（宿主实现） */
   sink: AgentEventSink;
   /** 运行配置：宿主读自己的持久化后传入 */
@@ -135,7 +141,7 @@ export class AgentRuntime {
 
   /** 启动一次 agent 运行（同会话已在运行则先中止旧运行再启动，适配渲染端状态丢失后的重发） */
   async start(input: AgentStartInput): Promise<AgentStartResult> {
-    const { sessionId, model, rawMessages, sink, config } = input;
+    const { sessionId, model, rawMessages, sink, config, initialStats } = input;
 
     // 先做输入校验，避免非法输入中止正在进行的运行
     const provider = config.providers[0];
@@ -157,6 +163,10 @@ export class AgentRuntime {
     const controller = new AbortController();
     const run: RunState = { controller, replacing: false, done: Promise.resolve() };
     this.runs.set(sessionId, run);
+    // 重启后回灌持久化的会话统计作为累计起点：轮次/token/上下文占用不再被清零
+    if (initialStats && !this.sessionStats.has(sessionId)) {
+      this.sessionStats.set(sessionId, { ...initialStats });
+    }
     // agent 启动时快照工作目录，作为本次运行 diff 的基线
     await this.snapshots.initSnapshot(sessionId, config.workingDirectory);
 
@@ -334,7 +344,21 @@ export class AgentRuntime {
         s.cacheMissTokens += (usage?.promptTokens ?? 0) - (usage?.cachedPromptTokens ?? 0);
         // 当前上下文占用：最近一轮请求的完整 prompt 大小（含缓存命中，与官方 pressureTokens 语义一致）；
         // 缓存命中轮不调 API（usage 缺省），上下文未变，沿用上轮值
-        if (usage) s.contextTokens = usage.promptTokens;
+        if (usage) {
+          s.contextTokens = usage.promptTokens;
+          // 上下文构成估算：把准确的 promptTokens 按相对 token 数拆到 系统提示词/工具/对话消息，
+          // 供 ContextMeter 菜单展示各部分对上下文的占用（非精确计费；messagesTokens 补齐使总和 = contextTokens）
+          const systemContent = (messages[0] as { content?: string } | undefined)?.content ?? '';
+          const rawSystem = estimateTokens(systemContent);
+          const rawTools = estimateTokens(JSON.stringify(tools));
+          const rawMessages = estimateTokens(JSON.stringify(messages.slice(1)));
+          const rawTotal = rawSystem + rawTools + rawMessages;
+          if (rawTotal > 0) {
+            s.systemTokens = Math.round((usage.promptTokens * rawSystem) / rawTotal);
+            s.toolsTokens = Math.round((usage.promptTokens * rawTools) / rawTotal);
+            s.messagesTokens = usage.promptTokens - s.systemTokens - s.toolsTokens;
+          }
+        }
         if (cacheHit) s.cacheHits += 1;
         else s.cacheMisses += 1;
         if (toolCalls.length === 0) {

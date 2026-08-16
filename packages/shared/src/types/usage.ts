@@ -39,6 +39,13 @@ export interface SessionStats {
   cacheMissTokens: number;
   /** 当前上下文占用（tokens）：最近一轮请求的完整 prompt 大小（含缓存命中；缓存命中轮沿用上轮值） */
   contextTokens?: number;
+  /**
+   * 当前上下文构成（估算 tokens，总和 ≈ contextTokens）：最近一轮请求里
+   * 系统提示词 / 工具 schema / 对话消息 各自对上下文的占用，供 ContextMeter 菜单展示。
+   */
+  systemTokens?: number;
+  toolsTokens?: number;
+  messagesTokens?: number;
 }
 
 /** LLM 回复缓存统计（使用统计版块展示命中率与节省量） */

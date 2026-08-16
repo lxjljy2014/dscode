@@ -9,6 +9,7 @@ import { defaultSettings, loadSettings, saveSettings } from '../src/persist/conf
 import type { SettingsCrypto } from '../src/persist/config';
 import {
   backfillSessions,
+  getSessionStats,
   initSessions,
   listSessions,
   setSessionArchived,
@@ -469,16 +470,22 @@ describe('sessions 持久化（JSONL：meta.json + session.jsonl）', () => {
 
 
   it('会话级运行统计随 meta 持久化：upsert 携带、setSessionStats 更新、读回恢复', () => {
-    const stats1 = { rounds: 3, llmMs: 12000, toolMs: 800, firstTokenMsSum: 600, firstTokenCount: 3, promptTokens: 5000, completionTokens: 2000, cacheHits: 1, cacheMisses: 2, cacheHitTokens: 4000, cacheMissTokens: 1000, contextTokens: 6000 };
+    const stats1 = { rounds: 3, llmMs: 12000, toolMs: 800, firstTokenMsSum: 600, firstTokenCount: 3, promptTokens: 5000, completionTokens: 2000, cacheHits: 1, cacheMisses: 2, cacheHitTokens: 4000, cacheMissTokens: 1000, contextTokens: 6000, systemTokens: 500, toolsTokens: 1500, messagesTokens: 4000 };
     upsertSession(rootDir, { ...makeSession('s-stats', '统计'), stats: stats1 });
     expect(listSessions(rootDir).find(s => s.id === 's-stats')?.stats).toEqual(stats1);
+    // getSessionStats 单会话读回（供宿主重启后回灌运行时，含上下文占用 contextTokens）
+    expect(getSessionStats(rootDir, 's-stats')).toEqual(stats1);
     // setSessionStats 更新（运行结束时推送）
     const stats2 = { ...stats1, rounds: 4, llmMs: 15000 };
     setSessionStats(rootDir, 's-stats', stats2);
     expect(listSessions(rootDir).find(s => s.id === 's-stats')?.stats).toEqual(stats2);
+    expect(getSessionStats(rootDir, 's-stats')).toEqual(stats2);
     // 无统计的会话不带 stats
     upsertSession(rootDir, makeSession('s-plain', '无统计'));
     expect(listSessions(rootDir).find(s => s.id === 's-plain')?.stats).toBeUndefined();
+    expect(getSessionStats(rootDir, 's-plain')).toBeUndefined();
+    // 不存在的会话返回 undefined
+    expect(getSessionStats(rootDir, 's-nonexistent')).toBeUndefined();
   });
   it('归档标记落库读回：upsert 携带 archived，缺省未归档', () => {
     upsertSession(rootDir, makeSession('s13', '普通'));

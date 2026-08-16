@@ -50,7 +50,12 @@
       "millisecond": "毫秒"
     },
     "contextMeter": {
-      "tooltip": "上下文 {percent}%（{used}/{total}）"
+      "tooltip": "上下文 {percent}%（{used}/{total}）",
+      "title": "上下文占用",
+      "system": "系统提示词",
+      "tools": "工具",
+      "messages": "对话消息",
+      "caption": "已用 {used} / 窗口 {total}"
     },
     "sessionStats": {
       "rounds": "轮",
@@ -309,7 +314,11 @@
       "customSection": "我的技能",
       "added": "已添加",
       "addBuiltin": "添加",
-      "viewDetailHint": "查看详情"
+      "viewDetailHint": "查看详情",
+      "install": "安装",
+      "tryNow": "立即试用",
+      "manage": "管理",
+      "uninstall": "卸载"
     },
     "hooks": {
       "desc": "在会话开始/结束或工具完成后执行 shell 命令（工作目录为当前项目）。",

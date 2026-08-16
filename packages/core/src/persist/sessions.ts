@@ -356,6 +356,14 @@ export function setSessionStats(rootDir: string, sessionId: string, stats: Sessi
   if (!meta) return;
   writeJsonAtomic(metaFile(dir), { ...meta, stats });
 }
+
+/** 读取会话级运行统计（meta.json 里的 stats；会话不存在/损坏返回 undefined）。
+ *  供宿主在重启后启动 agent 时把累计值（含上下文占用 contextTokens）作为起点回灌运行时，避免被清零。 */
+export function getSessionStats(rootDir: string, sessionId: string): SessionStats | undefined {
+  const dir = findSessionDir(rootDir, sessionId);
+  if (!dir) return undefined;
+  return readMeta(dir)?.stats;
+}
 export function upsertMessage(rootDir: string, sessionId: string, message: Message): void {
   const dir = findSessionDir(rootDir, sessionId);
   // 会话目录不存在（渲染端应先 persistSession 再 append）时静默跳过，避免孤儿文件

@@ -50,7 +50,12 @@
       "millisecond": "ms"
     },
     "contextMeter": {
-      "tooltip": "Context {percent}% ({used}/{total})"
+      "tooltip": "Context {percent}% ({used}/{total})",
+      "title": "Context usage",
+      "system": "System prompt",
+      "tools": "Tools",
+      "messages": "Messages",
+      "caption": "Used {used} / Window {total}"
     },
     "sessionStats": {
       "rounds": "rounds",
@@ -309,7 +314,11 @@
       "customSection": "My skills",
       "added": "Added",
       "addBuiltin": "Add",
-      "viewDetailHint": "View details"
+      "viewDetailHint": "View details",
+      "install": "Install",
+      "tryNow": "Try now",
+      "manage": "Manage",
+      "uninstall": "Uninstall"
     },
     "hooks": {
       "desc": "Run a shell command on session start/end or after a tool completes (working directory is the project).",

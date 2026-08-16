@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { DEFAULT_SKILLS, type Skill } from '@dscode/shared';
 import { useSettingsStore } from '../../stores/settings';
 
 const { t } = useI18n();
+const router = useRouter();
 const settingsStore = useSettingsStore();
 
 /** 我的技能（用户可编辑/删除；含已添加的内置副本） */
@@ -62,13 +64,44 @@ async function persist() {
   await settingsStore.save({ skills: skills.value.map(s => ({ ...s })) });
 }
 
+/** 技能 logo 映射：内置技能按 id 配专属图标 + toolAccent 强调色 key，自定义技能回退通用图标 */
+const SKILL_LOGOS: Record<string, { icon: string; color: string }> = {
+  'code-review': { icon: 'i-lucide:file-search', color: 'tool-read' },
+  'test-writing': { icon: 'i-lucide:flask-conical', color: 'tool-list' },
+  'git-commit': { icon: 'i-lucide:git-commit', color: 'tool-search' },
+  debugging: { icon: 'i-lucide:bug', color: 'tool-run' },
+  refactoring: { icon: 'i-lucide:hammer', color: 'tool-write' },
+  'docs-writing': { icon: 'i-lucide:file-text', color: 'tool-edit' },
+  'security-audit': { icon: 'i-lucide:shield-check', color: 'tool-browse' },
+  'performance-tuning': { icon: 'i-lucide:gauge', color: 'tool-read' }
+};
+
+function skillLogo(id: string): { icon: string; color: string } {
+  return SKILL_LOGOS[id] ?? { icon: 'i-lucide:wand-sparkles', color: 'tool-run' };
+}
+
+/** logo 图标颜色：引用 Vuetify 生成的 tool 强调色 CSS 变量 */
+function logoColor(colorKey: string): string {
+  return 'rgb(var(--v-theme-' + colorKey + '))';
+}
+
 /** 我的技能里已存在的内置 id（内置卡片/详情弹窗显示「已添加」） */
 const addedBuiltinIds = computed(() => new Set(skills.value.map(s => s.id)));
 
-/** 把某个内置技能加入我的技能（可随后编辑） */
+/** 安装：把内置技能加入我的技能（可随后编辑） */
 function addBuiltin(d: Skill) {
   skills.value.push({ ...d });
   void persist();
+}
+
+/** 立即试用：回到工作区发起对话 */
+function trySkill(): void {
+  void router.push('/').catch(() => {});
+}
+
+/** 管理：打开编辑弹窗 */
+function manageSkill(s: Skill): void {
+  openEdit(s);
 }
 
 /** 内置技能详情弹窗 */
@@ -84,7 +117,7 @@ function openDetail(d: Skill) {
   <div class="flex flex-col gap-6">
     <div class="text-xs text-muted">{{ t('settingsPage.skills.desc') }}</div>
 
-    <!-- 内置技能：常驻展示（不依赖用户配置），简洁卡片 + 详情弹窗 -->
+    <!-- 内置技能：左右结构（logo | title+subtitle | 安装/更多），点击卡片看详情 -->
     <div>
       <div class="mb-2 flex items-center gap-2">
         <span class="i-lucide:sparkles text-sm text-muted" />
@@ -97,46 +130,43 @@ function openDetail(d: Skill) {
           class="cursor-pointer px-4 py-3 transition-colors hover:bg-elevated"
           @click="openDetail(d)"
         >
-          <div class="flex items-start gap-3">
-            <span class="mt-0.5 shrink-0 text-lg leading-none text-tool-read">
-              <span class="i-lucide:wand-sparkles" />
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-elevated">
+              <span :class="skillLogo(d.id).icon" class="text-lg" :style="{ color: logoColor(skillLogo(d.id).color) }" />
             </span>
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
-                <code class="rounded bg-elevated px-1.5 py-0.5 text-xs font-mono">{{ d.name }}</code>
+                <span class="truncate text-sm font-medium">{{ d.name }}</span>
                 <span
                   class="shrink-0 rounded border border-line px-1 py-0.5 text-[10px] font-medium leading-none text-muted"
                 >
                   {{ t('settingsPage.skills.builtin') }}
                 </span>
               </div>
-              <div class="mt-1.5 truncate text-sm text-fg">{{ d.description }}</div>
+              <div class="mt-0.5 truncate text-xs text-muted">{{ d.description }}</div>
             </div>
-          </div>
-          <div class="mt-3 flex items-center justify-end gap-2">
-            <span class="mr-auto inline-flex items-center gap-1 text-xs text-faint">
-              <span class="i-lucide:eye text-3.5" />
-              {{ t('settingsPage.skills.viewDetailHint') }}
-            </span>
-            <VBtn
-              v-if="addedBuiltinIds.has(d.id)"
-              size="small"
-              variant="text"
-              prepend-icon="i-lucide:check"
-              class="text-faint"
-              disabled
-            >
-              {{ t('settingsPage.skills.added') }}
-            </VBtn>
-            <VBtn v-else size="small" variant="tonal" prepend-icon="i-lucide:plus" @click.stop="addBuiltin(d)">
-              {{ t('settingsPage.skills.addBuiltin') }}
-            </VBtn>
+            <div class="shrink-0" @click.stop>
+              <VMenu v-if="addedBuiltinIds.has(d.id)" location="bottom end">
+                <template #activator="{ props: menuProps }">
+                  <VBtn v-bind="menuProps" icon="i-lucide:ellipsis" variant="text" size="small" class="text-muted" />
+                </template>
+                <VList density="compact" nav class="min-w-40">
+                  <VListItem :title="t('settingsPage.skills.tryNow')" @click="trySkill" />
+                  <VListItem :title="t('settingsPage.skills.manage')" @click="manageSkill(d)" />
+                  <VDivider class="my-1" />
+                  <VListItem :title="t('settingsPage.skills.uninstall')" @click="removeSkill(d.id)" />
+                </VList>
+              </VMenu>
+              <VBtn v-else size="small" variant="tonal" prepend-icon="i-lucide:download" @click="addBuiltin(d)">
+                {{ t('settingsPage.skills.install') }}
+              </VBtn>
+            </div>
           </div>
         </VCard>
       </div>
     </div>
 
-    <!-- 我的技能：可编辑/删除的自定义列表 -->
+    <!-- 我的技能：已安装，左右结构 + 更多菜单（立即试用/管理/卸载） -->
     <div>
       <div class="mb-2 flex items-center justify-between">
         <div class="flex items-center gap-2">
@@ -155,27 +185,35 @@ function openDetail(d: Skill) {
           class="cursor-pointer px-4 py-3 transition-colors hover:bg-elevated"
           @click="openEdit(s)"
         >
-          <div class="flex items-start justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-elevated">
+              <span :class="skillLogo(s.id).icon" class="text-lg" :style="{ color: logoColor(skillLogo(s.id).color) }" />
+            </span>
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
-                <code class="rounded bg-elevated px-1.5 py-0.5 text-xs font-mono">{{ s.name }}</code>
+                <span class="truncate text-sm font-medium">{{ s.name }}</span>
                 <span
                   v-if="addedBuiltinIds.has(s.id)"
                   class="shrink-0 rounded border border-line px-1 py-0.5 text-[10px] font-medium leading-none text-muted"
                 >
                   {{ t('settingsPage.skills.builtin') }}
                 </span>
-                <span class="truncate text-sm">{{ s.description }}</span>
               </div>
-              <div class="mt-2 truncate text-xs leading-5 text-muted">{{ s.instructions }}</div>
+              <div class="mt-0.5 truncate text-xs text-muted">{{ s.description }}</div>
             </div>
-            <VBtn
-              icon="i-lucide:trash-2"
-              variant="text"
-              size="small"
-              class="shrink-0 text-muted"
-              @click.stop="removeSkill(s.id)"
-            />
+            <div class="shrink-0" @click.stop>
+              <VMenu location="bottom end">
+                <template #activator="{ props: menuProps }">
+                  <VBtn v-bind="menuProps" icon="i-lucide:ellipsis" variant="text" size="small" class="text-muted" />
+                </template>
+                <VList density="compact" nav class="min-w-40">
+                  <VListItem :title="t('settingsPage.skills.tryNow')" @click="trySkill" />
+                  <VListItem :title="t('settingsPage.skills.manage')" @click="manageSkill(s)" />
+                  <VDivider class="my-1" />
+                  <VListItem :title="t('settingsPage.skills.uninstall')" @click="removeSkill(s.id)" />
+                </VList>
+              </VMenu>
+            </div>
           </div>
         </VCard>
       </div>
