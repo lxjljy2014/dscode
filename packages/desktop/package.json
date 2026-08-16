@@ -2,7 +2,7 @@
   "name": "@dscode/desktop",
   "description": "DSCode —— AI 编程助手桌面客户端",
   "author": "DSCode",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "private": true,
   "main": "./out/main/index.js",
   "scripts": {
