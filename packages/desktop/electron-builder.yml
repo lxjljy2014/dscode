@@ -1,6 +1,7 @@
 # electron-builder 打包配置（发布用）。
-# 只有 node-pty 是主进程运行时外部化依赖（见 package.json dependencies），其余 workspace/前端依赖
-# 均被 electron-vite 打进 out/ 产物，故不进入 dependencies，避免 electron-builder 尝试解析 workspace:*。
+# 主进程运行时外部化依赖（见 package.json dependencies）：node-pty、electron-updater；
+# 其余 workspace/前端依赖均被 electron-vite 打进 out/ 产物，故不进入 dependencies，
+# 避免 electron-builder 尝试解析 workspace:*。
 appId: com.dscode.app
 productName: DSCode
 copyright: Copyright © 2026 DSCode
@@ -8,6 +9,13 @@ copyright: Copyright © 2026 DSCode
 directories:
   output: release
   buildResources: resources
+
+# 自动更新（electron-updater）：发布渠道指向 GitHub Releases。
+# 打包时据此在 release/ 生成 latest.yml（Windows 更新元数据），随安装包一起上传到 Release 即可。
+publish:
+  provider: github
+  owner: lxjljy2014
+  repo: dscode
 
 # 打进安装包的内容：编译产物 + 资源；node_modules 仅收集生产依赖（node-pty），package.json 自动包含
 files:

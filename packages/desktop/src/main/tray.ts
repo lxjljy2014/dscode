@@ -1,17 +1,10 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, Menu, Tray, dialog, nativeImage, shell, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, Menu, Tray, dialog, nativeImage, type MenuItemConstructorOptions } from 'electron';
 import type { TrayAction } from '@dscode/shared';
 import { initProjects, listProjectsWithHome } from '@dscode/core';
 import { getDbFile } from './data-dir';
+import { checkForUpdates } from './updater';
 
-// GitHub 仓库（owner/repo），镜像到 GitHub 后替换为实际地址；可用环境变量 DSCODE_UPDATE_REPO 覆盖
-const GITHUB_REPO = process.env['DSCODE_UPDATE_REPO'] ?? 'lxjljy2014/dscode';
-// 检查更新走 GitHub Releases「最新版本」API（无需认证，限速 60 次/小时，够用）
-const RELEASES_API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
-// 更新说明展示最大长度（避免超长 markdown 撑爆对话框）
-const MAX_NOTES_LENGTH = 500;
-// 更新检查超时（毫秒）
-const UPDATE_TIMEOUT_MS = 10_000;
 
 // 托盘图标：Windows/Linux 用满幅圆角应用图标缩到小尺寸（16px 适配系统托盘渲染）。
 // resources/ 与 out/ 同级（与窗口图标同一布局，打包配置 files 已含 resources/**）
@@ -62,20 +55,6 @@ function sendAction(hooks: TrayHooks, payload: TrayAction): void {
   hooks.getMainWindow()?.webContents.send('tray:action', payload);
 }
 
-/** 版本号比较：latest > current 视为有新版本（忽略前缀 v） */
-function isNewerVersion(latest: string, current: string): boolean {
-  const parse = (v: string): number[] => v.replace(/^v/i, '').split('.').map(n => Number.parseInt(n, 10) || 0);
-  const a = parse(latest);
-  const b = parse(current);
-  const len = Math.max(a.length, b.length);
-  for (let i = 0; i < len; i++) {
-    const x = a[i] ?? 0;
-    const y = b[i] ?? 0;
-    if (x !== y) return x > y;
-  }
-  return false;
-}
-
 /** 消息框封装：有主窗口时作为 parent 弹出（macOS 全关窗口时无 parent 也能弹） */
 function showMessageBox(
   win: BrowserWindow | null,
@@ -116,122 +95,6 @@ function showAbout(hooks: TrayHooks): void {
 }
 
 /**
- * 检查更新（GitHub Releases）：拉取最新 Release 对比当前版本，按结果弹提示。
- * - 有新版：提示版本/更新说明，可「前往下载」（交给系统浏览器，避免未签名静默安装被 SmartScreen 拦截）
- * - 无新版：提示已是最新
- * - 未发布/拉取失败：提示相应错误（含原因）
- */
-async function checkForUpdates(hooks: TrayHooks): Promise<void> {
-  showWindow(hooks);
-  const win = hooks.getMainWindow();
-  const current = app.getVersion();
-
-  let release: Record<string, unknown>;
-  try {
-    const res = await fetch(RELEASES_API_URL, {
-      headers: { Accept: 'application/vnd.github+json' },
-      signal: AbortSignal.timeout(UPDATE_TIMEOUT_MS)
-    });
-    if (res.status === 404) {
-      await showMessageBox(win, {
-        type: 'info',
-        title: '检查更新',
-        message: '尚未发布任何版本',
-        detail: '仓库还没有 Release',
-        buttons: ['确定']
-      });
-      return;
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    release = (await res.json()) as Record<string, unknown>;
-  } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
-    await showMessageBox(win, {
-      type: 'error',
-      title: '检查更新失败',
-      message: '无法连接更新服务器',
-      detail,
-      buttons: ['确定']
-    });
-    return;
-  }
-
-  const tagName = release['tag_name'];
-  const latest = typeof tagName === 'string' ? tagName.replace(/^v/i, '') : '';
-  if (!latest) {
-    await showMessageBox(win, {
-      type: 'error',
-      title: '检查更新失败',
-      message: '未找到版本信息',
-      detail: 'Release 缺少 tag',
-      buttons: ['确定']
-    });
-    return;
-  }
-
-  if (!isNewerVersion(latest, current)) {
-    await showMessageBox(win, {
-      type: 'info',
-      title: '检查更新',
-      message: '已是最新版本',
-      detail: `当前版本 v${current}`,
-      buttons: ['确定']
-    });
-    return;
-  }
-
-  // 找 Windows 安装包直链：优先含 Setup 的 .exe，否则第一个 .exe
-  const rawAssets = release['assets'];
-  const assets = Array.isArray(rawAssets) ? (rawAssets as Array<Record<string, unknown>>) : [];
-  let downloadUrl = '';
-  for (const a of assets) {
-    const name = a['name'];
-    const url = a['browser_download_url'];
-    if (typeof name === 'string' && typeof url === 'string' && name.endsWith('.exe') && name.includes('Setup')) {
-      downloadUrl = url;
-      break;
-    }
-  }
-  if (!downloadUrl) {
-    for (const a of assets) {
-      const name = a['name'];
-      const url = a['browser_download_url'];
-      if (typeof name === 'string' && typeof url === 'string' && name.endsWith('.exe')) {
-        downloadUrl = url;
-        break;
-      }
-    }
-  }
-  const htmlUrl = typeof release['html_url'] === 'string' ? release['html_url'] : '';
-
-  const rawBody = release['body'];
-  let body = typeof rawBody === 'string' ? rawBody.trim() : '';
-  if (body.length > MAX_NOTES_LENGTH) body = `${body.slice(0, MAX_NOTES_LENGTH)}…`;
-
-  const detail = [`最新版本 v${latest}`, body ? `\n\n${body}` : ''].join('');
-
-  // 跳转目标：优先资产直链（直接下载安装包），否则 Release 页面
-  const target = downloadUrl || htmlUrl;
-  if (target) {
-    const r = await showMessageBox(win, {
-      type: 'info',
-      title: '发现新版本',
-      message: `发现新版本 v${latest}`,
-      detail,
-      buttons: ['前往下载', '取消']
-    });
-    if (r.response === 0) void shell.openExternal(target);
-  } else {
-    await showMessageBox(win, {
-      type: 'info',
-      title: '发现新版本',
-      message: `发现新版本 v${latest}`,
-      detail,
-      buttons: ['确定']
-    });
-  }
-}
-/**
  * 动态构建托盘右键菜单：每次弹出时读取最新最近项目。
  * - 打开 DSCode：恢复窗口
  * - 新建会话：渲染端回到新任务页
@@ -265,7 +128,7 @@ function buildMenu(hooks: TrayHooks): Menu {
     { type: 'separator' },
     { label: '设置', submenu: settingsItems },
     { type: 'separator' },
-    { label: '检查更新', click: () => void checkForUpdates(hooks) },
+    { label: '检查更新', click: () => void checkForUpdates() },
     { label: '关于 DSCode', click: () => showAbout(hooks) },
     { type: 'separator' },
     { label: '退出', click: () => app.quit() }

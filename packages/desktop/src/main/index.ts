@@ -5,6 +5,7 @@ import { disposeAgents, stopWindowAgents } from './agent/agent';
 import { migrateLegacyData } from './data-dir';
 import { disposeTerminals, killWindowTerminals } from './shell/terminal';
 import { createTray, destroyTray } from './tray';
+import { initAutoUpdater } from './updater';
 
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
@@ -140,6 +141,9 @@ app.whenReady().then(() => {
       // 非法颜色值由 Electron 抛错，兜底避免主进程崩溃
     }
   });
+
+  // 自动更新（electron-updater）：托盘「检查更新」触发；静默下载 + 下载完成提示重启安装
+  initAutoUpdater(() => mainWindow);
 
   // 系统托盘：窗口「关闭」后驻留后台，可从托盘恢复窗口、执行常用操作或退出应用
   createTray({
