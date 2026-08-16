@@ -8,6 +8,11 @@
   "header": {
     "taskName": "Task name"
   },
+  "updater": {
+    "available": "New version v{version} available, click to download",
+    "downloading": "Downloading {percent}%",
+    "downloaded": "Update ready, click to restart"
+  },
   "sidebar": {
     "project": "Projects",
     "more": "More",

@@ -173,4 +173,5 @@ export * from './projects';
 export * from './settings';
 export * from './terminal';
 export * from './tray';
+export * from './updater';
 export * from './usage';

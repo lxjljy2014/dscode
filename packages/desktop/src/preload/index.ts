@@ -25,6 +25,7 @@ import type {
   TerminalEnsureResult,
   TerminalExitInfo,
   TrayAction,
+  UpdaterState,
   UsageRecord
 } from '@dscode/shared';
 
@@ -214,7 +215,25 @@ const api = {
     };
     ipcRenderer.on('tray:action', listener);
     return () => ipcRenderer.removeListener('tray:action', listener);
-  }
+  },
+
+  // ---- 自动更新 ----
+  /** 订阅自动更新状态（驱动侧边栏更新按钮），返回取消订阅函数 */
+  onUpdaterState: (cb: (state: UpdaterState) => void): (() => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, state: unknown): void => {
+      if (typeof state === 'object' && state !== null && typeof (state as Record<string, unknown>)['state'] === 'string') {
+        cb(state as UpdaterState);
+      }
+    };
+    ipcRenderer.on('updater:state', listener);
+    return () => ipcRenderer.removeListener('updater:state', listener);
+  },
+  /** 触发下载更新（用户点击「更新」按钮） */
+  updaterDownload: (): Promise<void> => ipcRenderer.invoke('updater:download'),
+  /** 重启并安装已下载的更新（用户点击「重启更新」按钮） */
+  updaterInstall: (): Promise<void> => ipcRenderer.invoke('updater:install'),
+  /** 拉取当前更新状态（渲染端加载时同步一次） */
+  updaterGetState: (): Promise<UpdaterState> => ipcRenderer.invoke('updater:get-state')
 };
 
 export type DsCodeApi = typeof api;

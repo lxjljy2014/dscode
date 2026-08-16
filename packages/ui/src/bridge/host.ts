@@ -26,6 +26,7 @@ import type {
   TerminalEnsureResult,
   TerminalExitInfo,
   TrayAction,
+  UpdaterState,
   UsageRecord
 } from '@dscode/shared';
 
@@ -128,6 +129,16 @@ export interface HostApi {
   // ---- 系统托盘 ----
   /** 订阅托盘菜单动作（新建会话/打开设置/切换工作空间），返回取消订阅函数 */
   onTrayAction: (cb: (ev: TrayAction) => void) => () => void;
+
+  // ---- 自动更新 ----
+  /** 订阅自动更新状态（驱动侧边栏更新按钮），返回取消订阅函数 */
+  onUpdaterState: (cb: (state: UpdaterState) => void) => () => void;
+  /** 触发下载更新（用户点击「更新」按钮） */
+  updaterDownload: () => Promise<void>;
+  /** 重启并安装已下载的更新（用户点击「重启更新」按钮） */
+  updaterInstall: () => Promise<void>;
+  /** 拉取当前更新状态（渲染端加载时同步一次） */
+  updaterGetState: () => Promise<UpdaterState>;
 }
 
 declare global {
