@@ -35,6 +35,9 @@ export interface ProviderConfig {
   contextWindow?: number;
 }
 
+/** 斜杠命令的内置动作：命中后直接执行真实操作（而非展开为提示词发送） */
+export type CommandAction = 'permission' | 'plan' | 'model';
+
 /** 用户自定义斜杠命令（/name 展开为 prompt） */
 export interface Command {
   /** 唯一标识（uuid） */
@@ -43,8 +46,14 @@ export interface Command {
   name: string;
   /** 菜单展示用一句话说明 */
   description: string;
-  /** 展开后的提示词模板 */
+  /** 展开后的提示词模板（action 命令忽略此字段，仅作设置页说明） */
   prompt: string;
+  /** 可选的输入提示（如 [<objective>|clear|edit <objective>]），命令卡片展示用；缺省无 */
+  input?: string;
+  /** 内置动作：命中后直接执行（切换权限/计划模式/模型），而非展开为提示词发送 */
+  action?: CommandAction;
+  /** 条目来源标记：'skill' 表示由可用技能合成的斜杠条目（运行时生成，不持久化到 commands） */
+  kind?: 'skill';
 }
 
 /** 长期记忆条目（注入系统提示词） */
@@ -235,6 +244,64 @@ export const DEFAULT_SUBAGENTS: Subagent[] = [
     description: '定位并修复 bug',
     systemPrompt:
       '你是调试专家。针对用户描述的问题，先复现并定位根因：阅读相关代码、查看错误信息与日志、必要时用工具搜索或加临时日志。定位到根因后再做最小化修复，并解释根因与修复逻辑。避免掩盖症状式的修补，也不要扩大改动范围。'
+  }
+];
+
+/** 内置斜杠命令：对齐官方 Harness（DSH）的内置命令集，首次启动（无自定义）时预置，可编辑/删除。
+ *  action 命令命中后直接执行真实操作（切换权限/计划模式/模型）；其余为提示词模板，
+ *  /name 展开为 prompt 填入输入框，用户可在此基础上补充上下文再发送。 */
+export const DEFAULT_COMMANDS: Command[] = [
+  {
+    id: 'builtin-compact',
+    name: 'compact',
+    description: '压缩较旧的对话历史',
+    prompt:
+      '请总结本次对话的完整上下文，输出一份精炼摘要：关键目标、已确认的决策、已完成事项与待办事项，供压缩历史后延续工作使用。'
+  },
+  {
+    id: 'builtin-goal',
+    name: 'goal',
+    description: '设置或查看长期任务的目标',
+    input: '[<objective>|clear|edit <objective>|pause|resume]',
+    prompt:
+      '请为当前任务设定一个清晰、可度量的目标：说明要达成的结果、完成标准与关键步骤，并据此规划后续工作。'
+  },
+  {
+    id: 'builtin-feedback',
+    name: 'feedback',
+    description: '记录本会话的反馈',
+    input: '<text>',
+    prompt: '请就本次会话的表现给出反馈：指出做得好的地方、存在的问题与改进建议。'
+  },
+  {
+    id: 'builtin-plan',
+    name: 'plan',
+    description: '进入或退出计划模式',
+    input: '[off|message]',
+    action: 'plan',
+    prompt: '进入计划模式（/plan off 退出）：只读分析并给出方案，经确认后再修改文件或执行命令。'
+  },
+  {
+    id: 'builtin-permission',
+    name: 'permission',
+    description: '切换权限模式',
+    input: '[confirm|auto-edit|plan|full-access]',
+    action: 'permission',
+    prompt: '切换权限模式：confirm（变更前确认）/ auto-edit（自动编辑）/ plan（计划）/ full-access（完全访问）。'
+  },
+  {
+    id: 'builtin-model',
+    name: 'model',
+    description: '切换本会话使用的模型',
+    input: '[<name>]',
+    action: 'model',
+    prompt: '切换本会话使用的模型；不带参数时列出当前模型与可用模型。'
+  },
+  {
+    id: 'builtin-export',
+    name: 'export',
+    description: '将会话日志下载为 ZIP 归档',
+    prompt: '请说明如何导出当前会话的日志（会话记录保存在 ~/.dscode/sessions 目录下）。'
   }
 ];
 

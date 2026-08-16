@@ -83,6 +83,11 @@
     "agentMode": "Agent mode",
     "addContext": "Add context",
     "subagentDefault": "Default",
+    "commandTitle": "Commands",
+    "commandEmpty": "No matching commands",
+    "commandHint": "↑/↓ select · Enter apply · Esc close",
+    "commandGroup": "Commands",
+    "skillGroup": "Skills",
     "effort": {
       "close": "Off",
       "high": "High",
@@ -98,6 +103,16 @@
     "hintPlan": "Read-only analysis, changes need manual approval",
     "fullAccess": "Full access",
     "hintFullAccess": "All operations run directly"
+  },
+  "command": {
+    "permissionCurrent": "Current permission mode: ",
+    "permissionSwitched": "Permission mode switched to: ",
+    "permissionInvalid": "Unknown permission mode: {value} (available: confirm / auto-edit / plan / full-access)",
+    "planOn": "Plan mode on (/plan off to leave)",
+    "planOff": "Plan mode off",
+    "modelCurrent": "Current model: ",
+    "modelSwitched": "Model switched to: ",
+    "modelInvalid": "Unknown model: {value} (available: {list})"
   },
   "project": {
     "search": "Search projects",
@@ -282,9 +297,10 @@
       "contextWindowHint": "Clear to restore the 1M default (aligned with official); used for context occupancy"
     },
     "commands": {
-      "desc": "Custom slash commands: typing /name expands into a prompt.",
+      "desc": "Slash commands: typing /name expands into a prompt. Built-in commands can be edited or removed.",
       "add": "Add command",
       "edit": "Edit command",
+      "builtin": "Built-in",
       "empty": "No custom commands yet",
       "name": "Command name (without /)",
       "namePlaceholder": "e.g. explain",

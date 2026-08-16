@@ -239,7 +239,7 @@ const blockDiff = computed(() => {
 </script>
 
 <template>
-  <div class="mb-2">
+  <div class="my-4">
     <!-- 主行：灰色工具图标 + 动词 + 扩展名徽章 + 文件名 + 目录 + 行数 + 状态（仅右侧箭头可展开/折叠） -->
     <div class="group flex items-center gap-1.5 text-sm">
       <span class="shrink-0 text-4" :class="leadingIcon" />

@@ -159,12 +159,17 @@ html {
 .ds-thought:hover .ds-thought-summary {
   color: rgb(var(--v-theme-on-surface));
 }
-/* 展开箭头：折叠时朝右，展开时朝下 */
+/* 展开箭头：默认隐藏，悬停思考行或已展开时显示；折叠时朝右，展开时朝下 */
 .ds-thought-chevron {
   flex-shrink: 0;
   font-size: 14px;
   color: rgb(var(--v-theme-on-surface-variant));
-  transition: transform 0.2s ease;
+  opacity: 0;
+  transition: transform 0.2s ease, opacity 0.15s ease;
+}
+.ds-thought:hover .ds-thought-chevron,
+.ds-thought[open] .ds-thought-chevron {
+  opacity: 1;
 }
 .ds-thought[open] .ds-thought-chevron {
   transform: rotate(90deg);

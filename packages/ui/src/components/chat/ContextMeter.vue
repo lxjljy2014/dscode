@@ -72,9 +72,11 @@ const tooltip = computed(() => {
         v-bind="menuProps"
         variant="text"
         size="x-small"
+        icon
+        rounded="50%"
         class="text-muted"
       >
-        <VProgressCircular :model-value="percent" :size="16" :width="2" :color="color" />
+        <VProgressCircular :model-value="percent" :size="16" :width="3" :color="color" />
       </VBtn>
     </template>
 

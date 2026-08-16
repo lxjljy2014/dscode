@@ -83,6 +83,11 @@
     "agentMode": "代理模式",
     "addContext": "添加上下文",
     "subagentDefault": "默认",
+    "commandTitle": "命令",
+    "commandEmpty": "无匹配命令",
+    "commandHint": "↑/↓ 选择 · Enter 应用 · Esc 关闭",
+    "commandGroup": "命令",
+    "skillGroup": "技能",
     "effort": {
       "close": "关闭",
       "high": "高",
@@ -98,6 +103,16 @@
     "hintPlan": "变更前先出计划",
     "fullAccess": "完全访问",
     "hintFullAccess": "减少确认次数"
+  },
+  "command": {
+    "permissionCurrent": "当前权限模式：",
+    "permissionSwitched": "已切换权限模式：",
+    "permissionInvalid": "未知权限模式：{value}（可用 confirm / auto-edit / plan / full-access）",
+    "planOn": "已进入计划模式（/plan off 退出）",
+    "planOff": "已退出计划模式",
+    "modelCurrent": "当前模型：",
+    "modelSwitched": "已切换模型：",
+    "modelInvalid": "未知模型：{value}（可用 {list}）"
   },
   "project": {
     "search": "搜索项目",
@@ -282,9 +297,10 @@
       "contextWindowHint": "清空恢复默认 1M（对齐官方）；用于上下文占用展示"
     },
     "commands": {
-      "desc": "自定义斜杠命令：在输入框输入 /名称 可展开为提示词。",
+      "desc": "斜杠命令：在输入框输入 /名称 展开为提示词。内置常用命令可编辑或删除。",
       "add": "添加命令",
       "edit": "编辑命令",
+      "builtin": "内置",
       "empty": "尚未自定义命令",
       "name": "命令名（不含 /）",
       "namePlaceholder": "例如 explain",

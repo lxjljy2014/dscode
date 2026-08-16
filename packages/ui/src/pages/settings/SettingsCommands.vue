@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { Command } from '@dscode/shared';
+import { DEFAULT_COMMANDS, type Command } from '@dscode/shared';
 import { useSettingsStore } from '../../stores/settings';
 
 const { t } = useI18n();
 const settingsStore = useSettingsStore();
+
+/** 内置命令 id 集合（用于「内置」徽标，与自定义命令区分） */
+const builtinIds = new Set(DEFAULT_COMMANDS.map(c => c.id));
 
 const commands = ref<Command[]>([]);
 watch(
@@ -82,6 +85,13 @@ async function persist() {
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <code class="rounded bg-elevated px-1.5 py-0.5 text-xs font-mono">/{{ c.name }}</code>
+            <code v-if="c.input" class="shrink-0 font-mono text-[11px] text-faint">{{ c.input }}</code>
+            <span
+              v-if="builtinIds.has(c.id)"
+              class="shrink-0 rounded border border-line px-1 py-0.5 text-[10px] font-medium leading-none text-muted"
+            >
+              {{ t('settingsPage.commands.builtin') }}
+            </span>
             <span class="truncate text-sm">{{ c.description }}</span>
           </div>
           <div class="mt-1.5 truncate text-xs leading-5 text-muted">{{ c.prompt }}</div>

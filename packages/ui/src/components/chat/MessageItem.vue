@@ -42,6 +42,13 @@ function reasoningLabel(content: string, streaming: boolean): string {
   return title ? base + ' · ' + title : base;
 }
 
+/** 是否为消息里第一个思考行（去掉其顶部间距，避免与头像行之间留空） */
+function isFirstReasoning(index: number): boolean {
+  const steps = props.message.steps;
+  if (!steps) return false;
+  return steps.findIndex(s => s.kind === 'reasoning') === index;
+}
+
 // ---- 回复底部操作：复制 / 点赞 / 踩 / fork ----
 
 /** 点赞/踩状态（按消息 id，仅内存，不持久化；模块级避免切换任务后丢失） */
@@ -129,7 +136,11 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
         <template v-if="message.steps && message.steps.length">
           <template v-for="(step, i) in message.steps" :key="i">
             <!-- 思考（默认折叠；思考中显示旋转 loading 图标，完成显示大脑图标，无背景） -->
-            <details v-if="step.kind === 'reasoning'" class="ds-thought mb-3">
+            <details
+              v-if="step.kind === 'reasoning'"
+              class="ds-thought"
+              :class="isFirstReasoning(i) ? 'mb-4 mt-1' : 'my-4'"
+            >
               <summary :class="{ 'ds-breathe': isCurrentReasoning(i) }">
                 <span class="ds-thought-icon">
                   <span v-if="isCurrentReasoning(i)" class="i-lucide:brain-circuit ds-spin" />

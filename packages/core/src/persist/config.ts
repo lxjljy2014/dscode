@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path';
 // 经子路径出口导入运行时值：主进程外部化 @dscode/shared 后由 Node 直接加载，
 // 主入口 index.ts 的目录 re-export（./types）在 Node ESM 下不可解析
-import { DEFAULT_SKILLS, DEFAULT_SUBAGENTS, DEEPSEEK_PRESET } from '@dscode/shared/settings';
+import { DEFAULT_COMMANDS, DEFAULT_SKILLS, DEFAULT_SUBAGENTS, DEEPSEEK_PRESET } from '@dscode/shared/settings';
 import type {
   AppSettings,
   Command,
@@ -236,7 +236,7 @@ export function defaultSettings(homeDir: string): AppSettings {
     permissionMode: 'confirm',
     providers: [],
     onboardingDone: false,
-    commands: [],
+    commands: [...DEFAULT_COMMANDS],
     memory: [],
     skills: [...DEFAULT_SKILLS],
     hooks: [],
