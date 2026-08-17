@@ -55,8 +55,9 @@ const groups = computed(() => [
       <VBtn
         variant="text"
         size="small"
-        class="-ml-1 px-2 text-muted"
+        class="-ml-1 px-2 text-muted justify-start"
         prepend-icon="i-lucide:arrow-left"
+        block
         @click="router.push('/')"
       >
         {{ t('settingsPage.back') }}

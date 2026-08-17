@@ -13,13 +13,13 @@ const title = computed(() => t(`settingsPage.section.${route.path.split('/').fil
 
 <template>
   <!-- 设置路由：完整布局（设置导航侧栏常驻 + 顶栏 + 内容区） -->
-  <VNavigationDrawer permanent width="280" class="border-r border-line">
+  <VNavigationDrawer permanent class="border-r border-line">
     <SettingsSidebar />
   </VNavigationDrawer>
 
   <SettingsHeader />
 
-  <VMain>
+  <VMain scrollable>
     <div class="h-full flex flex-col bg-base">
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto max-w-180 px-8 pb-10 pt-6">

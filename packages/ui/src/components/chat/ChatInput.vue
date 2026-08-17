@@ -311,25 +311,45 @@ function onKeydown(e: KeyboardEvent) {
       />
 
       <div class="flex items-center gap-1 px-2 pb-1">
-        <VTooltip :text="t('input.addContext')" location="top">
-          <template #activator="{ props: tipProps }">
-            <VIconBtn v-bind="tipProps" icon="i-lucide:plus" variant="text" size="small" class="text-muted" />
+        <VMenu location="top" :offset="4">
+          <template #activator="{ props: menuProps }">
+            <VTooltip :text="t('input.addContext')" location="top">
+              <template #activator="{ props: tipProps }">
+                <VIconBtn
+                  v-bind="{ ...menuProps, ...tipProps }"
+                  icon="i-lucide:plus"
+                  variant="text"
+                  size="small"
+                  class="text-muted"
+                />
+              </template>
+            </VTooltip>
           </template>
-        </VTooltip>
-
+          <VList min-width="220" nav>
+            <VListItem prepend-icon="i-lucide:paperclip" @click="insertSlash">
+              <VListItemTitle class="text-sm">添加附件</VListItemTitle>
+            </VListItem>
+            <VListItem prepend-icon="i-lucide:at-sign" @click="insertSlash">
+              <VListItemTitle class="text-sm">使用 @ 添加上下文</VListItemTitle>
+            </VListItem>
+            <VListItem prepend-icon="i-lucide:square-slash" @click="insertSlash">
+              <VListItemTitle class="text-sm">使用 / 选择命令或能力</VListItemTitle>
+            </VListItem>
+          </VList>
+        </VMenu>
         <!-- 斜杠命令：点击在输入框末尾补 /，触发命令卡片 -->
-        <VTooltip :text="t('input.commandTitle')" location="top">
-          <template #activator="{ props: tipProps }">
-            <VIconBtn
-              v-bind="tipProps"
-              icon="i-lucide:slash"
-              variant="text"
-              size="small"
-              class="text-muted"
-              @click="insertSlash"
-            />
-          </template>
-        </VTooltip>
+        <!--        <VTooltip :text="t('input.commandTitle')" location="top">-->
+        <!--          <template #activator="{ props: tipProps }">-->
+        <!--            <VIconBtn-->
+        <!--              v-bind="tipProps"-->
+        <!--              icon="i-lucide:slash"-->
+        <!--              variant="text"-->
+        <!--              size="small"-->
+        <!--              class="text-muted"-->
+        <!--              @click="insertSlash"-->
+        <!--            />-->
+        <!--          </template>-->
+        <!--        </VTooltip>-->
 
         <!-- 权限模式 -->
         <PermissionSelector />
