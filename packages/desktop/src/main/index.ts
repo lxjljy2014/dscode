@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { registerIpcHandlers } from './ipc';
 import { disposeAgents, stopWindowAgents } from './agent/agent';
@@ -18,6 +19,8 @@ const TITLEBAR_HEIGHT = 48;
 // Windows/Linux 任务栏/标题栏用满幅圆角版（满幅内容避免方形槽位里显得偏小，圆角画在内容上、角外透明）
 const MAC_DOCK_ICON = join(__dirname, '../../resources/icon.png');
 const WINDOW_ICON = join(__dirname, '../../resources/icon-win.png');
+// 生产环境唯一放行的本地导航目标（应用自身 renderer/index.html）
+const RENDERER_INDEX_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href;
 
 // 允许交给系统浏览器打开的协议白名单
 const ALLOWED_OPEN_PROTOCOLS = ['https:', 'http:'];
@@ -63,7 +66,8 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      // preload 仅使用 contextBridge/ipcRenderer/process.platform/versions，均支持沙箱化，收紧权限面
+      sandbox: true
     }
   });
 
@@ -98,7 +102,7 @@ function createWindow(): void {
   // 拦截窗口内导航：仅放行自身 dev server / 本地文件，其余交给系统浏览器或直接拦截
   win.webContents.on('will-navigate', (event, url) => {
     const devUrl = process.env['ELECTRON_RENDERER_URL'];
-    if (devUrl ? url.startsWith(devUrl) : url.startsWith('file:')) return;
+    if (devUrl ? url.startsWith(devUrl) : url.startsWith(RENDERER_INDEX_URL)) return;
     event.preventDefault();
     openExternalIfAllowed(url);
   });

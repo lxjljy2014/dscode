@@ -5,6 +5,7 @@ import type {
   AgentToolEvent,
   AgentUsageEvent,
   AppSettings,
+  AttachmentReadResult,
   ChatMessagePayload,
   DiffFile,
   FileNode,
@@ -53,6 +54,12 @@ export interface HostApi {
   listRecentProjects: () => Promise<ProjectsListResult>;
   removeRecentProject: (path: string) => Promise<{ ok: boolean }>;
   pickDirectory: () => Promise<string | null>;
+  /** 选择文件（附件 / @ 引用），取消返回 null */
+  pickFiles: () => Promise<string[] | null>;
+  /** 读取附件文件（图片预览 dataUrl / 文本内容） */
+  readAttachment: (path: string) => Promise<AttachmentReadResult>;
+  /** 保存文件（代码块下载），取消返回 { ok: false, canceled: true } */
+  saveFile: (defaultName: string, content: string) => Promise<{ ok: true } | { ok: false; canceled?: boolean; error?: string }>;
 
   // ---- 供应商校验 ----
   verifyProvider: (baseUrl: string, apiKey: string) => Promise<ProviderVerifyResult>;
@@ -62,7 +69,8 @@ export interface HostApi {
     sessionId: string,
     model: string,
     messages: ChatMessagePayload[],
-    subagentId: string
+    subagentId: string,
+    reasoningEffort?: 'off' | 'high' | 'max'
   ) => Promise<{ ok: boolean }>;
   agentStop: (sessionId: string) => Promise<void>;
   agentConfirmResponse: (toolEventId: string, decision: ConfirmDecision) => Promise<void>;

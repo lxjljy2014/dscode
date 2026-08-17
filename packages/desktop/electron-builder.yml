@@ -11,7 +11,8 @@ directories:
   buildResources: resources
 
 # 自动更新（electron-updater）：发布渠道指向 GitHub Releases。
-# 打包时据此在 release/ 生成 latest.yml（Windows 更新元数据），随安装包一起上传到 Release 即可。
+# 仓库双推：fetch/push 到 github.com/lxjljy2014/dscode（同时 push 到 gitee.com/lixjun/dscode），
+# 发布时把 release/ 下生成的 latest.yml 与安装包一并上传到 GitHub Release 即可。
 publish:
   provider: github
   owner: lxjljy2014
@@ -28,9 +29,9 @@ asar: true
 asarUnpack:
   - '**/node_modules/node-pty/**'
 
-# 用 electron-builder 自带的 rebuild 把 node-pty 对齐 Electron ABI（需要本机有编译工具链）
-# node-pty 1.x 基于 node-addon-api（N-API，ABI 稳定），现有 prebuilds 直接兼容 Electron，无需重编译；
-# 本机 VS2022 缺 Spectre-mitigated libraries 组件，node-gyp 重建会失败（MSB8040）
+# node-pty 用 N-API（ABI 稳定）：macOS/Windows 有官方 prebuild，可直接加载无需 rebuild；
+# Linux 无 prebuild，会在 pnpm install 时按系统 Node 走 node-gyp 源码编译（需 python3/make/g++）。
+# 本机 VS2022 缺 Spectre-mitigated libraries 组件，node-gyp 重建会失败（MSB8040），故关闭 electron-builder rebuild。
 npmRebuild: false
 
 mac:

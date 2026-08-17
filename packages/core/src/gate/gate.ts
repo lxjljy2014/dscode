@@ -56,15 +56,17 @@ export async function gateTool(
 
   // 确认等待 120s 超时自动拒绝（区分用户拒绝与超时，便于渲染端展示原因）
   let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const decision = await Promise.race([
     confirm(toolEventId, name, argsJson),
     new Promise<ConfirmDecision>(resolve => {
-      setTimeout(() => {
+      timer = setTimeout(() => {
         timedOut = true;
         resolve({ kind: 'deny' });
       }, CONFIRM_TIMEOUT_MS);
     })
   ]);
+  clearTimeout(timer);
   switch (decision.kind) {
     case 'allow-once':
     case 'allow-session':

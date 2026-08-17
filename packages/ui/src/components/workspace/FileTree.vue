@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useWorkspaceStore } from '../../stores/workspace';
@@ -10,6 +10,13 @@ const store = useWorkspaceStore();
 const { fileTree, selectedFile, selectedFilePath } = storeToRefs(store);
 
 const opened = ref<string[]>([]);
+
+// 大文件内容显示封顶，避免把整个 512KB 文本塞进一个 <pre> 造成卡顿
+const MAX_CONTENT_CHARS = 100_000;
+const displayedContent = computed(() => {
+  const c = selectedFile.value?.content ?? '';
+  return c.length > MAX_CONTENT_CHARS ? c.slice(0, MAX_CONTENT_CHARS) + '\n' + t('diff.fileTruncated') : c;
+});
 
 function onActivate(ids: unknown) {
   const path = Array.isArray(ids) ? (ids[0] as string | undefined) : undefined;
@@ -49,7 +56,7 @@ function isDir(node: FileNode) {
           <span class="i-lucide:file-text shrink-0 text-3.5 text-muted" />
           <span class="truncate font-mono text-xs text-fg">{{ selectedFile.path }}</span>
         </div>
-        <pre class="p-3 font-mono text-xs leading-[22px] text-fg"><code>{{ selectedFile.content }}</code></pre>
+        <pre class="p-3 font-mono text-xs leading-[22px] text-fg"><code>{{ displayedContent }}</code></pre>
       </template>
 
       <div v-else class="h-full flex flex-col items-center justify-center gap-2 text-faint">

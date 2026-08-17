@@ -15,10 +15,15 @@ const MAX_LCS_CELLS = 4_000_000;
 /** hunk 两侧保留的上下文行数 */
 const CONTEXT_LINES = 3;
 
-/** 收集工作目录内全部文本文件（≤512KB，跳过 node_modules/.git/out/dist） */
-export async function collectTextFiles(cwd: string): Promise<Map<string, string>> {
+/** 快照/全量 diff 最多收集的文件数：超大仓库 OOM 安全阀，超出告警并截断（超出部分不参与 diff） */
+export const MAX_SNAPSHOT_FILES = 20_000;
+
+/** 收集工作目录内全部文本文件（≤512KB，跳过 node_modules/.git/out/dist）；maxFiles 上限超出截断 */
+export async function collectTextFiles(cwd: string, maxFiles = Number.POSITIVE_INFINITY): Promise<Map<string, string>> {
   const files = new Map<string, string>();
+  let truncated = false;
   const walk = async (dir: string): Promise<void> => {
+    if (files.size >= maxFiles) return;
     let entries;
     try {
       entries = await readdir(dir, { withFileTypes: true });
@@ -26,6 +31,10 @@ export async function collectTextFiles(cwd: string): Promise<Map<string, string>
       return;
     }
     for (const e of entries) {
+      if (files.size >= maxFiles) {
+        truncated = true;
+        return;
+      }
       if (e.isDirectory()) {
         if (!SKIP_DIRS.has(e.name)) await walk(join(dir, e.name));
         continue;
@@ -42,6 +51,7 @@ export async function collectTextFiles(cwd: string): Promise<Map<string, string>
     }
   };
   await walk(cwd);
+  if (truncated) console.warn(`[diff] 工作区文件数超过 ${maxFiles}，快照已截断（超出部分不参与 diff）`);
   return files;
 }
 
@@ -197,7 +207,7 @@ export class DiffSnapshotStore {
 
   /** agent 启动时建立快照 */
   async initSnapshot(sessionId: string, cwd: string): Promise<void> {
-    this.snapshots.set(sessionId, await collectTextFiles(cwd));
+    this.snapshots.set(sessionId, await collectTextFiles(cwd, MAX_SNAPSHOT_FILES));
   }
 
   /** agent 运行结束后清理快照 */
@@ -221,7 +231,7 @@ export class DiffSnapshotStore {
       }
     } else {
       // 全量：对比快照键与当前全部文件（run_command 等无法追踪路径时）
-      const current = await collectTextFiles(cwd);
+      const current = await collectTextFiles(cwd, MAX_SNAPSHOT_FILES);
       const allPaths = new Set([...snap.keys(), ...current.keys()]);
       for (const p of allPaths) {
         const oldText = snap.has(p) ? snap.get(p)! : null;

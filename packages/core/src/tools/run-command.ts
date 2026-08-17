@@ -13,7 +13,6 @@ export const runCommandTool = defineTool({
   name: 'run_command',
   permission: 'execute',
   description: '在工作目录内执行 shell 命令（最长 60 秒，返回输出与退出码）',
-  timeoutMs: COMMAND_TIMEOUT_MS,
   presentation: {
     presentCall: (args) => ({
       card: 'terminal',
@@ -33,7 +32,9 @@ export const runCommandTool = defineTool({
         cwd: ctx.cwd,
         timeout: COMMAND_TIMEOUT_MS,
         maxBuffer: 4 * 1024 * 1024,
-        windowsHide: true
+        windowsHide: true,
+        // 传播运行中止信号：agent 停止时杀掉子进程（此前只靠 timeout，停止后子进程仍跑满 60s）
+        ...(ctx.signal ? { signal: ctx.signal } : {})
       });
       const output = [stdout, stderr].filter(Boolean).join('\n');
       return {
@@ -44,6 +45,10 @@ export const runCommandTool = defineTool({
         blocks: [{ type: 'text', text: truncate(output) || '（无输出）' }]
       };
     } catch (e) {
+      // 运行中止（AbortError）：与超时/失败区分，避免误报为命令失败
+      if (ctx.signal?.aborted) {
+        return { ok: false, error: '命令执行已中止', meta: { exitCode: null, killed: false, command, cwd: ctx.cwd } };
+      }
       // 超时（killed）或非零退出码：execFile 的 error 里带有 stdout/stderr/exit code，一并回给模型
       const err = e as { stdout?: string; stderr?: string; code?: number | string; killed?: boolean; message?: string };
       const output = [err.stdout, err.stderr].filter(Boolean).join('\n');

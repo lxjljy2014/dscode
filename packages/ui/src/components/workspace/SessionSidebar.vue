@@ -179,7 +179,7 @@ async function restoreTask(s: { id: string }): Promise<void> {
                     />
                   </template>
                 </VTooltip>
-                <VBtn v-else variant="tonal" size="small" color="error" text="确认" @click="archiveTask(s)" />
+                <VBtn v-else variant="tonal" size="small" color="error" :text="t('sidebar.confirmArchive')" @click="archiveTask(s)" />
               </div>
             </template>
           </VListItem>

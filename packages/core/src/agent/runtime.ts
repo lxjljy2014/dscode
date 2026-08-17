@@ -24,6 +24,8 @@ import type { AgentEventSink } from './types';
  */
 
 const MAX_TOOL_ROUNDS = 30;
+/** 单次运行注入上下文的工具结果总字符预算：封顶最坏情况输出，防上下文无界增长 */
+const MAX_TOOL_CONTEXT_CHARS = 200_000;
 /** 单轮 LLM 请求最长等待（含流式全程） */
 const ROUND_TIMEOUT_MS = 5 * 60_000;
 
@@ -241,6 +243,8 @@ export class AgentRuntime {
       let totalCompletion = 0;
       // API 前缀缓存命中的输入 token 累计（DeepSeek 上下文缓存；随前缀稳定而升高，随 usage 事件落库）
       let totalCachedPrompt = 0;
+      // 本运行的工具结果上下文预算（跨轮累计，executeToolBatch 在插入时按预算截断）
+      const toolBudget = { remaining: MAX_TOOL_CONTEXT_CHARS };
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const combined = AbortSignal.any([signal, AbortSignal.timeout(ROUND_TIMEOUT_MS)]);
         const roundStart = Date.now();
@@ -401,6 +405,7 @@ sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalComple
             pendingConfirms: this.pendingConfirms,
             abortRun: sid => { run.controller.abort(); void sid; },
             recomputeDiff: (sid, wd, changedPaths) => this.snapshots.recomputeDiff(sid, wd, changedPaths).then(files => { sink.diff(sid, files); }),
+            toolBudget,
             skills,
           }
         );
@@ -412,8 +417,9 @@ sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalComple
           return;
         }
       }
-sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion, cachedPromptTokens: totalCachedPrompt });
-      sink.done(sessionId);
+      // 工具循环打满 MAX_TOOL_ROUNDS 仍未产生最终回答：按错误收尾，避免「无结论却显示完成」误导用户
+      sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion, cachedPromptTokens: totalCachedPrompt });
+      sink.error(sessionId, 'max-rounds', `已达到最大工具轮次（${MAX_TOOL_ROUNDS} 轮），任务提前结束`);
     } catch (e) {
       if (signal.aborted) {
         // 被新运行替换时静默退出（渲染端已丢失状态，aborted 事件无接收方）

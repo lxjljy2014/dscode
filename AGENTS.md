@@ -25,7 +25,7 @@ packages/
 ├── core/             # @dscode/core —— 纯 TS 核心逻辑（无 Electron/DOM 依赖，Node 内建可用；desktop 与将来 TUI 直接复用）
 │   └── src/
 │       ├── agent/    # 运行时编排：runtime.ts（SSE 流式+工具循环+30 轮上限）、types.ts（AgentEventSink 事件抽象，宿主各自实现）
-│       ├── tools/    # 工具注册表：Tool 接口（描述+实现一体）+ 每工具一文件 ×6，注册表 Record<AgentToolName, Tool> 编译期保证完整
+│       ├── tools/    # 工具注册表：Tool 接口（描述+实现一体）+ 每工具一文件 ×9（read_file/list_dir/search/run_command/write_file/edit_file/browse/run_code/skill），注册表 Record<AgentToolName, Tool> 编译期保证完整
 │       ├── gate/     # 权限门控（只读放行/四权限模式；确认卡片三选项：允许一次/本会话/拒绝，拒绝停止整个任务，120s 超时自动拒绝）
 │       ├── adapters/ # 模型适配：ModelAdapter 接口（请求构造 + SSE 增量归一化）+ openai-compatible/deepseek + 通用 streamChat
 │       ├── workspace/# 文件树扫描/读文件、paths.ts（SKIP_DIRS+resolveSafePath）、diff.ts（快照 + LCS 行级 diff）
@@ -83,9 +83,9 @@ pnpm fmt            # oxfmt 格式化
 pnpm test           # 运行 @dscode/core 与 @dscode/desktop 的 vitest 单测
 ```
 
-CI 已配置（`.github/workflows/ci.yml`，GitHub Actions：`pnpm install --frozen-lockfile` + typecheck + lint + test + build）。**注意仓库托管在 gitee，GitHub Actions 不会在 gitee 上运行**——需镜像到 GitHub 或改用 Gitee Go 才能生效；本地提交前仍至少跑 `pnpm typecheck` + `pnpm lint` + `pnpm test` 验证。
+CI 已配置（`.github/workflows/ci.yml`，GitHub Actions：`pnpm install --frozen-lockfile` + typecheck + lint + test + build）。仓库双推：fetch/push 到 github.com/lxjljy2014/dscode（同时 push 到 gitee.com/lixjun/dscode），GitHub Actions 在 GitHub 侧生效；本地提交前仍至少跑 `pnpm typecheck` + `pnpm lint` + `pnpm test` 验证。
 
-Electron 二进制通过 `.pnpmfile.cjs` 注入 `ELECTRON_MIRROR`（npmmirror 镜像）下载；`.npmrc` 的 `electron_mirror` 对 pnpm 无效（pnpm 不会把 `.npmrc` 配置转成 `npm_config_*` 环境变量传给 postinstall），不要回退到那种写法。注意 `.pnpmfile.cjs` 内容变化会使 lockfile 的 `pnpmfileChecksum` 失效，需执行一次 `pnpm install --no-frozen-lockfile` 更新。
+Electron 二进制下载：electron@43 起无 postinstall、改为首次 require 时懒下载，`.pnpmfile.cjs` 注入的 `ELECTRON_MIRROR` 不会被子进程继承；实际由根 `postinstall` 里的 `scripts/ensure-electron.mjs` 显式跑 `electron/install.js`（幂等）并把 `ELECTRON_MIRROR`（npmmirror）注入到真正下载的进程。`.npmrc` 的 `electron_mirror` 对 pnpm 无效，不要回退到那种写法。注意 `.pnpmfile.cjs` 内容变化会使 lockfile 的 `pnpmfileChecksum` 失效，需执行一次 `pnpm install --no-frozen-lockfile` 更新。
 
 `pnpm-workspace.yaml` 里的 `allowBuilds` 是 pnpm 11 的依赖构建白名单（当前已登记：`electron`、`esbuild`、`sass-embedded`、`@parcel/watcher`、`node-pty`）：**新增带 postinstall 的原生依赖必须在此登记，否则其 build scripts 不会执行**；`minimumReleaseAgeExclude` 用于绕过 electron 的发布年龄检查（目前登记了 `electron@43.4.0`）。
 
@@ -119,7 +119,7 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 - 无边框窗口（`titleBarStyle: 'hidden'`）：macOS 用 `trafficLightPosition` 悬浮红绿灯，Windows 用 `titleBarOverlay` 原生悬浮按钮（背景色固定透明，渲染端主题切换时经 IPC `win:set-titlebar-overlay` 只同步 `symbolColor` 符号色）。渲染端需为系统控件预留位置，相关常量在 `@dscode/ui` 的 `host.ts`（`TITLEBAR_OVERLAY_WIDTH = 150`，macOS 左侧让位 84px）。
 - 渲染端通过 `.ds-drag` / `.ds-no-drag` CSS 类处理标题栏拖拽区（见 `global.css`）。
-- 安全设置：`contextIsolation: true`、`nodeIntegration: false`、`sandbox: false`；外部链接一律 `shell.openExternal`，`window.open` 被 deny。
+- 安全设置：`contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`（preload 仅用 contextBridge/ipcRenderer/process.platform/versions，均支持沙箱化）；外部链接一律 `shell.openExternal`，`window.open` 被 deny。
 - preload 只暴露 `window.dscode`（platform、versions、setTitleBarOverlay + 业务 IPC 封装），即 `@dscode/ui` HostApi 桥接的 Electron 实现。
 - **业务 IPC 通道**（全部 `ipcMain.handle` / `ipcRenderer.invoke`，定义在 `desktop/src/main/ipc.ts`，渲染端类型见 `@dscode/ui` 的 `host.ts`）：
   - `settings:get` / `settings:set` —— 工作目录 + 权限模式（`~/.dscode/config/` 下按域拆分的 JSON 持久化（general/providers/skills 等）；set 时工作目录变化自动记入最近项目）
@@ -144,6 +144,6 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 ## 部署 / 打包
 
-`pnpm build` 产出 `packages/desktop/out/`（编译产物）。**已配置 electron-builder**（`packages/desktop/electron-builder.yml`，mac dmg/zip + win nsis + linux AppImage/deb），`pnpm dist`（或 `dist:mac`/`dist:win`/`dist:linux`）产出安装包到 `release/`（已 gitignore）。`node-pty` 由 electron-builder 对 Electron ABI 重编译；workspace/前端依赖打进 `out/`，故 `dependencies` 只保留 `node-pty`。
+`pnpm build` 产出 `packages/desktop/out/`（编译产物）。**已配置 electron-builder**（`packages/desktop/electron-builder.yml`，mac dmg/zip + win nsis + linux AppImage/deb），`pnpm dist`（或 `dist:mac`/`dist:win`/`dist:linux`）产出安装包到 `release/`（已 gitignore）。`node-pty` 用 N-API（ABI 稳定），macOS/Windows 有官方 prebuild、Linux 走 node-gyp 源码编译（需 python3/make/g++），故 `npmRebuild: false`；workspace/前端依赖打进 `out/`，故 `dependencies` 只保留 `node-pty`。
 
 **分发策略（已定）**：定位为**发布**——已引入 electron-builder 打包与三平台安装器。代码签名/公证仍需真实证书（当前无 Developer ID，构建时跳过签名）；正式发布前补充 macOS 签名/公证与 Windows 签名配置。

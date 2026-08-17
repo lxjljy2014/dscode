@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@dscode/shared": "workspace:*",
-    "@types/markdown-it": "^14.1.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "highlight.js": "^11.12.0",
@@ -22,5 +21,8 @@
     "vue-i18n": "^11.4.8",
     "vue-router": "^4.6.4",
     "vuetify": "^4.1.8"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2"
   }
 }

@@ -13,6 +13,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const [input = 'packages/desktop/resources/icon.png', output = input, ratioArg = '0.225', scaleArg = '0.8'] =
   process.argv.slice(2);
+if (input === output) {
+  console.error('输入与输出相同（默认 output=input 会覆盖源文件），请显式指定输出路径：node scripts/make-icon-rounded.mjs <输入png> <输出png>');
+  process.exit(1);
+}
 const cornerRatio = Number(ratioArg);
 const contentScale = Number(scaleArg);
 

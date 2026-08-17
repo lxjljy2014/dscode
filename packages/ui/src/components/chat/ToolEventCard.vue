@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import type { AgentToolEvent } from '@dscode/shared';
 import { useAgentStore } from '../../stores/agent';
 import { useSettingsStore } from '../../stores/settings';
+import { diffLinesUi } from '../../utils/diff';
 
 const props = defineProps<{ event: AgentToolEvent }>();
 
@@ -219,21 +220,10 @@ const textBlockContent = computed(() => {
 const blockDiff = computed(() => {
   const b = contentBlocks.value.find(x => x.type === 'diff');
   if (!b) return null;
-  // 无旧内容（新建/覆盖）：直接展示新内容
-  const oldLines = b.oldText ? b.oldText.split('\n') : [];
-  const newLines = b.newText.split('\n');
-  const lines: Array<{ type: 'add' | 'del' | 'context'; content: string }> = [];
-  const max = Math.max(oldLines.length, newLines.length);
-  for (let i = 0; i < max; i++) {
-    const o = oldLines[i];
-    const n = newLines[i];
-    if (o !== undefined && n === undefined) lines.push({ type: 'del', content: o });
-    else if (o === undefined && n !== undefined) lines.push({ type: 'add', content: n });
-    else if (o !== n) {
-      lines.push({ type: 'del', content: o ?? '' });
-      lines.push({ type: 'add', content: n ?? '' });
-    } else lines.push({ type: 'context', content: o ?? '' });
-  }
+  // 无旧内容（新建/覆盖）：直接展示新内容；有旧内容用 LCS 行级 diff，避免朴素 zip 在插删行时错位
+  const lines = b.oldText
+    ? diffLinesUi(b.oldText, b.newText)
+    : b.newText.split('\n').map(content => ({ type: 'add' as const, content }));
   return { path: b.path, lines };
 });
 </script>

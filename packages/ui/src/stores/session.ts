@@ -120,6 +120,10 @@ export const useSessionStore = defineStore('session', () => {
     if (s.workingDirectory && s.workingDirectory !== wd) {
       pendingSelectId = id;
       await useSettingsStore().save({ workingDirectory: s.workingDirectory });
+      // save 失败（工作目录未变化）时清除悬挂的待选 id，避免污染后续 wd 切换
+      if (useSettingsStore().settings.workingDirectory !== s.workingDirectory) {
+        pendingSelectId = null;
+      }
     } else {
       activeSessionId.value = id;
     }
@@ -206,7 +210,14 @@ export const useSessionStore = defineStore('session', () => {
           : {}),
         ...(message.errorCode ? { errorCode: message.errorCode } : {}),
         // 回复运行统计随消息落库（重启/恢复历史后仍可展示）
-        ...(message.stats ? { stats: JSON.parse(JSON.stringify(message.stats)) as Message['stats'] } : {})
+        ...(message.stats ? { stats: JSON.parse(JSON.stringify(message.stats)) as Message['stats'] } : {}),
+        // 附件 / @ 引用随消息落库（响应式代理转普通对象再经 IPC 结构化克隆）
+        ...(message.attachments && message.attachments.length > 0
+          ? { attachments: JSON.parse(JSON.stringify(message.attachments)) as Message['attachments'] }
+          : {}),
+        ...(message.contexts && message.contexts.length > 0
+          ? { contexts: JSON.parse(JSON.stringify(message.contexts)) as Message['contexts'] }
+          : {})
       });
       if (!r.ok) console.warn('[dscode] 消息持久化失败', message.id);
     } catch (e) {

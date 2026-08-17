@@ -34,6 +34,8 @@ onMounted(() => {
   // 拉取当前状态（窗口重载后仍能同步）
   void host.updaterGetState().then(s => {
     updaterState.value = s;
+  }).catch(() => {
+    // 未打包/主进程未就绪时拉取状态可能失败，忽略避免 unhandled rejection
   });
 });
 onBeforeUnmount(() => unsubscribe?.());
@@ -45,7 +47,7 @@ onBeforeUnmount(() => unsubscribe?.());
     <VAvatar size="26" color="primary">
       <span class="text-xs font-medium text-on-primary">D</span>
     </VAvatar>
-    <span class="truncate text-sm">developer</span>
+    <span class="truncate text-sm">{{ t('common.userName') }}</span>
     <VSpacer />
     <VBtn icon="i-lucide:app-window" variant="text" size="x-small" class="text-muted" />
 

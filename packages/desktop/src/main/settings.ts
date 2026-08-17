@@ -29,10 +29,19 @@ function makeCrypto(): SettingsCrypto | undefined {
   };
 }
 
+/** 内存缓存（按 configDir + homeDir 隔离）：避免高频 IPC（workspace:tree / 权限轮询）反复读盘解析 */
+const settingsCache = new Map<string, { homeDir: string; value: AppSettings }>();
+
 export function loadAppSettings(configDir: string, homeDir: string): AppSettings {
-  return loadSettings(configDir, homeDir, makeCrypto());
+  const hit = settingsCache.get(configDir);
+  if (hit && hit.homeDir === homeDir) return hit.value;
+  const value = loadSettings(configDir, homeDir, makeCrypto());
+  settingsCache.set(configDir, { homeDir, value });
+  return value;
 }
 
 export function saveAppSettings(configDir: string, homeDir: string, patch: SettingsPatch): AppSettings {
-  return saveSettings(configDir, homeDir, patch, makeCrypto());
+  const value = saveSettings(configDir, homeDir, patch, makeCrypto());
+  settingsCache.set(configDir, { homeDir, value });
+  return value;
 }

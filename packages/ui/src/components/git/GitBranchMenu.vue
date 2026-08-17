@@ -74,7 +74,10 @@ async function loadBranches(): Promise<void> {
   if (!cwd || !host) return;
   branchLoading.value = true;
   try {
-    branchResult.value = await host.gitListBranches(cwd);
+    const r = await host.gitListBranches(cwd);
+    // 等待期间工作目录可能已变化：丢弃过期结果，避免覆盖新目录的分支列表
+    if (settingsStore.settings.workingDirectory !== cwd) return;
+    branchResult.value = r;
   } finally {
     branchLoading.value = false;
   }

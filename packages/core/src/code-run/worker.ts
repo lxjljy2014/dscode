@@ -10,6 +10,7 @@ import { Worker } from 'node:worker_threads';
 /** worker 线程内的执行逻辑（内联字符串；主线程通过消息与之通信） */
 const WORKER_SOURCE = `
 const { parentPort } = require('node:worker_threads');
+const vm = require('node:vm');
 
 const port = parentPort;
 if (!port) throw new Error('run_code worker 必须经 Worker 启动');
@@ -50,10 +51,17 @@ port.on('message', async (req) => {
         },
       });
     }
-    // 程序体：async 函数体（模型写，await/return 可用）
-    const body = 'return (async () => {\\n' + (req.code || '') + '\\n})();';
-    const fn = new Function('tools', 'description', body);
-    const value = await fn(tools, req.description || '');
+    // 受限沙箱执行：只暴露 tools 命名空间与少量安全全局，剥离 require/process/Buffer 等 Node 权限。
+    // vm 的 timeout 只约束同步段（首个 await 之前），整体挂起由主线程侧 runProgram 的墙钟超时兜底。
+    const sandbox = {
+      tools,
+      description: req.description || '',
+      console,
+      setTimeout,
+      clearTimeout
+    };
+    const body = '(async () => {\\n' + (req.code || '') + '\\n})()';
+    const value = await vm.runInNewContext(body, sandbox, { timeout: 30000 });
     // oxlint-disable-next-line unicorn/require-post-message-target-origin -- node worker_threads 的 postMessage 无 targetOrigin
           port.postMessage({ type: 'done', value: value === undefined ? null : value });
   } catch (e) {

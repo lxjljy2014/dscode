@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
+import type { DiffFile } from '@dscode/shared';
 import { useAgentStore } from '../../stores/agent';
 import FileTree from './FileTree.vue';
 
@@ -9,6 +11,18 @@ const store = useAgentStore();
 const { diffFiles } = storeToRefs(store);
 
 const tab = defineModel<'changes' | 'files'>({ default: 'changes' });
+
+// 大 diff 防护：文件数 / 单文件行数封顶，避免海量 DOM 导致卡顿
+const MAX_DIFF_FILES = 200;
+const MAX_DIFF_LINES = 2000;
+const visibleDiffFiles = computed(() => diffFiles.value.slice(0, MAX_DIFF_FILES));
+const hiddenFileCount = computed(() => Math.max(0, diffFiles.value.length - MAX_DIFF_FILES));
+function visibleLines(f: DiffFile) {
+  return f.lines.slice(0, MAX_DIFF_LINES);
+}
+function hiddenLineCount(f: DiffFile) {
+  return Math.max(0, f.lines.length - MAX_DIFF_LINES);
+}
 </script>
 
 <template>
@@ -28,7 +42,7 @@ const tab = defineModel<'changes' | 'files'>({ default: 'changes' });
       <!-- 变更 -->
       <VTabsWindowItem value="changes" class="h-full">
         <div v-if="diffFiles.length" class="h-full overflow-y-auto">
-          <div v-for="f in diffFiles" :key="f.path" class="border-b border-line">
+          <div v-for="f in visibleDiffFiles" :key="f.path" class="border-b border-line">
             <div class="sticky top-0 z-1 flex items-center gap-2 border-b border-line bg-elevated px-3 py-1.5">
               <span class="i-lucide:file-diff shrink-0 text-3.5 text-muted" />
               <span class="truncate font-mono text-xs text-fg">{{ f.path }}</span>
@@ -48,7 +62,7 @@ const tab = defineModel<'changes' | 'files'>({ default: 'changes' });
             </div>
 
             <div class="py-1 font-mono text-xs leading-[22px]">
-              <template v-for="(line, i) in f.lines" :key="i">
+              <template v-for="(line, i) in visibleLines(f)" :key="i">
                 <!-- hunk 头 -->
                 <div v-if="line.type === 'hunk'" class="px-3 text-faint select-none">
                   {{ line.content }}
@@ -81,7 +95,13 @@ const tab = defineModel<'changes' | 'files'>({ default: 'changes' });
                   <span class="whitespace-pre-wrap pr-3 text-fg">{{ line.content }}</span>
                 </div>
               </template>
+              <div v-if="hiddenLineCount(f) > 0" class="px-3 text-faint select-none">
+                {{ t('diff.foldedLines', { n: hiddenLineCount(f) }) }}
+              </div>
             </div>
+          </div>
+          <div v-if="hiddenFileCount > 0" class="px-3 py-2 text-xs text-faint">
+            {{ t('diff.foldedFiles', { n: hiddenFileCount }) }}
           </div>
         </div>
 

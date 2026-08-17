@@ -108,6 +108,8 @@ export async function checkForUpdates(): Promise<void> {
 
 /** 启动后自动检查更新（静默）：检测到新版本时仅点亮侧边栏更新按钮 */
 export function scheduleAutoCheck(delayMs = 5000): void {
+  // 未打包（dev/electron-vite）无 dev-app-update.yml，autoUpdater 检查必然报错，跳过避免控制台噪音
+  if (!app.isPackaged) return;
   setTimeout(() => {
     void autoUpdater.checkForUpdates().catch(e => console.error('[updater] 自动检查异常', e));
   }, delayMs);

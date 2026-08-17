@@ -1,5 +1,6 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
+import { MAX_FILE_BYTES } from '../constants';
 import { resolveSafePath } from '../workspace/paths';
 import { defineTool } from './schema';
 import type { ToolResult } from './types';
@@ -28,6 +29,9 @@ export const editFileTool = defineTool({
     if (!target) return { ok: false, error: '路径不在工作目录内' };
     let original: string;
     try {
+      const st = await stat(target);
+      if (!st.isFile()) return { ok: false, error: '目标不是文件' };
+      if (st.size > MAX_FILE_BYTES) return { ok: false, error: '文件过大（>512KB）' };
       original = await readFile(target, 'utf8');
     } catch {
       return { ok: false, error: '文件不存在或无法读取' };

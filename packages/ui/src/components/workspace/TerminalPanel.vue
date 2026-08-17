@@ -77,7 +77,10 @@ async function initTab(tab: TabState): Promise<void> {
 
   const dataDisposable = term.onData(data => host?.terminalWrite(tab.id, data));
   const resizeDisposable = term.onResize(({ cols, rows }) => host?.terminalResize(tab.id, cols, rows));
-  const ro = new ResizeObserver(() => fit.fit());
+  const ro = new ResizeObserver(() => {
+    // v-show 隐藏时容器尺寸为 0，跳过 fit，避免误测行/列并向 pty 发错误尺寸
+    if (container.clientWidth > 0 && container.clientHeight > 0) fit.fit();
+  });
   ro.observe(container);
   views.set(tab.id, {
     term,
@@ -88,6 +91,11 @@ async function initTab(tab: TabState): Promise<void> {
 
   const cwd = settingsStore.settings.workingDirectory || '';
   const r = await host.terminalEnsure(tab.id, cwd);
+  // 初始化期间标签可能已被关闭：刚创建的会话已无主，回收避免孤儿 pty
+  if (!views.has(tab.id)) {
+    void host.terminalKill(tab.id);
+    return;
+  }
   if (!r.ok) tab.ensureError = r.error;
 }
 

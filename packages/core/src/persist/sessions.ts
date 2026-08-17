@@ -1,7 +1,16 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { AgentToolEvent, AgentToolName, AssistantStep, Message, Session, SessionStats } from '@dscode/shared';
+import type {
+  AgentToolEvent,
+  AgentToolName,
+  AssistantStep,
+  Message,
+  MessageAttachment,
+  MessageContext,
+  Session,
+  SessionStats
+} from '@dscode/shared';
 
 /**
  * 会话持久化（JSONL 文件，借鉴 Claude Code / DSH 的主流 harness 做法）：
@@ -74,13 +83,26 @@ function readMeta(dir: string): SessionMeta | null {
   }
 }
 
-/** 按 id 扫描会话目录（在哪个工作空间下不确定；找不到返回 null） */
+/** sessionId → 目录 缓存（按 rootDir 隔离）：避免每次持久化都全量扫描工作空间目录 */
+const dirCache = new Map<string, string>();
+
+function cacheKey(rootDir: string, sessionId: string): string {
+  return rootDir + '\u0000' + sessionId;
+}
+
+/** 按 id 定位会话目录（优先缓存，命中校验存在性后返回；找不到返回 null） */
 function findSessionDir(rootDir: string, sessionId: string): string | null {
+  const key = cacheKey(rootDir, sessionId);
+  const hit = dirCache.get(key);
+  if (hit && existsSync(join(hit, 'meta.json'))) return hit;
   const name = sessionDirName(sessionId);
   try {
     for (const ws of readdirSync(rootDir)) {
       const dir = join(rootDir, ws, name);
-      if (existsSync(join(dir, 'meta.json')) || existsSync(join(dir, 'session.jsonl'))) return dir;
+      if (existsSync(join(dir, 'meta.json')) || existsSync(join(dir, 'session.jsonl'))) {
+        dirCache.set(key, dir);
+        return dir;
+      }
     }
   } catch {
     // 扫描失败（根目录不存在等）返回 null
@@ -176,6 +198,44 @@ function parseStats(stats: unknown): Message['stats'] | undefined {
   return result;
 }
 
+/** 读回时把附件归一化；非法项过滤 */
+function parseAttachments(v: unknown): MessageAttachment[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const result: MessageAttachment[] = [];
+  for (const a of v) {
+    if (typeof a !== 'object' || a === null) continue;
+    const r = a as Record<string, unknown>;
+    if (typeof r['id'] !== 'string' || typeof r['name'] !== 'string' || typeof r['path'] !== 'string') continue;
+    const item: MessageAttachment = { id: r['id'], name: r['name'], path: r['path'] };
+    if (typeof r['mime'] === 'string') item.mime = r['mime'];
+    if (typeof r['size'] === 'number') item.size = r['size'];
+    if (typeof r['dataUrl'] === 'string') item.dataUrl = r['dataUrl'];
+    if (typeof r['content'] === 'string') item.content = r['content'];
+    result.push(item);
+  }
+  return result.length > 0 ? result : undefined;
+}
+
+/** 读回时把 @ 引用上下文归一化；非法项过滤 */
+function parseContexts(v: unknown): MessageContext[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const result: MessageContext[] = [];
+  for (const c of v) {
+    if (typeof c !== 'object' || c === null) continue;
+    const r = c as Record<string, unknown>;
+    if (
+      typeof r['id'] !== 'string' ||
+      typeof r['path'] !== 'string' ||
+      typeof r['name'] !== 'string' ||
+      typeof r['content'] !== 'string'
+    ) {
+      continue;
+    }
+    result.push({ id: r['id'], path: r['path'], name: r['name'], content: r['content'] });
+  }
+  return result.length > 0 ? result : undefined;
+}
+
 /** 解析一行 JSONL 为消息（结构非法/损坏返回 null 跳过） */
 function parseMessageLine(line: string): Message | null {
   try {
@@ -190,6 +250,10 @@ function parseMessageLine(line: string): Message | null {
     if (steps !== undefined) msg.steps = steps;
     const stats = parseStats(m['stats']);
     if (stats !== undefined) msg.stats = stats;
+    const attachments = parseAttachments(m['attachments']);
+    if (attachments !== undefined) msg.attachments = attachments;
+    const contexts = parseContexts(m['contexts']);
+    if (contexts !== undefined) msg.contexts = contexts;
     return msg;
   } catch {
     return null;
@@ -296,6 +360,7 @@ export function listSessions(rootDir: string): Session[] {
       const dir = join(rootDir, ws, name);
       const meta = readMeta(dir);
       if (!meta) continue;
+      dirCache.set(cacheKey(rootDir, meta.id), dir);
       const messages: Message[] = [];
       for (const line of readLogLines(dir)) {
         const msg = parseMessageLine(line);
@@ -323,6 +388,7 @@ export function upsertSession(rootDir: string, session: Session): void {
   mkdirSync(rootDir, { recursive: true });
   const dir = sessionPath(rootDir, session.workingDirectory, session.id);
   mkdirSync(dir, { recursive: true });
+  dirCache.set(cacheKey(rootDir, session.id), dir);
   // 归档状态只在 setSessionArchived 中变更：常规落库保留已有归档值（对齐 sqlite 版 ON CONFLICT 不覆盖 archived）
   const existing = readMeta(dir);
   const archived = existing ? existing.archived : session.archived === true;
@@ -376,7 +442,9 @@ export function upsertMessage(rootDir: string, sessionId: string, message: Messa
     createdAt: message.createdAt,
     ...(message.errorCode ? { errorCode: message.errorCode } : {}),
     ...(message.steps && message.steps.length > 0 ? { steps: message.steps } : {}),
-    ...(message.stats ? { stats: message.stats } : {})
+    ...(message.stats ? { stats: message.stats } : {}),
+    ...(message.attachments && message.attachments.length > 0 ? { attachments: message.attachments } : {}),
+    ...(message.contexts && message.contexts.length > 0 ? { contexts: message.contexts } : {})
   });
   const lines = existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(l => l.length > 0) : [];
   const idx = lines.findIndex(l => {
@@ -420,6 +488,7 @@ export function backfillSessions(rootDir: string, workingDirectory: string): voi
           mkdirSync(join(rootDir, workspaceSlug(workingDirectory)), { recursive: true });
           renameSync(dir, target);
         }
+        dirCache.set(cacheKey(rootDir, meta.id), target);
         writeJsonAtomic(metaFile(target), { ...meta, workingDirectory });
       } catch {
         // 迁移失败（占用等）忽略，下次启动重试

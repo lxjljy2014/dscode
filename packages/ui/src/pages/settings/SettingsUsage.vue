@@ -95,8 +95,7 @@ onMounted(load);
             <div class="text-xs text-muted">{{ t('settingsPage.usage.apiCacheHitTokens') }}</div>
             <div class="mt-1 text-xl font-semibold">{{ formatNumber(apiCache.cached) }}</div>
             <div class="text-xs text-faint">
-            <div class="text-xs text-faint">{{ t('settingsPage.usage.apiCacheSamples') }} {{ apiCache.sampled }}</div>
-              {{ t('settingsPage.usage.apiCacheMissTokens') }} {{ formatNumber(apiCache.miss) }}
+              {{ t('settingsPage.usage.apiCacheSamples') }} {{ apiCache.sampled }} · {{ t('settingsPage.usage.apiCacheMissTokens') }} {{ formatNumber(apiCache.miss) }}
             </div>
           </div>
         </div>
@@ -140,7 +139,7 @@ onMounted(load);
 
     <VCard class="px-4 py-3.5">
       <div class="flex items-center justify-between">
-        <div class="text-sm font-medium">{{ t('settingsPage.usage.recent') }}（{{ totals.count }}）</div>
+        <div class="text-sm font-medium">{{ t('settingsPage.usage.recent') }} ({{ totals.count }})</div>
         <VBtn size="small" variant="text" :loading="loading" @click="load">
           {{ t('settingsPage.usage.refresh') }}
         </VBtn>
@@ -164,7 +163,7 @@ onMounted(load);
             <span class="mx-1 text-faint">/</span>
             <span>{{ r.completionTokens }}</span>
             <span v-if="r.cacheTracked && r.promptTokens > 0" class="ml-2 shrink-0 text-xs text-tool-read">
-              缓存 {{ ((r.cachedPromptTokens ?? 0) / r.promptTokens * 100).toFixed(0) }}%
+              {{ t('settingsPage.usage.cachedRatio', { percent: ((r.cachedPromptTokens ?? 0) / r.promptTokens * 100).toFixed(0) }) }}
             </span>
           </div>
         </div>

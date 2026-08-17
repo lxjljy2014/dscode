@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { writeFile } from 'node:fs/promises';
 import type { SettingsPatch } from '@dscode/shared';
 import {
   backfillSessions,
@@ -32,6 +33,7 @@ import {
   verifyProvider
 } from '@dscode/core';
 import { resolveConfirm, startAgent, stopAgent } from './agent/agent';
+import { readAttachment } from './attachment';
 import { loadAppSettings, saveAppSettings } from './settings';
 import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './shell/terminal';
 import { isMessage, isSession, isSessionStats, isString, parseTerminalSize } from './validators';
@@ -112,6 +114,43 @@ export function registerIpcHandlers(): void {
     })
   );
 
+  // ---- 文件选择（附件 / @ 引用） ----
+  ipcMain.handle(
+    'dialog:pick-files',
+    withMainWindow(async win => {
+      const result = await dialog.showOpenDialog(win, {
+        title: '选择文件',
+        properties: ['openFile', 'multiSelections']
+      });
+      return result.canceled ? null : result.filePaths;
+    })
+  );
+  ipcMain.handle(
+    'attachment:read',
+    withMainWindow((_win, absPath: unknown) =>
+      isString(absPath) ? readAttachment(absPath) : { ok: false as const, error: 'invalid path' }
+    )
+  );
+
+  // ---- 保存文件（代码块下载） ----
+  ipcMain.handle(
+    'dialog:save-file',
+    withMainWindow(async (win, defaultName: unknown, content: unknown) => {
+      if (!isString(defaultName) || !isString(content)) return { ok: false as const, error: 'invalid args' };
+      const result = await dialog.showSaveDialog(win, {
+        title: '保存文件',
+        defaultPath: defaultName
+      });
+      if (result.canceled || !result.filePath) return { ok: false as const, canceled: true as const };
+      try {
+        await writeFile(result.filePath, content, 'utf8');
+        return { ok: true as const };
+      } catch (e) {
+        return { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+      }
+    })
+  );
+
   // ---- 供应商校验 ----
   ipcMain.handle(
     'provider:verify',
@@ -187,9 +226,9 @@ export function registerIpcHandlers(): void {
   // ---- agent ----
   ipcMain.handle(
     'agent:start',
-    withMainWindow((win, sessionId: unknown, model: unknown, messages: unknown, subagentId: unknown) =>
+    withMainWindow((win, sessionId: unknown, model: unknown, messages: unknown, subagentId: unknown, reasoningEffort: unknown) =>
       isString(sessionId)
-        ? startAgent(win, sessionId, model, messages, subagentId)
+        ? startAgent(win, sessionId, model, messages, subagentId, reasoningEffort)
         : { ok: false, error: 'invalid-args' as const }
     )
   );

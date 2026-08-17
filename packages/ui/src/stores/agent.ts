@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import type {
   AgentToolEvent,
   AssistantStep,
@@ -7,6 +7,8 @@ import type {
   ConfirmDecision,
   DiffFile,
   Message,
+  MessageAttachment,
+  MessageContext,
   Session,
   SessionStats
 } from '@dscode/shared';
@@ -26,6 +28,29 @@ function toolResultContent(e: AgentToolEvent): string {
   if (e.status === 'done') return e.content ?? e.summary ?? '(no output)';
   if (e.status === 'error') return `执行失败：${e.error ?? '未知错误'}`;
   return '已拒绝执行';
+}
+
+/** 把 @ 引用与文本附件的内容注入用户消息（发送与历史重建保持一致，保证跨运行前缀缓存稳定） */
+function injectFileContents(
+  content: string,
+  contexts?: MessageContext[],
+  attachments?: MessageAttachment[]
+): string {
+  const blocks: string[] = [];
+  for (const c of contexts ?? []) {
+    blocks.push(`【文件：${c.path}】\n${c.content}`);
+  }
+  for (const a of attachments ?? []) {
+    if (a.content) {
+      blocks.push(`【附件：${a.path}】\n${a.content}`);
+    } else if (a.dataUrl) {
+      // 图片附件：文本模型无法读取像素内容，附上文件名说明，避免空消息
+      blocks.push(`【图片附件：${a.name}】（纯文本模型无法读取图片内容）`);
+    }
+  }
+  if (blocks.length === 0) return content;
+  const prefix = blocks.join('\n\n');
+  return content ? `${prefix}\n\n${content}` : prefix;
 }
 
 /**
@@ -74,8 +99,9 @@ const sessionStats = computed<SessionStats | null>(() => {
   return active?.stats ?? null;
 });
 
-  /** 各会话的 diff 结果（主进程 workspace:diff 推送，按 sessionId 缓存） */
-  const diffBySession = new Map<string, DiffFile[]>();
+  /** 各会话的 diff 结果（主进程 workspace:diff 推送，按 sessionId 缓存）。
+   *  必须用 reactive 包裹 Map，否则 computed 不追踪 Map.set，diff 面板不会实时刷新。 */
+  const diffBySession = reactive(new Map<string, DiffFile[]>());
   const diffFiles = computed<DiffFile[]>(() => {
     const id = sessionStore.activeSessionId;
     return id ? (diffBySession.get(id) ?? []) : [];
@@ -90,7 +116,14 @@ const sessionStats = computed<SessionStats | null>(() => {
     return null;
   }
 
-  async function sendMessage(content: string, model = '', subagentId = '') {
+  async function sendMessage(
+    content: string,
+    model = '',
+    subagentId = '',
+    reasoningEffort?: 'off' | 'high' | 'max',
+    attachments?: MessageAttachment[],
+    contexts?: MessageContext[]
+  ) {
     if (generating.value) return;
     if (!host) return;
     // 空会话状态（无激活任务）直接发送：首条消息才生成任务，避免静默吞掉输入
@@ -102,11 +135,14 @@ const sessionStats = computed<SessionStats | null>(() => {
       id: nextId('m'),
       role: 'user',
       content,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      ...(attachments && attachments.length > 0 ? { attachments: attachments.map(a => ({ ...a })) } : {}),
+      ...(contexts && contexts.length > 0 ? { contexts: contexts.map(c => ({ ...c })) } : {})
     };
     session.messages.push(userMsg);
     if (!session.title) {
-      session.title = content.length > 24 ? `${content.slice(0, 24)}…` : content;
+      const raw = content || contexts?.[0]?.name || attachments?.[0]?.name || '';
+      session.title = raw.length > 24 ? `${raw.slice(0, 24)}…` : raw;
     }
     session.updatedAt = Date.now();
     void sessionStore.persistMessage(session, userMsg);
@@ -134,7 +170,7 @@ const sessionStats = computed<SessionStats | null>(() => {
     for (const m of session.messages) {
       if (m.streaming) continue;
       if (m.role === 'user') {
-        history.push({ role: 'user', content: m.content });
+        history.push({ role: 'user', content: injectFileContents(m.content, m.contexts, m.attachments) });
         continue;
       }
       const steps = m.steps ?? [];
@@ -181,7 +217,7 @@ const sessionStats = computed<SessionStats | null>(() => {
     }
     let r: { ok: boolean; error?: string };
     try {
-      r = await host.agentStart(session.id, model, history, subagentId);
+      r = await host.agentStart(session.id, model, history, subagentId, reasoningEffort);
     } catch {
       // IPC 异常兜底：避免 generating 卡死
       r = { ok: false, error: 'IPC 调用异常' };
@@ -276,6 +312,8 @@ const sessionStats = computed<SessionStats | null>(() => {
       }
     } else {
       session.toolEvents.push(ev.event);
+      // 记录首次展示时间戳：最短展示时长以「首次出现」为起点（此前从不 set，退化为固定 450ms 延迟）
+      toolShownAt.set(ev.event.id, Date.now());
       // 首次出现：把 tool step 追加到正在流式的回复步骤里
       const reply = streamingReply(session);
       if (reply) {

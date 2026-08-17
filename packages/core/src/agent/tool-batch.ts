@@ -21,6 +21,8 @@ export interface ToolBatchRuntime {
   abortRun(sessionId: string): void;
   /** 写/执行成功后重算快照 diff 并推送 */
   recomputeDiff(sessionId: string, cwd: string, changedPaths?: string[]): Promise<void>;
+  /** 工具结果上下文预算（跨轮累计；插入时按 remaining 截断，保证 steps 落库与运行时上下文逐字节一致）；缺省不截断 */
+  toolBudget?: { remaining: number };
   /** 本次运行可用的技能列表（透传给 skill 工具） */
   skills: Skill[];
 }
@@ -116,6 +118,7 @@ export async function executeToolBatch(
   }
 
   // ---- 执行阶段：并行滚动池 + 独占屏障，结果按模型顺序提交 ----
+  const budget = rt.toolBudget ?? { remaining: Number.POSITIVE_INFINITY };
   const results: Array<{ result: ToolResult; toolMs: number } | undefined> = planned.map(() => undefined);
   let cursor = 0;
   let concluded = false;
@@ -148,18 +151,26 @@ export async function executeToolBatch(
       const settled = results[i]!;
       rt.addToolMs(sessionId, settled.toolMs);
       if (settled.result.ok) {
-        // content 全量结果：渲染端 steps 落库，跨运行历史重建 role:'tool' 消息时与运行时上下文逐字节一致
+        // 上下文预算：在插入时按剩余预算截断，且「存进 steps 的 content」与「注入上下文的 content」用同一份截断值，
+        // 跨运行历史重建仍逐字节一致（前缀缓存稳定），并把最坏情况的工具输出总量封顶在预算内。
+        let content = settled.result.content;
+        if (content.length > budget.remaining) {
+          content = content.slice(0, budget.remaining) + '\n…（上下文预算已满，已截断）';
+          budget.remaining = 0;
+        } else {
+          budget.remaining -= content.length;
+        }
         const doneEvent: AgentToolEvent = {
           ...p.event,
           status: 'done',
           summary: settled.result.content.slice(0, 200),
-          content: settled.result.content,
+          content,
           ...(settled.result.blocks !== undefined ? { blocks: settled.result.blocks } : {}),
           ...(settled.result.meta !== undefined ? { meta: settled.result.meta } : {}),
           ...(settled.result.additionalContexts !== undefined ? { additionalContexts: settled.result.additionalContexts } : {})
         };
         sink.tool(sessionId, doneEvent);
-        messages.push({ role: 'tool', tool_call_id: p.call.id, content: settled.result.content });
+        messages.push({ role: 'tool', tool_call_id: p.call.id, content });
         // 附加上下文：注入为 user 消息，供下一步模型使用（渲染端事件已透传，落库后可重建对齐）
         for (const ctx of settled.result.additionalContexts ?? []) {
           messages.push({ role: 'user', content: ctx });

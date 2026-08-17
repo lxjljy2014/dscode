@@ -11,7 +11,7 @@
     "lint:eslint": "eslint .",
     "lint:fast": "oxlint .",
     "lint:fix": "eslint . --fix && oxlint . --fix",
-    "postinstall": "node scripts/fix-node-pty-exec.mjs",
+    "postinstall": "node scripts/fix-node-pty-exec.mjs && node scripts/ensure-electron.mjs",
     "start": "pnpm --filter @dscode/desktop start",
     "test": "pnpm --filter @dscode/core test && pnpm --filter @dscode/desktop test",
     "typecheck": "pnpm --filter @dscode/desktop typecheck && pnpm --filter @dscode/core typecheck"

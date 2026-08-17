@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onBeforeUnmount, ref } from 'vue';
 
 const props = defineProps<{
   /** 拖拽轴：'x' 左右拖（调整宽度）| 'y' 上下拖（调整高度） */
@@ -71,8 +71,29 @@ function onPointerUp(e: PointerEvent): void {
     pendingSize = null;
   }
   document.body.classList.remove('ds-resizing');
-  (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+  const el = e.currentTarget as HTMLElement | null;
+  try {
+    if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+  } catch {
+    // pointercancel 等边界下捕获可能已释放，忽略避免抛 NotFoundError
+  }
 }
+
+function onLostPointerCapture(): void {
+  // 捕获被意外释放（元素移除/浏览器手势打断）时统一收尾，避免 dragging 卡死、body class 残留
+  if (!dragging.value) return;
+  dragging.value = false;
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+  }
+  pendingSize = null;
+  document.body.classList.remove('ds-resizing');
+}
+
+onBeforeUnmount(() => {
+  document.body.classList.remove('ds-resizing');
+});
 </script>
 
 <template>
@@ -87,6 +108,7 @@ function onPointerUp(e: PointerEvent): void {
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
+      @lostpointercapture="onLostPointerCapture"
     />
     <!-- 高亮细线（2px）：覆盖抽屉外缘 1px 边框，与其重合 -->
     <div

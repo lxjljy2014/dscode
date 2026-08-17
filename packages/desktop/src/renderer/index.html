@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; worker-src 'self' blob:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <!-- 启动占位页样式：颜色与 packages/ui/src/theme/tokens.ts 的 neutral 色阶对齐。
          深浅色默认跟随系统（媒体查询），boot.ts 会依据应用持久化主题（localStorage dscode.ui）

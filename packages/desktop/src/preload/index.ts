@@ -4,6 +4,7 @@ import type {
   AgentErrorEvent,
   ConfirmDecision,
   AppSettings,
+  AttachmentReadResult,
   ChatMessagePayload,
   DiffFile,
   FileNode,
@@ -66,6 +67,13 @@ const api = {
   listRecentProjects: (): Promise<ProjectsListResult> => ipcRenderer.invoke('projects:list'),
   removeRecentProject: (path: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('projects:remove', path),
   pickDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-directory'),
+  pickFiles: (): Promise<string[] | null> => ipcRenderer.invoke('dialog:pick-files'),
+  readAttachment: (path: string): Promise<AttachmentReadResult> => ipcRenderer.invoke('attachment:read', path),
+  saveFile: (
+    defaultName: string,
+    content: string
+  ): Promise<{ ok: true } | { ok: false; canceled?: boolean; error?: string }> =>
+    ipcRenderer.invoke('dialog:save-file', defaultName, content),
 
   // ---- 供应商校验 ----
   verifyProvider: (baseUrl: string, apiKey: string): Promise<ProviderVerifyResult> =>
@@ -76,8 +84,10 @@ const api = {
     sessionId: string,
     model: string,
     messages: ChatMessagePayload[],
-    subagentId: string
-  ): Promise<{ ok: boolean }> => ipcRenderer.invoke('agent:start', sessionId, model, messages, subagentId),
+    subagentId: string,
+    reasoningEffort?: 'off' | 'high' | 'max'
+  ): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('agent:start', sessionId, model, messages, subagentId, reasoningEffort),
   agentStop: (sessionId: string): Promise<void> => ipcRenderer.invoke('agent:stop', sessionId),
   agentConfirmResponse: (toolEventId: string, decision: ConfirmDecision): Promise<void> =>
     ipcRenderer.invoke('agent:confirm-response', toolEventId, decision),

@@ -40,8 +40,13 @@ export const useSettingsStore = defineStore('settings', () => {
     if (loaded.value) return;
     if (!loadPromise) {
       loadPromise = (async () => {
-        settings.value = await requireHost().getSettings();
-        loaded.value = true;
+        try {
+          settings.value = await requireHost().getSettings();
+          loaded.value = true;
+        } catch (err) {
+          loadPromise = null; // 失败后清空，允许下次重试（否则 rejected 链会让 load 永久失败）
+          throw err;
+        }
       })();
     }
     await loadPromise;
@@ -50,9 +55,15 @@ export const useSettingsStore = defineStore('settings', () => {
   // save 串行化：快速连续切换权限模式/工作目录时按提交顺序落盘，避免响应乱序覆盖 settings.value
   let saveChain: Promise<void> = Promise.resolve();
   function save(patch: SettingsPatch): Promise<void> {
-    saveChain = saveChain.then(async () => {
-      settings.value = await requireHost().setSettings(patch);
-    });
+    // 串行化 + 失败自愈：.then 链上一旦 reject 会一直 reject，导致后续保存静默失效，
+    // 故在链尾 catch 吸收错误并告警，保证下一次保存仍能执行。
+    saveChain = saveChain
+      .then(async () => {
+        settings.value = await requireHost().setSettings(patch);
+      })
+      .catch(err => {
+        console.warn('[dscode] 设置保存失败', err);
+      });
     return saveChain;
   }
 

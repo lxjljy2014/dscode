@@ -33,6 +33,9 @@ function sdkSection(): string {
   return ['可用工具（程序内通过 tools 命名空间调用，均为异步）：', ...lines].join('\n');
 }
 
+/** 单个程序最长执行时间（含桥接工具调用的等待）；超时 terminate 并重建 worker，避免死循环/挂起拖垮单例 */
+const RUN_PROGRAM_TIMEOUT_MS = 120_000;
+
 /** worker 单例（首次调用时启动；主进程生命周期内复用；异常/退出后重建） */
 let worker: Worker | null = null;
 let workerReady: Promise<Worker> | null = null;
@@ -42,14 +45,19 @@ function getWorker(): Promise<Worker> {
   if (!workerReady) {
     workerReady = new Promise((resolve, reject) => {
       const w = createRunCodeWorker();
+      // 仅当退出的正是当前 worker 时才清空单例：terminate 重建期间避免旧 worker 的 exit 抹掉新 worker
       w.on('error', err => {
-        worker = null;
-        workerReady = null;
+        if (worker === w) {
+          worker = null;
+          workerReady = null;
+        }
         reject(err);
       });
       w.on('exit', () => {
-        worker = null;
-        workerReady = null;
+        if (worker === w) {
+          worker = null;
+          workerReady = null;
+        }
       });
       worker = w;
       resolve(w);
@@ -78,6 +86,15 @@ async function runProgram(
 ): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
   const w = await getWorker();
   return new Promise(resolve => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (result: { ok: true; value: unknown } | { ok: false; error: string }): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      w.off('message', onMessage);
+      resolve(result);
+    };
     const onMessage = (raw: unknown): void => {
       const msg = raw as WorkerMsg;
       if (msg.type === 'tool-call') {
@@ -93,15 +110,23 @@ async function runProgram(
         return;
       }
       if (msg.type === 'done') {
-        w.off('message', onMessage);
-        resolve({ ok: true, value: msg.value });
+        finish({ ok: true, value: msg.value });
         return;
       }
       if (msg.type === 'error') {
-        w.off('message', onMessage);
-        resolve({ ok: false, error: msg.message });
+        finish({ ok: false, error: msg.message });
       }
     };
+    timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      w.off('message', onMessage);
+      // 超时：终止卡死的 worker 并重置单例，后续 run_code 会重建新 worker
+      void w.terminate();
+      worker = null;
+      workerReady = null;
+      resolve({ ok: false, error: `程序执行超时（${RUN_PROGRAM_TIMEOUT_MS / 1000}s）` });
+    }, RUN_PROGRAM_TIMEOUT_MS);
     w.on('message', onMessage);
     w.postMessage({ type: 'run', code, description, bindings: getCodeBindings() });
   });

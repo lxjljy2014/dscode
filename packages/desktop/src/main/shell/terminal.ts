@@ -19,7 +19,6 @@ function track(wcId: number, sessionId: string): void {
   let set = windowSessions.get(wcId);
   if (!set) windowSessions.set(wcId, (set = new Set()));
   set.add(sessionId);
-  set.add(sessionId);
 }
 
 function untrack(wcId: number, sessionId: string): void {

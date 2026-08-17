@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '../../stores/session';
+import type { Message } from '@dscode/shared';
 import { useAgentStore } from '../../stores/agent';
 import ChatInput from './ChatInput.vue';
 import ConfirmOverlay from './ConfirmOverlay.vue';
@@ -17,7 +18,11 @@ const { generating } = storeToRefs(agentStore);
 
 const messages = computed(() => activeSession.value?.messages ?? []);
 
-const listRef = ref<HTMLElement>();
+interface ChatVirtualScroll {
+  $el?: HTMLElement;
+  scrollToIndex?: (index: number) => void;
+}
+const vsRef = ref<ChatVirtualScroll | null>(null);
 
 // 按时段的问候语（空状态展示）
 const greeting = computed(() => {
@@ -29,16 +34,52 @@ const greeting = computed(() => {
   return t('chat.greeting.night');
 });
 
+/** 轻量吸底：流式期间用（仅 scrollTop=scrollHeight，不重排虚拟窗口，避免一跳一跳） */
 function scrollToBottom() {
   nextTick(() => {
-    const el = listRef.value;
-    if (el) el.scrollTop = el.scrollHeight;
+    const el = vsRef.value?.$el;
+    if (!el) return;
+    const scroll = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+    scroll();
+    requestAnimationFrame(scroll);
   });
 }
 
+/** 强吸底：新消息/切换会话/挂载时用（偏移量未测完，多帧校正 + 延迟兜底到真实底部） */
+function scrollToBottomHard() {
+  nextTick(() => {
+    const vs = vsRef.value;
+    const el = vs?.$el;
+    if (!el) return;
+    const index = messages.value.length - 1;
+    // 先把虚拟窗口定位到末尾批次（scrollToIndex 内部会等初始 offset 算完再滚），
+    // 再把 scrollTop 校正到真实底部（scrollToIndex 是顶部对齐，不是底部）。
+    if (index >= 0) vs?.scrollToIndex?.(index);
+    const scroll = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+    scroll();
+    // 新增消息时偏移量先按假设高度重算、真实高度由 ResizeObserver 实测后回填（大附件更慢），
+    // 仅靠两帧不够，补延迟兜底校正到真实底部，避免停在假设高度的伪底部。
+    requestAnimationFrame(() => {
+      scroll();
+      requestAnimationFrame(() => {
+        scroll();
+        window.setTimeout(scroll, 200);
+        window.setTimeout(scroll, 450);
+      });
+    });
+  });
+}
+
+// 新增消息（发送 / fork）→ 强吸底（偏移量未测完，含延迟兜底）
+watch(() => messages.value.length, scrollToBottomHard, { flush: 'post' });
+
+// 流式内容增长 / 工具事件 → 轻量吸底（不重排虚拟窗口，避免一跳一跳）
 watch(
   () => [
-    messages.value.length,
     messages.value[messages.value.length - 1]?.content,
     activeSession.value?.toolEvents.length
   ],
@@ -46,18 +87,27 @@ watch(
   { flush: 'post' }
 );
 
-watch(activeSession, scrollToBottom, { flush: 'post' });
+// 切换会话 / 组件重挂载（设置页返回、重启后恢复）→ 强吸底
+watch(activeSession, scrollToBottomHard, { flush: 'post' });
+
+onMounted(() => {
+  scrollToBottomHard();
+});
 </script>
 
 <template>
   <div class="h-full flex flex-col bg-base">
     <template v-if="messages.length">
-      <div ref="listRef" class="min-h-0 flex-1 overflow-y-auto">
-        <div class="mx-auto max-w-200 px-6 py-6">
-          <MessageItem v-for="m in messages" :key="m.id" :message="m" :session="activeSession" />
-          <div class="h-2" />
-        </div>
-      </div>
+      <VVirtualScroll ref="vsRef" :items="messages" item-key="id" class="min-h-0">
+        <template #default="{ item, index }">
+          <div
+            class="mx-auto max-w-200 px-6"
+            :class="index === 0 ? 'pt-6' : index === messages.length - 1 ? 'pb-6' : ''"
+          >
+            <MessageItem :message="(item as Message)" :session="activeSession" />
+          </div>
+        </template>
+      </VVirtualScroll>
 
       <div class="shrink-0 px-6 pb-3 pt-1">
         <div class="relative mx-auto max-w-200">

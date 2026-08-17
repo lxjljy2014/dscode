@@ -8,8 +8,9 @@ export default defineConfig({
   main: {
     build: {
       // electron-vite 5：externalizeDepsPlugin 已弃用，改用 build.externalizeDeps 配置。
-      // exclude 掉 workspace 包（core/shared）打进产物：若外部化，Node 运行时直接加载其
-      // TS 源码，目录 re-export 会报 ERR_UNSUPPORTED_DIR_IMPORT，交给 rollup 打包规避。
+      // externalizeDeps 只会外部化 dependencies（node-pty/electron-updater）；@dscode/core 与
+      // @dscode/shared 是 devDependencies，本就被 rollup 打进 main 产物。exclude 为防御性保留
+      // （避免未来把 core/shared 提升为 dependencies 时被外部化，触发 ERR_UNSUPPORTED_DIR_IMPORT）。
       externalizeDeps: { exclude: ['@dscode/core', '@dscode/shared'] }
     }
   },

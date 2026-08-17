@@ -13,12 +13,16 @@
     "downloading": "Downloading {percent}%",
     "downloaded": "Update ready, click to restart"
   },
+  "common": {
+    "userName": "Developer"
+  },
   "sidebar": {
     "project": "Projects",
     "more": "More",
     "archived": "Archived",
     "removeProject": "Remove project",
     "archiveTask": "Archive task",
+    "confirmArchive": "Confirm archive",
     "unarchiveTask": "Unarchive",
     "emptyArchived": "No archived tasks",
     "removed": "Project removed",
@@ -40,6 +44,8 @@
     "like": "Like",
     "dislike": "Dislike",
     "fork": "Fork conversation",
+    "copyCode": "Copy code",
+    "downloadCode": "Download",
     "stats": {
       "time": "Time",
       "duration": "Duration",
@@ -51,11 +57,11 @@
     },
     "contextMeter": {
       "tooltip": "Context {percent}% ({used}/{total})",
-      "title": "Context usage",
+      "title": "Context used",
       "system": "System prompt",
       "tools": "Tools",
       "messages": "Messages",
-      "caption": "Used {used} / Window {total}"
+      "caption": "~{used} / {total}"
     },
     "sessionStats": {
       "rounds": "rounds",
@@ -82,6 +88,12 @@
     "planMode": "Plan mode",
     "agentMode": "Agent mode",
     "addContext": "Add context",
+    "addAttachment": "Add attachment",
+    "addAtContext": "Use {'@'} to add context",
+    "addSlashCommand": "Use / for commands or skills",
+    "remove": "Remove",
+    "contextNotText": "Only text/code files can be referenced",
+    "atEmpty": "No matching files",
     "subagentDefault": "Default",
     "commandTitle": "Commands",
     "commandEmpty": "No matching commands",
@@ -89,6 +101,7 @@
     "commandGroup": "Commands",
     "skillGroup": "Skills",
     "effort": {
+      "auto": "Auto",
       "close": "Off",
       "high": "High",
       "max": "Max"
@@ -155,7 +168,10 @@
     "additions": "{n} additions",
     "deletions": "{n} deletions",
     "newFile": "New",
-    "deletedFile": "Deleted"
+    "deletedFile": "Deleted",
+    "foldedLines": "…folded {n} lines",
+    "foldedFiles": "…folded {n} files",
+    "fileTruncated": "…(file too large, truncated)"
   },
   "agent": {
     "tool": {
@@ -208,6 +224,7 @@
       "network": "Network error or request timeout. Please try again later.",
       "aborted": "Stopped",
       "running": "The previous message is still being processed. Please wait or stop it first.",
+      "max-rounds": "Maximum tool rounds reached; the task ended early.",
       "unknown": "An unknown error occurred"
     }
   },
@@ -375,7 +392,8 @@
       "apiCacheHint": "DeepSeek context caching: each round in a session hits the shared prefix and the hit portion is billed at a discount. The rate covers only records created after cache tracking was enabled; legacy records (no cache data) are excluded.",
       "localCacheTitle": "Local replay cache (identical requests)",
       "localCacheHint": "Only identical requests (e.g. retry after interruption, repeated question) hit and replay; every round in normal chat has a different context, so a low hit rate is expected.",
-      "apiCacheSamples": "Tracked records"
+      "apiCacheSamples": "Tracked records",
+      "cachedRatio": "cached {percent}%"
     },
     "subagents": {
       "desc": "Define switchable agent personas; selecting one runs the conversation with its system prompt.",
@@ -396,7 +414,7 @@
       "command": "Command",
       "commandPlaceholder": "e.g. npx",
       "args": "Args (space-separated)",
-      "argsPlaceholder": "e.g. -y @modelcontextprotocol/server-filesystem /path",
+      "argsPlaceholder": "e.g. -y {'@'}modelcontextprotocol/server-filesystem /path",
       "listTools": "List tools",
       "loading": "Connecting…",
       "noTools": "Click 'List tools' to inspect"

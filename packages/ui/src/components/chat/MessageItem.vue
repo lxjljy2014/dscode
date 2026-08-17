@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Message, Session } from '@dscode/shared';
 import { renderMarkdown } from '../../utils/markdown';
+import { feedback } from '../../utils/feedback';
 import { useSessionStore } from '../../stores/session';
+import { host } from '../../bridge/host';
 import ToolEventCard from './ToolEventCard.vue';
 
 const props = defineProps<{ message: Message; session?: Session | null }>();
@@ -12,7 +14,10 @@ const { t } = useI18n();
 const sessionStore = useSessionStore();
 
 /** 历史消息兜底：无步骤时直接渲染完整正文的 markdown */
-const renderedContent = computed(() => renderMarkdown(props.message.content));
+const renderedContent = computed(() => renderMarkdown(props.message.content, t));
+
+/** 文本附件（已读取内容，折叠展示；图片/二进制附件走上方预览区） */
+const textAttachments = computed(() => props.message.attachments?.filter(a => !!a.content) ?? []);
 
 /** 流式光标：仅当最后一步是正文时显示（思考中/工具执行中不显示） */
 const showCursor = computed(() => {
@@ -51,19 +56,15 @@ function isFirstReasoning(index: number): boolean {
 
 // ---- 回复底部操作：复制 / 点赞 / 踩 / fork ----
 
-/** 点赞/踩状态（按消息 id，仅内存，不持久化；模块级避免切换任务后丢失） */
-const feedback = reactive(new Map<string, 'like' | 'dislike'>());
-
 /** 复制状态（短暂显示「已复制」反馈） */
 const copied = ref(false);
 let copyTimer: number | undefined;
 
-async function copyContent(): Promise<void> {
-  const text = props.message.content;
+/** 写入剪贴板（clipboard API 优先，非安全上下文兜底 execCommand） */
+async function writeClipboard(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
-    // 兜底：隐藏 textarea + execCommand（非安全上下文等环境）
     const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
@@ -73,11 +74,37 @@ async function copyContent(): Promise<void> {
     document.execCommand('copy');
     ta.remove();
   }
+}
+
+async function copyContent(): Promise<void> {
+  await writeClipboard(props.message.content);
   copied.value = true;
   window.clearTimeout(copyTimer);
   copyTimer = window.setTimeout(() => {
     copied.value = false;
   }, 1500);
+}
+
+/** 代码块 header 按钮事件委托：复制 / 下载（v-html 内按钮无 Vue 绑定） */
+function onContentClick(e: MouseEvent): void {
+  const btn = (e.target as HTMLElement | null)?.closest?.('[data-action]') as HTMLElement | null;
+  if (!btn) return;
+  const block = btn.closest('.ds-codeblock') as HTMLElement | null;
+  const code = block?.querySelector('code')?.textContent ?? '';
+  if (btn.dataset.action === 'copy') {
+    void writeClipboard(code).then(() => {
+      const icon = btn.querySelector('span');
+      if (icon) {
+        const prev = icon.className;
+        icon.className = 'i-lucide:check';
+        window.setTimeout(() => {
+          icon.className = prev;
+        }, 1500);
+      }
+    });
+  } else if (btn.dataset.action === 'download') {
+    if (host) void host.saveFile(btn.dataset.filename ?? 'code.txt', code);
+  }
 }
 
 function toggleFeedback(kind: 'like' | 'dislike'): void {
@@ -113,6 +140,11 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
   if (!tokens || durationMs <= 0) return '—';
   return `${Math.round(tokens / (durationMs / 1000))} ${t('chat.stats.tokensPerSec')}`;
 }
+
+// 组件卸载时清理「已复制」提示的定时器，避免残留
+onBeforeUnmount(() => {
+  window.clearTimeout(copyTimer);
+});
 </script>
 
 <template>
@@ -120,9 +152,41 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
     <!-- user：右对齐弱气泡 -->
     <div
       v-if="message.role === 'user'"
-      class="max-w-[78%] whitespace-pre-wrap rounded-2xl bg-elevated px-4 py-2.5 text-sm leading-relaxed text-fg"
+      class="max-w-[78%] rounded-2xl bg-elevated px-4 py-2.5 text-sm leading-relaxed text-fg"
     >
-      {{ message.content }}
+      <!-- @ 引用文件 + 附件预览 -->
+      <div v-if="message.contexts?.length || message.attachments?.length" class="mb-2 flex flex-wrap items-center gap-2">
+        <template v-for="c in message.contexts" :key="c.id">
+          <div class="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs">
+            <span class="i-lucide:at-sign text-3.5 text-primary" />
+            <span class="font-mono">{{ c.name }}</span>
+          </div>
+        </template>
+        <template v-for="a in message.attachments" :key="a.id">
+          <img
+            v-if="a.dataUrl"
+            :src="a.dataUrl"
+            :alt="a.name"
+            class="h-24 w-24 rounded-xl border border-line object-cover shadow-sm"
+          />
+          <div v-else-if="!a.content" class="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs">
+            <span class="i-lucide:file text-3.5 text-muted" />
+            <span>{{ a.name }}</span>
+          </div>
+        </template>
+      </div>
+      <!-- 文本附件内容（折叠卡片，样式对齐思考折叠卡） -->
+      <template v-for="a in textAttachments" :key="a.id">
+        <details class="ds-attachment mb-2">
+          <summary>
+            <span class="ds-attachment-icon i-lucide:file-text" />
+            <span class="ds-attachment-name">{{ a.name }}</span>
+            <span class="ds-attachment-chevron i-lucide:chevron-right" />
+          </summary>
+          <pre class="ds-attachment-body">{{ a.content }}</pre>
+        </details>
+      </template>
+      <div v-if="message.content" class="whitespace-pre-wrap">{{ message.content }}</div>
     </div>
 
     <!-- assistant：通栏文档式 -->
@@ -130,7 +194,7 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
       <div class="mt-0.5 size-7 shrink-0 flex items-center justify-center rounded-full border border-line text-muted">
         <span class="i-lucide:sparkles text-3.5" />
       </div>
-      <div class="min-w-0 flex-1 pt-1 text-sm leading-relaxed text-fg">
+      <div class="min-w-0 flex-1 pt-1 text-sm leading-relaxed text-fg" @click="onContentClick">
         <!-- 有序步骤：思考 → 说话 → 工具，按发生顺序交错 -->
         <!-- eslint-disable vue/no-v-html -->
         <template v-if="message.steps && message.steps.length">
@@ -152,7 +216,7 @@ function formatTokensPerSec(tokens: number | undefined, durationMs: number): str
               <div class="ds-thought-body">{{ step.content }}</div>
             </details>
             <!-- 正文（说话/总结） -->
-            <div v-else-if="step.kind === 'text'" class="ds-md" v-html="renderMarkdown(step.content)" />
+            <div v-else-if="step.kind === 'text'" class="ds-md" v-html="renderMarkdown(step.content, t)" />
             <!-- 工具调用 -->
             <ToolEventCard v-else :event="step.event" />
           </template>

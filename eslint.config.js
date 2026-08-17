@@ -4,7 +4,7 @@ import { defineConfig } from '@soybeanjs/eslint-config-vue';
 // soybean 的 ignores 放在带 files 的 config 里不生效，会扫到构建产物 out/
 export default [
   {
-    ignores: ['**/out/**', '**/dist/**', '**/node_modules/**', '**/.zcode/**', '**/coverage/**']
+    ignores: ['**/out/**', '**/dist/**', '**/release/**', '**/node_modules/**', '**/.zcode/**', '**/coverage/**']
   },
   ...(await defineConfig())
 ];

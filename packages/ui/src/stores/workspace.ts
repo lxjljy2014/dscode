@@ -36,11 +36,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     selectedFilePath.value = path;
     if (!host) return;
     const r = await host.workspaceReadFile(path);
+    // 用户已切到别的文件：丢弃过期响应，避免覆盖当前选中显示
+    if (selectedFilePath.value !== path) return;
     fileContents.value[path] = r.ok ? r.content : `（读取失败：${r.error}）`;
   }
 
   async function loadTree(): Promise<void> {
     if (!host) return;
+    // 工作目录切换：清空旧工作区的文件内容缓存，避免无界增长
+    fileContents.value = {};
     fileTree.value = await host.workspaceTree();
   }
 

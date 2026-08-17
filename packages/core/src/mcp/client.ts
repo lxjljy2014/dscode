@@ -28,6 +28,8 @@ export async function listMcpTools(server: McpServerLike, timeoutMs = 10000): Pr
   return new Promise((resolve, reject) => {
     let settled = false;
     const child = spawn(server.command, server.args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    // 排空 stderr：不消费时 stderr 管道缓冲区填满会阻塞服务器进程
+    child.stderr.resume();
     const rl = createInterface({ input: child.stdout });
     let nextId = 1;
     const pending = new Map<number, (msg: RpcMessage) => void>();

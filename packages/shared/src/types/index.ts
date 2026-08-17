@@ -18,8 +18,46 @@ export interface Message {
   steps?: AssistantStep[];
   /** agent 回复的运行统计（仅内存展示，不持久化；旧消息无此字段） */
   stats?: MessageStats;
+  /** 用户消息附件（图片预览 / 文件 chip；随消息落库） */
+  attachments?: MessageAttachment[];
+  /** 用户消息 @ 引用的代码文件（内容随消息落库，历史重建时注入提示词） */
+  contexts?: MessageContext[];
   createdAt: number;
 }
+
+/** 用户消息附件（图片以 dataUrl 预览；随消息落库，重开恢复展示） */
+export interface MessageAttachment {
+  id: string;
+  /** 文件名（含扩展名） */
+  name: string;
+  /** 绝对路径（展示用；实际读取由主进程完成） */
+  path: string;
+  /** MIME 类型（image/* 为图片） */
+  mime?: string;
+  /** 字节大小 */
+  size?: number;
+  /** 图片预览 data URL（仅图片且 ≤ 上限时携带） */
+  dataUrl?: string;
+  /** 文本/代码文件内容（非图片附件读取后携带；注入提示词与折叠展示用） */
+  content?: string;
+}
+
+/** 用户消息 @ 引用的代码文件（发送时内容注入提示词；随消息落库，历史重建时重新注入） */
+export interface MessageContext {
+  id: string;
+  /** 绝对路径 */
+  path: string;
+  /** 文件名 */
+  name: string;
+  /** 文件内容（注入提示词用；随消息落库） */
+  content: string;
+}
+
+/** 主进程读取附件的返回（区分图片预览与文本内容） */
+export type AttachmentReadResult =
+  | { ok: true; name: string; path: string; size: number; mime: string; kind: 'image'; dataUrl: string }
+  | { ok: true; name: string; path: string; size: number; mime: string; kind: 'text'; text: string }
+  | { ok: false; error: string };
 
 /** 一次 agent 回复的运行统计（仅内存展示，不持久化） */
 export interface MessageStats {
@@ -104,7 +142,7 @@ export interface ChatMessagePayload {
 /** agent:error 事件负载 */
 export interface AgentErrorEvent {
   sessionId: string;
-  code: 'no-api-key' | 'api' | 'network' | 'aborted' | 'running' | 'unknown';
+  code: 'no-api-key' | 'api' | 'network' | 'aborted' | 'running' | 'max-rounds' | 'unknown';
   detail?: string;
 }
 

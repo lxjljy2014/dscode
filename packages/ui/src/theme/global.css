@@ -190,6 +190,68 @@ html {
   color: rgb(var(--v-theme-on-surface-variant));
 }
 
+/* ---- 附件卡片（用户消息里文本附件的折叠展示，视觉对齐 .ds-thought 折叠卡） ---- */
+.ds-attachment {
+  overflow: hidden;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.09);
+  border-radius: 10px;
+  background: rgb(var(--v-theme-surface-variant), 0.35);
+}
+/* 折叠行：文件图标 + 文件名 + 展开箭头 */
+.ds-attachment > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.ds-attachment > summary::-webkit-details-marker {
+  display: none;
+}
+.ds-attachment > summary:hover {
+  color: rgb(var(--v-theme-on-surface));
+  background: rgba(var(--v-theme-on-surface), 0.03);
+}
+.ds-attachment-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.ds-attachment-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.ds-attachment-chevron {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: rgba(var(--v-theme-on-surface), 0.4);
+  transition: transform 0.2s ease;
+}
+.ds-attachment[open] .ds-attachment-chevron {
+  transform: rotate(90deg);
+}
+/* 展开内容：顶部细分隔线 + 等宽字体代码块 */
+.ds-attachment-body {
+  max-height: 260px;
+  overflow-y: auto;
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  background: rgb(var(--v-theme-surface-variant), 0.35);
+  padding: 10px 14px;
+  white-space: pre-wrap;
+  font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgb(var(--v-theme-on-surface));
+}
+
 /* ---- 面板抽屉：关闭尺寸过渡 ----
    Vuetify 默认给 .v-navigation-drawer 加了 width/height/top/left/right/bottom 的 0.2s 过渡，
    拖拽 resize 时尺寸会追着指针慢半拍、显得卡顿；这里只保留 transform/visibility 的滑入滑出动画。 */
@@ -340,6 +402,94 @@ html {
 
 .ds-md img {
   max-width: 100%;
+}
+
+/* ---- 代码块卡片：header（语言 + 复制/下载）+ 高亮代码 ---- */
+.ds-codeblock {
+  margin: 0.75em 0;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgb(var(--v-theme-syntax-bg));
+}
+.ds-codeblock__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px 5px 12px;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  background: rgba(var(--v-theme-on-surface), 0.03);
+  user-select: none;
+}
+.ds-codeblock__lang {
+  font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: rgba(var(--v-theme-on-surface), 0.5);
+  text-transform: lowercase;
+}
+.ds-codeblock__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.ds-codeblock__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(var(--v-theme-on-surface), 0.5);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.ds-codeblock__btn:hover {
+  color: rgb(var(--v-theme-on-surface));
+  background: rgba(var(--v-theme-on-surface), 0.08);
+}
+.ds-codeblock__btn span {
+  font-size: 14px;
+}
+/* 代码区：左侧行号 + 右侧可横向滚动的代码 */
+.ds-codeblock__body {
+  display: flex;
+  align-items: stretch;
+}
+.ds-codeblock__ln {
+  flex-shrink: 0;
+  padding: 12px 12px 12px 14px;
+  border-right: 1px solid rgba(var(--v-theme-on-surface), 0.06);
+  color: rgba(var(--v-theme-on-surface), 0.35);
+  font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  text-align: right;
+  user-select: none;
+  white-space: pre;
+}
+/* 覆盖 .ds-md pre/code 的默认样式：代码块内部自管理边框/背景/内边距 */
+.ds-codeblock pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  overflow-x: auto;
+}
+.ds-codeblock pre code {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12.5px;
+  line-height: 1.65;
 }
 
 /* ---- 语法高亮 token 颜色（--v-theme-syntax-* 由 tokens.syntaxPalette 生成） ---- */

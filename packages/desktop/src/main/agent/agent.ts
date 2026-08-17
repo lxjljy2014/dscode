@@ -76,10 +76,14 @@ export async function startAgent(
   sessionId: string,
   model: unknown,
   rawMessages: unknown,
-  subagentId: unknown
+  subagentId: unknown,
+  reasoningEffort: unknown
 ): Promise<AgentStartResult> {
   if (typeof model !== 'string') return { ok: false, error: 'invalid-args' };
   if (subagentId !== undefined && typeof subagentId !== 'string') {
+    return { ok: false, error: 'invalid-args' };
+  }
+  if (reasoningEffort !== undefined && reasoningEffort !== 'off' && reasoningEffort !== 'high' && reasoningEffort !== 'max') {
     return { ok: false, error: 'invalid-args' };
   }
   if (!Array.isArray(rawMessages) || !rawMessages.every(isChatMessagePayload)) {
@@ -118,7 +122,9 @@ export async function startAgent(
       systemPrompt: basePrompt + memorySection + skillSection,
       browsingEnabled: settings.browsingEnabled,
       skills: settings.skills,
-      llmCache: getLlmCache()
+      llmCache: getLlmCache(),
+      // 渲染端「推理强度」选择器：显式值时覆盖 provider 默认；undefined（auto）跟随 provider
+      ...(reasoningEffort !== undefined ? { reasoningEffort: reasoningEffort as 'off' | 'high' | 'max' } : {})
     }
   });
   if (result.ok) winBySession.set(sessionId, win);

@@ -81,6 +81,36 @@ function isMessageStats(v: unknown): v is Message['stats'] {
   );
 }
 
+/** 校验附件（id/name/path 必填字符串；mime/size/dataUrl 可选） */
+function isAttachments(v: unknown): v is Message['attachments'] {
+  if (v === undefined) return true;
+  if (!Array.isArray(v)) return false;
+  return v.every(a => {
+    if (!isRecord(a)) return false;
+    const r = a as Record<string, unknown>;
+    return (
+      isString(r['id']) &&
+      isString(r['name']) &&
+      isString(r['path']) &&
+      (r['mime'] === undefined || isString(r['mime'])) &&
+      (r['size'] === undefined || typeof r['size'] === 'number') &&
+      (r['dataUrl'] === undefined || isString(r['dataUrl'])) &&
+      (r['content'] === undefined || isString(r['content']))
+    );
+  });
+}
+
+/** 校验 @ 引用上下文（id/path/name/content 必填字符串） */
+function isContexts(v: unknown): v is Message['contexts'] {
+  if (v === undefined) return true;
+  if (!Array.isArray(v)) return false;
+  return v.every(c => {
+    if (!isRecord(c)) return false;
+    const r = c as Record<string, unknown>;
+    return isString(r['id']) && isString(r['path']) && isString(r['name']) && isString(r['content']);
+  });
+}
+
 /** 校验持久化消息（required + errorCode/steps/stats 可选；streaming/reasoning 顶层字段为渲染端瞬态不落库） */
 export function isMessage(v: unknown): v is Message {
   if (!isRecord(v)) return false;
@@ -92,7 +122,9 @@ export function isMessage(v: unknown): v is Message {
     typeof r['createdAt'] === 'number' &&
     (r['errorCode'] === undefined || isString(r['errorCode'])) &&
     (r['steps'] === undefined || isAssistantSteps(r['steps'])) &&
-    (r['stats'] === undefined || isMessageStats(r['stats']))
+    (r['stats'] === undefined || isMessageStats(r['stats'])) &&
+    (r['attachments'] === undefined || isAttachments(r['attachments'])) &&
+    (r['contexts'] === undefined || isContexts(r['contexts']))
   );
 }
 

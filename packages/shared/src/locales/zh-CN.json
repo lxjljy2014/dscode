@@ -13,12 +13,16 @@
     "downloading": "正在下载 {percent}%",
     "downloaded": "新版本已就绪，点击重启更新"
   },
+  "common": {
+    "userName": "开发者"
+  },
   "sidebar": {
     "project": "项目",
     "more": "更多",
     "archived": "已归档",
     "removeProject": "移除项目",
     "archiveTask": "归档任务",
+    "confirmArchive": "确认归档",
     "unarchiveTask": "取消归档",
     "emptyArchived": "暂无归档任务",
     "removed": "已移除项目",
@@ -40,6 +44,8 @@
     "like": "点赞",
     "dislike": "踩",
     "fork": "派生新任务",
+    "copyCode": "复制代码",
+    "downloadCode": "下载代码",
     "stats": {
       "time": "时间",
       "duration": "用时",
@@ -51,11 +57,11 @@
     },
     "contextMeter": {
       "tooltip": "上下文 {percent}%（{used}/{total}）",
-      "title": "上下文占用",
+      "title": "上下文已用",
       "system": "系统提示词",
       "tools": "工具",
       "messages": "对话消息",
-      "caption": "已用 {used} / 窗口 {total}"
+      "caption": "~{used} / {total}"
     },
     "sessionStats": {
       "rounds": "轮",
@@ -82,6 +88,12 @@
     "planMode": "计划模式",
     "agentMode": "代理模式",
     "addContext": "添加上下文",
+    "addAttachment": "添加附件",
+    "addAtContext": "使用 {'@'} 添加上下文",
+    "addSlashCommand": "使用 / 选择命令或能力",
+    "remove": "移除",
+    "contextNotText": "仅支持引用文本/代码文件",
+    "atEmpty": "暂无匹配文件",
     "subagentDefault": "默认",
     "commandTitle": "命令",
     "commandEmpty": "无匹配命令",
@@ -89,6 +101,7 @@
     "commandGroup": "命令",
     "skillGroup": "技能",
     "effort": {
+      "auto": "自动",
       "close": "关闭",
       "high": "高",
       "max": "最高"
@@ -155,7 +168,10 @@
     "additions": "{n} 处新增",
     "deletions": "{n} 处删除",
     "newFile": "新增",
-    "deletedFile": "已删除"
+    "deletedFile": "已删除",
+    "foldedLines": "…已折叠 {n} 行",
+    "foldedFiles": "…已折叠 {n} 个文件",
+    "fileTruncated": "…（文件过大，已截断显示）"
   },
   "agent": {
     "tool": {
@@ -208,6 +224,7 @@
       "network": "网络异常或请求超时，请稍后重试",
       "aborted": "已停止",
       "running": "上一条消息还在处理中，请稍候或先停止",
+      "max-rounds": "已达到最大工具轮次，任务提前结束",
       "unknown": "发生未知错误"
     }
   },
@@ -375,7 +392,8 @@
       "apiCacheHint": "DeepSeek 上下文缓存：同一会话内每轮请求命中共享前缀，命中部分按折扣计费。命中率仅统计启用缓存统计后的记录；历史记录（无缓存数据）不参与计算。",
       "localCacheTitle": "本地重放缓存（相同请求）",
       "localCacheHint": "仅相同请求（如中断后重试、重复提问）会命中并重放；日常对话每轮上下文都不同，命中率低属正常。",
-      "apiCacheSamples": "已统计记录"
+      "apiCacheSamples": "已统计记录",
+      "cachedRatio": "缓存 {percent}%"
     },
     "subagents": {
       "desc": "定义可切换的专用 agent 人设，选定后对话以其系统提示词运行。",
@@ -396,7 +414,7 @@
       "command": "启动命令",
       "commandPlaceholder": "例如 npx",
       "args": "参数（空格分隔）",
-      "argsPlaceholder": "例如 -y @modelcontextprotocol/server-filesystem /path",
+      "argsPlaceholder": "例如 -y {'@'}modelcontextprotocol/server-filesystem /path",
       "listTools": "列出工具",
       "loading": "连接中…",
       "noTools": "点击「列出工具」查看"

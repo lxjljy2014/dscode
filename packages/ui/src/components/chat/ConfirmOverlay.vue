@@ -60,6 +60,7 @@ watch(confirm, async c => {
 
 /** 键盘控制：↑/↓ 移动选中项，Enter 确认，Esc 拒绝（停止任务） */
 function onKeydown(e: KeyboardEvent): void {
+  if (e.isComposing) return; // 输入法组合中不响应，避免误触发
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
