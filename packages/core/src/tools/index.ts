@@ -1,4 +1,4 @@
-import type { AgentToolName, Skill } from '@dscode/shared';
+import type { AgentToolEvent, AgentToolName, Skill } from '@dscode/shared';
 import { browseTool } from './browse';
 export { fetchWebPage } from './browse';
 import { editFileTool } from './edit-file';
@@ -44,6 +44,12 @@ export const TOOLS: Record<AgentToolName, Tool> = {
   run_code: runCodeTool,
   skill: skillTool
 };
+
+/** 工具名列表（与 AgentToolName 对齐，编译期由 Record<AgentToolName, Tool> 保证完整）；供跨进程校验单一事实源 */
+export const TOOL_NAMES: readonly AgentToolName[] = Object.keys(TOOLS) as AgentToolName[];
+
+/** 工具事件状态集合（与 shared AgentToolEvent['status'] 对齐）；供跨进程校验单一事实源 */
+export const TOOL_STATUSES: readonly AgentToolEvent['status'][] = ['running', 'done', 'error', 'confirming', 'denied'];
 
 /**
  * 返回给模型的工具 schema 数组（OpenAI function calling 格式）；includeBrowse=false 时排除 browse。

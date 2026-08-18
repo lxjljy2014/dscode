@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useWorkspaceStore } from '../../stores/workspace';
+import { accentKeyForPath, iconForPath } from '../../utils/fileKind';
 import type { FileNode } from '@dscode/shared';
 
 /**
@@ -48,55 +49,6 @@ function parentOf(path: string): string {
   return i < 0 ? '' : path.slice(0, i);
 }
 
-/** 常见扩展名 → 主题强调色 key（对齐 ToolEventCard 的 toolAccent 色板） */
-const EXT_COLORS: Record<string, string> = {
-  ts: 'tool-read', tsx: 'tool-read', mts: 'tool-read', cts: 'tool-read',
-  js: 'tool-search', jsx: 'tool-search', mjs: 'tool-search', cjs: 'tool-search',
-  vue: 'tool-write', py: 'tool-write',
-  md: 'tool-run',
-  json: 'tool-edit', sh: 'tool-edit', bash: 'tool-edit', zsh: 'tool-edit',
-  css: 'tool-browse', scss: 'tool-browse', less: 'tool-browse',
-  html: 'tool-list', xml: 'tool-list', yaml: 'tool-list', yml: 'tool-list', toml: 'tool-list', ini: 'tool-list'
-};
-
-/** 常见扩展名 → 图标（Lucide file-* 系列） */
-const EXT_ICONS: Record<string, string> = {
-  ts: 'i-lucide:file-code-2', tsx: 'i-lucide:file-code-2', mts: 'i-lucide:file-code-2', cts: 'i-lucide:file-code-2',
-  js: 'i-lucide:file-code', jsx: 'i-lucide:file-code', mjs: 'i-lucide:file-code', cjs: 'i-lucide:file-code',
-  vue: 'i-lucide:file-code-2', py: 'i-lucide:file-code',
-  json: 'i-lucide:file-json',
-  md: 'i-lucide:file-text',
-  css: 'i-lucide:palette', scss: 'i-lucide:palette', less: 'i-lucide:palette',
-  html: 'i-lucide:file-code', xml: 'i-lucide:file-code',
-  sh: 'i-lucide:terminal', bash: 'i-lucide:terminal', zsh: 'i-lucide:terminal',
-  yaml: 'i-lucide:settings', yml: 'i-lucide:settings', toml: 'i-lucide:settings', ini: 'i-lucide:settings',
-  png: 'i-lucide:file-image', jpg: 'i-lucide:file-image', jpeg: 'i-lucide:file-image',
-  gif: 'i-lucide:file-image', webp: 'i-lucide:file-image', svg: 'i-lucide:file-image'
-};
-
-const ACCENT_KEYS = ['tool-read', 'tool-list', 'tool-search', 'tool-run', 'tool-write', 'tool-edit', 'tool-browse'];
-
-function extOf(path: string): string {
-  const i = path.lastIndexOf('.');
-  return i < 0 ? '' : path.slice(i + 1).toLowerCase();
-}
-
-/** 扩展名 → 强调色 key（未知扩展名按哈希稳定落色） */
-function extColorKey(path: string): string {
-  const ext = extOf(path);
-  const key = EXT_COLORS[ext];
-  if (key) return key;
-  if (!ext) return 'tool-read';
-  let h = 0;
-  for (const ch of ext) h = (h * 31 + ch.charCodeAt(0)) | 0;
-  return ACCENT_KEYS[Math.abs(h) % ACCENT_KEYS.length] ?? 'tool-read';
-}
-
-/** 文件图标（按扩展名） */
-function fileIcon(path: string): string {
-  return EXT_ICONS[extOf(path)] ?? 'i-lucide:file';
-}
-
 /** 当前可见条目：搜索模式（文件）或浏览模式（目录 + 文件 + 上级） */
 const entries = computed<Entry[]>(() => {
   const kw = props.keyword.trim().toLowerCase();
@@ -127,14 +79,14 @@ function onClick(entry: Entry): void {
 function iconOf(entry: Entry): string {
   if (entry.type === 'up') return 'i-lucide:corner-left-up';
   if (entry.type === 'dir') return 'i-lucide:folder';
-  return fileIcon(entry.path);
+  return iconForPath(entry.path);
 }
 
 /** 目录暖色 / 文件按类型取色 / 上级灰色 */
 function colorOf(entry: Entry): string {
   if (entry.type === 'dir') return 'rgb(var(--v-theme-tool-search))';
   if (entry.type === 'up') return 'rgba(var(--v-theme-on-surface), 0.6)';
-  return 'rgb(var(--v-theme-' + extColorKey(entry.path) + '))';
+  return 'rgb(var(--v-theme-' + accentKeyForPath(entry.path) + '))';
 }
 </script>
 

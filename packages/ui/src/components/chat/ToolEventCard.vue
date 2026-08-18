@@ -5,6 +5,7 @@ import type { AgentToolEvent } from '@dscode/shared';
 import { useAgentStore } from '../../stores/agent';
 import { useSettingsStore } from '../../stores/settings';
 import { diffLinesUi } from '../../utils/diff';
+import { accentKeyForExt } from '../../utils/fileKind';
 
 const props = defineProps<{ event: AgentToolEvent }>();
 
@@ -68,37 +69,6 @@ const verb = computed(() => {
   return t('agent.verb.' + name);
 });
 
-/** 常见扩展名 → 主题强调色 key（tokens.toolAccent），其余按哈希稳定落到同一色板 */
-const EXT_COLORS: Record<string, string> = {
-  ts: 'tool-read',
-  tsx: 'tool-read',
-  mts: 'tool-read',
-  cts: 'tool-read',
-  js: 'tool-search',
-  jsx: 'tool-search',
-  mjs: 'tool-search',
-  cjs: 'tool-search',
-  vue: 'tool-write',
-  md: 'tool-run',
-  json: 'tool-edit',
-  css: 'tool-browse',
-  scss: 'tool-browse',
-  less: 'tool-browse',
-  html: 'tool-list',
-  py: 'tool-write',
-  sh: 'tool-edit'
-};
-
-const ACCENT_KEYS = ['tool-read', 'tool-list', 'tool-search', 'tool-run', 'tool-write', 'tool-edit', 'tool-browse'];
-
-function extColor(ext: string): string {
-  const key = EXT_COLORS[ext];
-  if (key) return key;
-  let h = 0;
-  for (const ch of ext) h = (h * 31 + ch.charCodeAt(0)) | 0;
-  return ACCENT_KEYS[Math.abs(h) % ACCENT_KEYS.length] ?? 'tool-read';
-}
-
 const PRIMARY_ARG: Record<string, string> = {
   read_file: 'path',
   write_file: 'path',
@@ -121,7 +91,7 @@ const primaryValue = computed(() => {
     const kv = Object.entries(parsed)
       .map(([k, v]) => k + '=' + (typeof v === 'string' ? v : JSON.stringify(v)))
       .join(' ');
-    return kv || '(默认)';
+    return kv || t('agent.argsDefault');
   } catch {
     return props.event.args;
   }
@@ -154,7 +124,7 @@ const fileSplit = computed(() => {
 
 /** 扩展名徽章样式：按文件类型取强调色（文字 + 同色细描边），无扩展名时不渲染 */
 const badgeStyle = computed(() => {
-  const key = fileSplit.value?.ext ? extColor(fileSplit.value.ext.toLowerCase()) : 'tool-read';
+  const key = fileSplit.value?.ext ? accentKeyForExt(fileSplit.value.ext.toLowerCase()) : 'tool-read';
   const c = 'rgb(var(--v-theme-' + key + '))';
   return { color: c, borderColor: c };
 });
@@ -191,10 +161,10 @@ const metaBadge = computed(() => {
         ? { text: '✓ 0', cls: 'text-diff-add' }
         : { text: '✗ ' + code, cls: 'text-diff-del' };
     }
-    if (m['killed'] === true) return { text: '⏱ 超时', cls: 'text-warning' };
+    if (m['killed'] === true) return { text: t('agent.timeout'), cls: 'text-warning' };
   }
   if (props.event.name === 'read_file' && typeof m['lineCount'] === 'number') {
-    return { text: m['lineCount'] + ' 行', cls: 'text-faint' };
+    return { text: t('agent.lineCount', { n: m['lineCount'] }), cls: 'text-faint' };
   }
   return null;
 });

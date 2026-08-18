@@ -213,6 +213,9 @@
     "keyboardHint": "↑/↓ 选择 · Enter 确认 · Esc 拒绝",
     "args": "参数",
     "result": "结果",
+    "argsDefault": "(默认)",
+    "timeout": "⏱ 超时",
+    "lineCount": "{n} 行",
     "action": {
       "writing": "写入中",
       "written": "已写入",

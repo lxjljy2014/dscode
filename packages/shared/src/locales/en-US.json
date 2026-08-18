@@ -213,6 +213,9 @@
     "keyboardHint": "↑/↓ Select · Enter Confirm · Esc Deny",
     "args": "Arguments",
     "result": "Result",
+    "argsDefault": "(default)",
+    "timeout": "⏱ Timed out",
+    "lineCount": "{n} lines",
     "action": {
       "writing": "Writing",
       "written": "Written",

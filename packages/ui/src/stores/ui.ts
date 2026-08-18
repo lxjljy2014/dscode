@@ -33,7 +33,8 @@ export const useUiStore = defineStore('ui', () => {
   const persisted = loadPersisted();
 
   const theme = ref<ThemeMode>(persisted.theme ?? systemTheme());
-  const locale = ref<LocaleSetting>(persisted.locale ?? 'zh-CN');
+  // 默认跟随系统：非中文用户首次启动即得英文界面（用户可在设置中显式切换）
+  const locale = ref<LocaleSetting>(persisted.locale ?? 'system');
   // 侧栏显隐不持久化：每次启动左侧展开、右侧隐藏
   const leftVisible = ref(true);
   const rightVisible = ref(false);
@@ -42,8 +43,19 @@ export const useUiStore = defineStore('ui', () => {
   const terminalHeight = ref(280);
   const rightPanelWidth = ref(440);
 
-  /** 实际生效的语言（system 时按操作系统解析） */
-  const resolvedLocale = computed<AppLocale>(() => (locale.value === 'system' ? systemLocale() : locale.value));
+  /** 系统语言变化信号：locale='system' 时触发 resolvedLocale 重算，跟随 OS 语言切换 */
+  const localeTick = ref(0);
+  if (typeof window !== 'undefined') {
+    window.addEventListener('languagechange', () => {
+      localeTick.value++;
+    });
+  }
+
+  /** 实际生效的语言（system 时按操作系统解析，并随 languagechange 更新） */
+  const resolvedLocale = computed<AppLocale>(() => {
+    void localeTick.value;
+    return locale.value === 'system' ? systemLocale() : locale.value;
+  });
 
   watch(
     [theme, locale],

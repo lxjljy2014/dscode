@@ -1,4 +1,5 @@
 import type { AgentToolEvent, AppSettings, AssistantStep, ChatMessagePayload, Message, Session, SessionStats } from '@dscode/shared';
+import { TOOL_NAMES, TOOL_STATUSES } from '@dscode/core';
 
 /**
  * IPC 参数校验的共享收窄函数。
@@ -58,21 +59,18 @@ export function isChatMessagePayload(v: unknown): v is ChatMessagePayload {
   });
 }
 
-const TOOL_NAMES = new Set(['read_file', 'list_dir', 'search', 'run_command', 'write_file', 'edit_file', 'browse', 'run_code', 'skill']);
-const TOOL_STATUSES = new Set(['running', 'done', 'error', 'confirming', 'denied']);
-
-/** 校验工具事件（required 字段 + 可选 summary/error 的类型） */
+/** 校验工具事件（required 字段 + 可选 summary/error 的类型）；工具名/状态取自 core 单一事实源 */
 function isToolEvent(v: unknown): v is AgentToolEvent {
   if (!isRecord(v)) return false;
   const r = v as Record<string, unknown>;
   return (
     isString(r['id']) &&
     isString(r['name']) &&
-    TOOL_NAMES.has(r['name']) &&
+    (TOOL_NAMES as readonly string[]).includes(r['name']) &&
     isString(r['args']) &&
     isString(r['status']) &&
-    TOOL_STATUSES.has(r['status']) &&
-    typeof r['createdAt'] === 'number' &&
+    (TOOL_STATUSES as readonly string[]).includes(r['status']) &&
+    isFiniteNumber(r['createdAt']) &&
     (r['toolCallId'] === undefined || isString(r['toolCallId'])) &&
     (r['summary'] === undefined || isString(r['summary'])) &&
     (r['content'] === undefined || isString(r['content'])) &&
