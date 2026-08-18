@@ -44,6 +44,7 @@
     "like": "点赞",
     "dislike": "踩",
     "fork": "派生新任务",
+    "scrollToBottom": "回到底部",
     "copyCode": "复制代码",
     "downloadCode": "下载代码",
     "stats": {

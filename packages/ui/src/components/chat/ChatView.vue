@@ -34,13 +34,30 @@ const greeting = computed(() => {
   return t('chat.greeting.night');
 });
 
+/** 距底部该阈值内视为「贴底」，超过则视为用户接管（暂停流式吸底） */
+const STICK_THRESHOLD = 64;
+
+/** 是否贴底：贴底时流式内容自动吸底；用户上滚后置 false，接管滚动、停止自动吸底 */
+const stickToBottom = ref(true);
+
+/** 用户滚动会话区时，按距底部距离更新贴底状态（scroll 不冒泡，用 capture 在祖先捕获） */
+function onScroll(e: Event) {
+  const el = e.target as HTMLElement | null;
+  // 只关心会话滚动容器自身，忽略内部代码块等子元素的横向滚动
+  if (!el || el !== vsRef.value?.$el) return;
+  const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+  stickToBottom.value = distance <= STICK_THRESHOLD;
+}
+
 /** 轻量吸底：流式期间用（仅 scrollTop=scrollHeight，不重排虚拟窗口，避免一跳一跳） */
 function scrollToBottom() {
+  // 用户上滚接管后不再强制吸底，等用户回到底部再恢复跟随
+  if (!stickToBottom.value) return;
   nextTick(() => {
     const el = vsRef.value?.$el;
     if (!el) return;
     const scroll = () => {
-      el.scrollTop = el.scrollHeight;
+      if (stickToBottom.value) el.scrollTop = el.scrollHeight;
     };
     scroll();
     requestAnimationFrame(scroll);
@@ -49,6 +66,8 @@ function scrollToBottom() {
 
 /** 强吸底：新消息/切换会话/挂载时用（偏移量未测完，多帧校正 + 延迟兜底到真实底部） */
 function scrollToBottomHard() {
+  // 显式回到底部：重置接管状态，恢复流式跟随
+  stickToBottom.value = true;
   nextTick(() => {
     const vs = vsRef.value;
     const el = vs?.$el;
@@ -96,18 +115,32 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-base">
+  <div class="h-full flex flex-col bg-base" @scroll.capture="onScroll">
     <template v-if="messages.length">
-      <VVirtualScroll ref="vsRef" :items="messages" item-key="id" class="min-h-0">
-        <template #default="{ item, index }">
-          <div
-            class="mx-auto max-w-200 px-6"
-            :class="index === 0 ? 'pt-6' : index === messages.length - 1 ? 'pb-6' : ''"
-          >
-            <MessageItem :message="(item as Message)" :session="activeSession" />
-          </div>
-        </template>
-      </VVirtualScroll>
+      <div class="relative flex min-h-0 flex-1 flex-col">
+        <VVirtualScroll ref="vsRef" :items="messages" item-key="id" class="min-h-0">
+          <template #default="{ item, index }">
+            <div
+              class="mx-auto max-w-200 px-6"
+              :class="index === 0 ? 'pt-6' : index === messages.length - 1 ? 'pb-6' : ''"
+            >
+              <MessageItem :message="(item as Message)" :session="activeSession" />
+            </div>
+          </template>
+        </VVirtualScroll>
+
+        <!-- 回到底部：用户上滚接管后出现，点击恢复吸底跟随 -->
+        <VBtn
+          v-if="!stickToBottom"
+          icon="i-lucide:arrow-down"
+          variant="tonal"
+          size="small"
+          class="ds-fade-in absolute right-6 bottom-4 z-10"
+          :aria-label="t('chat.scrollToBottom')"
+          :title="t('chat.scrollToBottom')"
+          @click="scrollToBottomHard"
+        />
+      </div>
 
       <div class="shrink-0 px-6 pb-3 pt-1">
         <div class="relative mx-auto max-w-200">
