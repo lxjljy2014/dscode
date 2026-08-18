@@ -128,18 +128,6 @@ onMounted(() => {
             </div>
           </template>
         </VVirtualScroll>
-
-        <!-- 回到底部：用户上滚接管后出现，点击恢复吸底跟随 -->
-        <VBtn
-          v-if="!stickToBottom"
-          icon="i-lucide:arrow-down"
-          variant="tonal"
-          size="small"
-          class="ds-fade-in absolute right-6 bottom-4 z-10"
-          :aria-label="t('chat.scrollToBottom')"
-          :title="t('chat.scrollToBottom')"
-          @click="scrollToBottomHard"
-        />
       </div>
 
       <div class="shrink-0 px-6 pb-3 pt-1">
@@ -147,6 +135,18 @@ onMounted(() => {
           <ChatInput :generating="generating" @send="agentStore.sendMessage" @stop="agentStore.stopGenerating" />
           <!-- 工具确认卡片：覆盖在输入卡片上 -->
           <ConfirmOverlay />
+          <!-- 回到底部：圆形悬浮按钮，固定在输入卡片右上方 -->
+          <VBtn
+            v-if="!stickToBottom"
+            icon="i-lucide:arrow-down"
+            variant="tonal"
+            size="small"
+            rounded="circle"
+            class="ds-fade-in absolute -top-12 right-4 z-20"
+            :aria-label="t('chat.scrollToBottom')"
+            :title="t('chat.scrollToBottom')"
+            @click="scrollToBottomHard"
+          />
         </div>
         <!-- 会话统计条（仿 Claude Code）：输入卡片下方 -->
         <SessionStatsBar class="mx-auto max-w-200" />
