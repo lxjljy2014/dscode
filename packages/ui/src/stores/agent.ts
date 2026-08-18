@@ -406,7 +406,7 @@ const sessionStats = computed<SessionStats | null>(() => {
       if (host) {
         host.sessionsStats(ev.sessionId, ev.stats).catch(() => {});
       }
-  }
+    }
   }
 
   /** 上下文占用投影：实时更新会话统计的 context/system/tools/messages（仅内存；run 结束的 sessionStats 才落库） */
@@ -434,7 +434,8 @@ const sessionStats = computed<SessionStats | null>(() => {
     host.onAgentUsage(onUsage);
     host.onWorkspaceDiff(onWorkspaceDiff);
     host.onSessionStats(onSessionStats);
-    host.onAgentContext(onContext);
+    // onAgentContext 为后加桥接方法：旧 preload 未暴露时会缺失，降级跳过而非让整个 setup 崩溃
+    host.onAgentContext?.(onContext);
   }
 
   subscribeEvents();
