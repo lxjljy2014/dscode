@@ -4,8 +4,17 @@ import type { UpdaterState } from '@dscode/shared';
 
 // 主窗口引用（弹提示 / 推送状态）
 let getMainWindow: (() => BrowserWindow | null) | null = null;
-// 手动检查（托盘触发）时无更新/失败要弹提示；启动自动检查则静默
-let manualCheck = false;
+// 手动检查（托盘触发）计数：无更新/失败时弹提示；启动自动检查则静默。
+// 用计数而非布尔，避免自动/手动并发时 update-not-available/error 回调互相覆盖弹窗状态
+let manualChecksPending = 0;
+
+function consumeManualCheck(): boolean {
+  if (manualChecksPending > 0) {
+    manualChecksPending--;
+    return true;
+  }
+  return false;
+}
 // 当前下载版本（download-progress 事件无 version 字段，需在 update-available 时记下）
 let downloadingVersion = '';
 // 当前状态快照（渲染端加载后主动拉取，避免错过已推送的状态）
@@ -14,7 +23,8 @@ let currentState: UpdaterState = { state: 'idle' };
 /** 推送状态给渲染端（驱动侧边栏更新按钮） */
 function pushState(state: UpdaterState): void {
   currentState = state;
-  getMainWindow?.()?.webContents.send('updater:state', state);
+  const win = getMainWindow?.();
+  if (win && !win.isDestroyed()) win.webContents.send('updater:state', state);
 }
 
 /** 校验 IPC 发送方属于主窗口 */
@@ -47,10 +57,11 @@ export function initAutoUpdater(mainWindowGetter: () => BrowserWindow | null): v
   autoUpdater.on('update-available', info => {
     downloadingVersion = info.version;
     pushState({ state: 'available', version: info.version });
+    consumeManualCheck(); // 手动检查找到新版本也算完成，不残留计数
   });
   autoUpdater.on('update-not-available', () => {
     pushState({ state: 'not-available' });
-    if (manualCheck) {
+    if (consumeManualCheck()) {
       void showDialog({
         type: 'info',
         title: '检查更新',
@@ -59,7 +70,6 @@ export function initAutoUpdater(mainWindowGetter: () => BrowserWindow | null): v
         buttons: ['确定']
       });
     }
-    manualCheck = false;
   });
   autoUpdater.on('download-progress', p => {
     pushState({ state: 'downloading', version: downloadingVersion, percent: Math.floor(p.percent) });
@@ -69,7 +79,7 @@ export function initAutoUpdater(mainWindowGetter: () => BrowserWindow | null): v
   });
   autoUpdater.on('error', err => {
     pushState({ state: 'error', message: err instanceof Error ? err.message : String(err) });
-    if (manualCheck) {
+    if (consumeManualCheck()) {
       void showDialog({
         type: 'error',
         title: '检查更新失败',
@@ -78,7 +88,6 @@ export function initAutoUpdater(mainWindowGetter: () => BrowserWindow | null): v
         buttons: ['确定']
       });
     }
-    manualCheck = false;
   });
 
   // 渲染端触发：开始下载 / 重启安装 / 拉取当前状态
@@ -98,10 +107,11 @@ export function initAutoUpdater(mainWindowGetter: () => BrowserWindow | null): v
 
 /** 手动检查更新（托盘「检查更新」触发）：无更新/失败会弹提示 */
 export async function checkForUpdates(): Promise<void> {
-  manualCheck = true;
+  manualChecksPending++;
   try {
     await autoUpdater.checkForUpdates();
   } catch (e) {
+    consumeManualCheck(); // 检查本身抛错时消费计数，避免残留
     console.error('[updater] 检查更新异常', e);
   }
 }

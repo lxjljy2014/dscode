@@ -49,10 +49,25 @@ function showWindow(hooks: TrayHooks): void {
   win.focus();
 }
 
+/** 窗口重建期间挂起的托盘动作：渲染端尚未订阅，立即投递会丢失，待加载完成后投递 */
+let pendingAction: TrayAction | null = null;
+
 /** 先恢复窗口，再把托盘动作发给渲染端执行 */
 function sendAction(hooks: TrayHooks, payload: TrayAction): void {
   showWindow(hooks);
-  hooks.getMainWindow()?.webContents.send('tray:action', payload);
+  const win = hooks.getMainWindow();
+  if (!win) return;
+  if (win.webContents.isLoading()) {
+    // 窗口重建中（macOS 全关窗口后）：挂起动作，加载完成后再投递，避免被丢弃
+    pendingAction = payload;
+    win.webContents.once('did-finish-load', () => {
+      if (!pendingAction) return;
+      win.webContents.send('tray:action', pendingAction);
+      pendingAction = null;
+    });
+    return;
+  }
+  win.webContents.send('tray:action', payload);
 }
 
 /** 消息框封装：有主窗口时作为 parent 弹出（macOS 全关窗口时无 parent 也能弹） */

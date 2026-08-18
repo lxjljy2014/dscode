@@ -240,7 +240,8 @@
     "close": "关闭终端",
     "tabTitle": "终端 {n}",
     "running": "运行中",
-    "exited": "已退出（code {code}）"
+    "exited": "已退出（code {code}）",
+    "ensureFailed": "终端启动失败"
   },
   "settings": {
     "toggleLeft": "切换会话侧栏",
@@ -290,7 +291,8 @@
       "httpProxyPlaceholder": "留空直连，例如 http://127.0.0.1:7890",
       "proxyExceptions": "代理例外",
       "proxyExceptionsDesc": "匹配这些主机的请求将直连，不经过 HTTP 代理。多个规则用英文逗号分隔。修改后需重启应用生效。",
-      "proxyExceptionsPlaceholder": "例如 localhost, 127.0.0.1, *.internal"
+      "proxyExceptionsPlaceholder": "例如 localhost, 127.0.0.1, *.internal",
+      "comingSoon": "即将推出"
     },
     "appearance": {
       "theme": "主题外观",

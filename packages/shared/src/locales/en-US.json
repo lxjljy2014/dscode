@@ -240,7 +240,8 @@
     "close": "Close terminal",
     "tabTitle": "Terminal {n}",
     "running": "Running",
-    "exited": "Exited (code {code})"
+    "exited": "Exited (code {code})",
+    "ensureFailed": "Terminal failed to start"
   },
   "settings": {
     "toggleLeft": "Toggle chat sidebar",
@@ -290,7 +291,8 @@
       "httpProxyPlaceholder": "Empty for direct, e.g. http://127.0.0.1:7890",
       "proxyExceptions": "Proxy exceptions",
       "proxyExceptionsDesc": "Requests to matching hosts connect directly, bypassing the HTTP proxy. Separate multiple rules with commas. Restart required after changes.",
-      "proxyExceptionsPlaceholder": "e.g. localhost, 127.0.0.1, *.internal"
+      "proxyExceptionsPlaceholder": "e.g. localhost, 127.0.0.1, *.internal",
+      "comingSoon": "Coming soon"
     },
     "appearance": {
       "theme": "Theme",

@@ -96,7 +96,7 @@ const proxyExceptions = ref('');
               {{ t('settingsPage.general.terminalFontDesc') }}
             </div>
           </div>
-          <VBtn size="small" class="shrink-0">{{ t('settingsPage.save') }}</VBtn>
+          <VBtn size="small" class="shrink-0" disabled>{{ t('settingsPage.general.comingSoon') }}</VBtn>
         </div>
         <VTextField
           v-model="terminalFont"
@@ -127,7 +127,7 @@ const proxyExceptions = ref('');
             {{ t('settingsPage.general.httpProxyDesc') }}
           </div>
         </div>
-        <VBtn size="small" class="shrink-0">{{ t('settingsPage.save') }}</VBtn>
+        <VBtn size="small" class="shrink-0" disabled>{{ t('settingsPage.general.comingSoon') }}</VBtn>
       </div>
       <VTextField
         v-model="httpProxy"
@@ -144,7 +144,7 @@ const proxyExceptions = ref('');
             {{ t('settingsPage.general.proxyExceptionsDesc') }}
           </div>
         </div>
-        <VBtn size="small" class="shrink-0">{{ t('settingsPage.save') }}</VBtn>
+        <VBtn size="small" class="shrink-0" disabled>{{ t('settingsPage.general.comingSoon') }}</VBtn>
       </div>
       <VTextField
         v-model="proxyExceptions"

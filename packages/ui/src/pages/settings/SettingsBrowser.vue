@@ -28,6 +28,8 @@ async function testFetch() {
     const r = await host.browserFetch(testUrl.value.trim());
     if (r.ok) result.value = r.content;
     else error.value = r.error;
+  } catch {
+    // 传输级异常：保持现状
   } finally {
     loading.value = false;
   }

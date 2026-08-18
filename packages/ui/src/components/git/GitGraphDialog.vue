@@ -39,6 +39,8 @@ watch(model, async open => {
     const r = await host.gitGraph(cwd);
     if (r.ok) rows.value = r.graph;
     else error.value = r.error;
+  } catch {
+    // 传输级异常：保持空态
   } finally {
     loading.value = false;
   }

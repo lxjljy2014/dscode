@@ -66,6 +66,9 @@ async function finish() {
       onboardingDone: true
     });
     await router.replace('/');
+  } catch {
+    // 传输级异常（主进程校验抛错/通道未就绪）：归为网络异常
+    verifyError.value = 'network';
   } finally {
     verifying.value = false;
   }

@@ -45,6 +45,8 @@ async function load() {
   try {
     records.value = await host.usageList();
     cache.value = await host.cacheStats();
+  } catch {
+    // 传输级异常：保持空态
   } finally {
     loading.value = false;
   }
@@ -56,6 +58,8 @@ async function clearCache() {
   clearing.value = true;
   try {
     cache.value = await host.cacheClear();
+  } catch {
+    // 传输级异常：保持现状
   } finally {
     clearing.value = false;
   }

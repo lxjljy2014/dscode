@@ -90,13 +90,19 @@ async function initTab(tab: TabState): Promise<void> {
   });
 
   const cwd = settingsStore.settings.workingDirectory || '';
-  const r = await host.terminalEnsure(tab.id, cwd);
+  let ensureResult: { ok: boolean; error?: string };
+  try {
+    ensureResult = await host.terminalEnsure(tab.id, cwd);
+  } catch {
+    // 传输级异常：归为启动失败，避免 unhandled rejection
+    ensureResult = { ok: false, error: t('terminal.ensureFailed') };
+  }
   // 初始化期间标签可能已被关闭：刚创建的会话已无主，回收避免孤儿 pty
   if (!views.has(tab.id)) {
     void host.terminalKill(tab.id);
     return;
   }
-  if (!r.ok) tab.ensureError = r.error;
+  if (!ensureResult.ok) tab.ensureError = ensureResult.error ?? '';
 }
 
 /** 回收标签页的 xterm 视图与会话 */

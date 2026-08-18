@@ -13,7 +13,11 @@ const searching = ref(false);
 
 async function loadStats() {
   if (!host) return;
-  stats.value = await host.indexStats();
+  try {
+    stats.value = await host.indexStats();
+  } catch {
+    // 传输级异常：保持默认空态
+  }
 }
 
 async function rebuild() {
@@ -21,6 +25,8 @@ async function rebuild() {
   building.value = true;
   try {
     stats.value = await host.indexBuild();
+  } catch {
+    // 传输级异常：保持现状
   } finally {
     building.value = false;
   }
@@ -31,6 +37,8 @@ async function search() {
   searching.value = true;
   try {
     hits.value = await host.indexSearch(query.value.trim());
+  } catch {
+    // 传输级异常：保持现状
   } finally {
     searching.value = false;
   }

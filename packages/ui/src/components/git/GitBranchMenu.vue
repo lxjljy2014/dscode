@@ -64,6 +64,8 @@ watch(
         gitState.value = 'no-git';
         branchResult.value = null;
       }
+    }).catch(() => {
+      // 传输级异常：保持未知态，避免 unhandled rejection
     });
   },
   { immediate: true }
@@ -78,6 +80,8 @@ async function loadBranches(): Promise<void> {
     // 等待期间工作目录可能已变化：丢弃过期结果，避免覆盖新目录的分支列表
     if (settingsStore.settings.workingDirectory !== cwd) return;
     branchResult.value = r;
+  } catch {
+    // 传输级异常：保持当前分支列表
   } finally {
     branchLoading.value = false;
   }
@@ -90,12 +94,17 @@ const snackbarShow = ref(false);
 async function switchBranch(branch: string): Promise<void> {
   const cwd = settingsStore.settings.workingDirectory;
   if (!cwd || !host) return;
-  const r = await host.gitCheckout(cwd, branch);
-  if (r.ok) {
-    await loadBranches();
-    snackbarText.value = t('branch.switched', { branch });
-  } else {
-    snackbarText.value = r.error;
+  try {
+    const r = await host.gitCheckout(cwd, branch);
+    if (r.ok) {
+      await loadBranches();
+      snackbarText.value = t('branch.switched', { branch });
+    } else {
+      snackbarText.value = r.error;
+    }
+  } catch {
+    // 传输级异常：静默返回，可重试
+    return;
   }
   snackbarShow.value = true;
 }
@@ -114,12 +123,17 @@ async function confirmCreateBranch(): Promise<void> {
   const name = newBranchName.value.trim();
   if (!cwd || !name || !host) return;
   createBranchDialog.value = false;
-  const r = await host.gitCreateBranch(cwd, name);
-  if (r.ok) {
-    await loadBranches();
-    snackbarText.value = t('branch.created', { name });
-  } else {
-    snackbarText.value = r.error;
+  try {
+    const r = await host.gitCreateBranch(cwd, name);
+    if (r.ok) {
+      await loadBranches();
+      snackbarText.value = t('branch.created', { name });
+    } else {
+      snackbarText.value = r.error;
+    }
+  } catch {
+    // 传输级异常：静默返回，可重试
+    return;
   }
   snackbarShow.value = true;
 }

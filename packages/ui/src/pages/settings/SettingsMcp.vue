@@ -38,12 +38,26 @@ function openAdd() {
 
 function openEdit(s: McpServer) {
   editingId.value = s.id;
-  draft.value = { name: s.name, command: s.command, argsText: s.args.join(' ') };
+  draft.value = {
+    name: s.name,
+    command: s.command,
+    // 含空格/引号的参数加双引号包裹，保证编辑回填再保存时往返不丢
+    argsText: s.args.map(a => (/\s|"/.test(a) ? '"' + a.replace(/"/g, '\\"') + '"' : a)).join(' ')
+  };
   dialogOpen.value = true;
 }
 
+/** shell-like 分词：支持双/单引号包裹含空格的参数（路径/JSON 等），往返不丢 */
 function parseArgs(text: string): string[] {
-  return text.trim().split(/\s+/).filter(Boolean);
+  const args: string[] = [];
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m[1] !== undefined) args.push(m[1]);
+    else if (m[2] !== undefined) args.push(m[2]);
+    else if (m[3] !== undefined) args.push(m[3]);
+  }
+  return args;
 }
 
 function saveDraft() {
@@ -78,6 +92,8 @@ async function listTools(s: McpServer) {
     const r = await host.listMcpTools(s.id);
     if (r.ok) toolsByServer.value[s.id] = r.tools;
     else errorByServer.value[s.id] = r.error;
+  } catch {
+    // 传输级异常：保持现状
   } finally {
     loadingId.value = null;
   }
