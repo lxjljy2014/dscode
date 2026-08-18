@@ -64,6 +64,7 @@ function createSink(win: BrowserWindow, hooks: Hook[], cwd: string, model: strin
       winBySession.delete(sessionId); // 运行结束清理窗口归属，防无界增长
     },
     sessionStats: (sessionId, stats) => send('agent:session-stats', { sessionId, stats }),
+    context: (sessionId, projection) => send('agent:context', { sessionId, ...projection }),
     error: (sessionId, code, detail) => {
       send('agent:error', { sessionId, code, ...(detail ? { detail } : {}) });
       fireHooks(hooks, 'session_end', cwd);

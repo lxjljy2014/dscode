@@ -22,7 +22,7 @@ afterAll(async () => {
 function noopSink(): AgentEventSink {
   return {
     delta: () => {}, tool: () => {}, confirm: () => {}, usage: () => {},
-    done: () => {}, error: () => {}, diff: () => {}, sessionStats: () => {}
+    done: () => {}, error: () => {}, diff: () => {}, sessionStats: () => {}, context: () => {}
   };
 }
 

@@ -79,6 +79,27 @@ export interface AgentUsageEvent {
   usage: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number };
 }
 
+/**
+ * 上下文占用投影（借鉴官方 harness token-meter 的 anchored projection，实时推送、非计费口径）：
+ * contextTokens = 供应商最近一次上报的 promptTokens + 表面相对采样点的启发式增量，
+ * 因此能随流式正文/工具结果实时更新，而不是等本轮 usage 到达后才统计。
+ */
+export interface ContextProjection {
+  /** 下一次请求预估 prompt 大小（tokens） */
+  contextTokens: number;
+  /** 启发式构成：系统提示词 tokens（近似，不与 contextTokens 精确相加） */
+  systemTokens: number;
+  /** 启发式构成：工具 schema tokens（近似） */
+  toolsTokens: number;
+  /** 启发式构成：对话消息 + 流式正文/思维链 tokens（近似） */
+  messagesTokens: number;
+}
+
+/** agent:context 事件负载（上下文占用实时投影） */
+export interface AgentContextEvent extends ContextProjection {
+  sessionId: string;
+}
+
 /** agent 可调用的工具名 */
 export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file' | 'browse' | 'run_code' | 'skill';
 

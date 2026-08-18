@@ -5,7 +5,7 @@ import { AgentRuntime } from '../src';
 function noopSink() {
   return {
     delta: () => {}, tool: () => {}, confirm: () => {}, usage: () => {},
-    done: () => {}, error: () => {}, sessionStats: () => {}, diff: () => {}
+    done: () => {}, error: () => {}, sessionStats: () => {}, context: () => {}, diff: () => {}
   };
 }
 

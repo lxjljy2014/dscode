@@ -255,6 +255,41 @@ export class AgentRuntime {
       let totalCachedPrompt = 0;
       // 本运行的工具结果上下文预算（跨轮累计，executeToolBatch 在插入时按预算截断）
       const toolBudget = { remaining: MAX_TOOL_CONTEXT_CHARS };
+      // 工具 schema 跨轮不变（browsingEnabled/skills 固定），提升到循环外供上下文投影复用
+      const tools = toolSchemas(browsingEnabled, false, skills.length > 0);
+      // ---- 上下文占用投影（借鉴官方 harness token-meter 的 anchored projection）----
+      // 锚定供应商最近一次 usage 的 promptTokens，叠加「表面」启发式增量，让占用随流式正文/工具结果
+      // 实时更新，而不是等本轮 usage 到达后才统计。表面 = 系统提示词 + 工具 schema + 对话消息 + 流式累计。
+      const CONTEXT_PUSH_INTERVAL_MS = 250;
+      const persistedStats = this.statsEntry(sessionId);
+      let anchoredPromptTokens = persistedStats.contextTokens ?? 0;
+      let streamingContent = '';
+      let streamingReasoning = '';
+      let lastContextPush = 0;
+      const computeBreakdown = (): { systemTokens: number; toolsTokens: number; messagesTokens: number } => {
+        const systemContent = (messages[0] as { content?: string } | undefined)?.content ?? '';
+        const systemTokens = estimateTokens(systemContent);
+        const toolsTokens = estimateTokens(JSON.stringify(tools));
+        const messagesTokens =
+          estimateTokens(JSON.stringify(messages.slice(1))) + estimateTokens(streamingContent) + estimateTokens(streamingReasoning);
+        return { systemTokens, toolsTokens, messagesTokens };
+      };
+      const surfaceTokens = (b: { systemTokens: number; toolsTokens: number; messagesTokens: number }): number =>
+        b.systemTokens + b.toolsTokens + b.messagesTokens;
+      // 有历史锚点时采样当前表面（投影从准确值起步）；无历史时采样 0（投影退化为纯启发式）
+      let sampledSurfaceTokens = anchoredPromptTokens > 0 ? surfaceTokens(computeBreakdown()) : 0;
+      const pushContext = (): void => {
+        const b = computeBreakdown();
+        const contextTokens = Math.max(0, anchoredPromptTokens + (surfaceTokens(b) - sampledSurfaceTokens));
+        sink.context(sessionId, { contextTokens, ...b });
+      };
+      const maybePushContext = (): void => {
+        const now = Date.now();
+        if (now - lastContextPush < CONTEXT_PUSH_INTERVAL_MS) return;
+        lastContextPush = now;
+        pushContext();
+      };
+      pushContext(); // 初始投影：锚定持久化占用（无历史时为纯启发式）
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const combined = AbortSignal.any([signal, AbortSignal.timeout(ROUND_TIMEOUT_MS)]);
         const roundStart = Date.now();
@@ -262,8 +297,9 @@ export class AgentRuntime {
         let firstTokenMs: number | null = null;
         // 一次 LLM 请求（聚合流式文本，供缓存写入）；瞬时故障（429/5xx/网络）指数退避重试，
         // 借鉴官方 harness llm-retry（可取消退避 + jitter，中止/超时不重试）
-        // 无可用技能时不暴露 skill 工具（避免模型调用必败工具）；codeMode=false（普通模式）
-        const tools = toolSchemas(browsingEnabled, false, skills.length > 0);
+        // 每轮重置流式累计：上一轮推理/正文已在 assistant 消息入上下文（见下方 messages.push）
+        streamingContent = '';
+        streamingReasoning = '';
         const requestOnce = async (): Promise<{
           toolCalls: { id: string; name: AgentToolName; arguments: string }[];
           usage?: ChatUsage;
@@ -288,11 +324,15 @@ export class AgentRuntime {
             text => {
               if (firstTokenMs === null && text.length > 0) firstTokenMs = Date.now() - roundStart;
               contentBuf += text;
+              streamingContent += text;
               sink.delta(sessionId, 'content', text);
+              maybePushContext();
             },
             text => {
               reasoningBuf += text;
+              streamingReasoning += text;
               sink.delta(sessionId, 'reasoning', text);
+              maybePushContext();
             }
           );
           return { toolCalls: res.toolCalls, usage: res.usage, content: contentBuf, reasoning: reasoningBuf };
@@ -311,6 +351,8 @@ export class AgentRuntime {
             cacheHit = true;
             // 命中不调用 API：节省量记入缓存统计，但真实用量为 0（不上报虚高的 tokens）
             await llmCache.recordHit(model, cached.promptTokens, cached.completionTokens);
+            streamingReasoning = cached.reasoning ?? '';
+            streamingContent = cached.content ?? '';
             if (cached.reasoning) sink.delta(sessionId, 'reasoning', cached.reasoning);
             if (cached.content) sink.delta(sessionId, 'content', cached.content);
             toolCalls = cached.toolCalls;
@@ -360,6 +402,9 @@ export class AgentRuntime {
         // 缓存命中轮不调 API（usage 缺省），上下文未变，沿用上轮值
         if (usage) {
           s.contextTokens = usage.promptTokens;
+          // 锚定投影：本轮准确 prompt 入锚，采样当前表面；之后表面增量（工具结果等）实时叠加到投影
+          anchoredPromptTokens = usage.promptTokens;
+          sampledSurfaceTokens = surfaceTokens(computeBreakdown());
           // 上下文构成估算：把准确的 promptTokens 按相对 token 数拆到 系统提示词/工具/对话消息，
           // 供 ContextMeter 菜单展示各部分对上下文的占用（非精确计费；messagesTokens 补齐使总和 = contextTokens）
           const systemContent = (messages[0] as { content?: string } | undefined)?.content ?? '';
@@ -393,6 +438,9 @@ export class AgentRuntime {
             function: { name: t.name, arguments: t.arguments }
           }))
         });
+        // 本轮 reasoning/正文已入 assistant 消息（reasoning_content），清空流式累计避免与 messages 重复计价
+        streamingReasoning = '';
+        streamingContent = '';
 
         // 调度本轮工具调用：门控串行确认 → 并行滚动池/独占屏障 → 模型顺序提交（借鉴官方 harness tool-calls 调度）。
         // 每次轮询前经 permissionModeSource 解析最新权限模式：运行中切换，下一轮工具立即按新模式门控（缺省用启动快照）
@@ -419,6 +467,8 @@ export class AgentRuntime {
             skills,
           }
         );
+        // 工具结果已入上下文：表面增长，推送实时投影
+        pushContext();
         if (!outcome.continueLoop) return;
         // 工具标记本轮结束（concludesTurn）：本轮不再回模型，直接完成运行
         if (outcome.concluded) {

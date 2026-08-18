@@ -120,6 +120,9 @@ const api = {
       cb,
       raw => hasSessionId(raw) && typeof raw['stats'] === 'object' && raw['stats'] !== null
     ),
+  /** 订阅上下文占用投影（实时推送），返回取消订阅函数 */
+  onAgentContext: (cb: (ev: { sessionId: string; contextTokens: number; systemTokens: number; toolsTokens: number; messagesTokens: number }) => void): (() => void) =>
+    subscribe('agent:context', cb, raw => hasSessionId(raw) && typeof raw['contextTokens'] === 'number'),
   /** 订阅 agent token 用量事件（回复底部统计；usage 为 { promptTokens, completionTokens }） */
   onAgentUsage: (
     cb: (ev: { sessionId: string; usage: { promptTokens: number; completionTokens: number } }) => void

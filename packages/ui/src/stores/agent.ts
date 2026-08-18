@@ -392,6 +392,19 @@ const sessionStats = computed<SessionStats | null>(() => {
   }
   }
 
+  /** 上下文占用投影：实时更新会话统计的 context/system/tools/messages（仅内存；run 结束的 sessionStats 才落库） */
+  function onContext(ev: { sessionId: string; contextTokens: number; systemTokens: number; toolsTokens: number; messagesTokens: number }) {
+    const session = sessionStore.sessions.find(s => s.id === ev.sessionId);
+    if (!session) return;
+    if (!session.stats) {
+      session.stats = { rounds: 0, llmMs: 0, toolMs: 0, firstTokenMsSum: 0, firstTokenCount: 0, promptTokens: 0, completionTokens: 0, cacheHits: 0, cacheMisses: 0, cacheHitTokens: 0, cacheMissTokens: 0 };
+    }
+    session.stats.contextTokens = ev.contextTokens;
+    session.stats.systemTokens = ev.systemTokens;
+    session.stats.toolsTokens = ev.toolsTokens;
+    session.stats.messagesTokens = ev.messagesTokens;
+  }
+
   let subscribed = false;
   function subscribeEvents(): void {
     if (!host || subscribed) return;
@@ -404,6 +417,7 @@ const sessionStats = computed<SessionStats | null>(() => {
     host.onAgentUsage(onUsage);
     host.onWorkspaceDiff(onWorkspaceDiff);
     host.onSessionStats(onSessionStats);
+    host.onAgentContext(onContext);
   }
 
   subscribeEvents();

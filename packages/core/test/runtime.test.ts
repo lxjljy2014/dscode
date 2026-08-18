@@ -14,6 +14,7 @@ const noopSink: AgentEventSink = {
   done: () => {},
   error: () => {},
   sessionStats: () => {},
+  context: () => {},
   diff: () => {}
 };
 
@@ -249,5 +250,41 @@ describe('LLM 回复缓存重放（相同请求第二次运行不调 API）', ()
       closeCacheDbs();
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// ---- 上下文占用投影：实时推送（不等待 usage） ----
+
+describe('上下文占用投影（anchored projection）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('运行中推送 context（初始 + 流式增量，无 usage 时为纯启发式）', async () => {
+    const textChunk = new TextEncoder().encode('data: {"choices":[{"delta":{"content":"hello world"}}]}\n\ndata: [DONE]\n\n');
+    const fetchMock = vi.fn(async () => mockSseResponse([textChunk]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const projections: number[] = [];
+    const sink: AgentEventSink = {
+      ...noopSink,
+      context: (_s, p) => projections.push(p.contextTokens),
+      done: () => {}
+    };
+    const rt = new AgentRuntime();
+    await rt.start({
+      ...baseInput,
+      sink,
+      config: {
+        workingDirectory: '/tmp',
+        permissionMode: 'full-access',
+        providers: [{ id: 'p', name: 'P', baseUrl: 'https://api.example.com', apiKey: 'k', models: ['m1'] }]
+      }
+    });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    // 至少初始一次 + 流式增量一次；系统提示词/工具 schema 非空，启发式占用 > 0
+    expect(projections.length).toBeGreaterThanOrEqual(2);
+    expect(projections[0]).toBeGreaterThan(0);
   });
 });

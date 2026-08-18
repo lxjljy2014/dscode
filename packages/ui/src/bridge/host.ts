@@ -81,6 +81,8 @@ export interface HostApi {
   onAgentDone: (cb: (ev: { sessionId: string }) => void) => () => void;
   /** 订阅会话级运行统计（输入卡片下方统计条） */
   onSessionStats: (cb: (ev: { sessionId: string; stats: SessionStats }) => void) => () => void;
+  /** 订阅上下文占用投影（实时推送），返回取消订阅函数 */
+  onAgentContext: (cb: (ev: { sessionId: string; contextTokens: number; systemTokens: number; toolsTokens: number; messagesTokens: number }) => void) => () => void;
   onAgentError: (cb: (ev: AgentErrorEvent) => void) => () => void;
   /** 订阅 agent token 用量事件（回复底部统计：首token/token 速率） */
   onAgentUsage: (cb: (ev: AgentUsageEvent) => void) => () => void;
