@@ -126,7 +126,9 @@
     "planOff": "Plan mode off",
     "modelCurrent": "Current model: ",
     "modelSwitched": "Model switched to: ",
-    "modelInvalid": "Unknown model: {value} (available: {list})"
+    "modelInvalid": "Unknown model: {value} (available: {list})",
+    "compactDone": "Conversation history compacted",
+    "compactFailed": "Compaction failed"
   },
   "project": {
     "search": "Search projects",

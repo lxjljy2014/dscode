@@ -34,6 +34,7 @@ import {
 } from '@dscode/core';
 import { resolveConfirm, startAgent, stopAgent } from './agent/agent';
 import { authorizeAttachmentPaths, isAuthorizedAttachmentPath, readAttachment } from './attachment';
+import { compactSession } from './compact';
 import { loadAppSettings, saveAppSettings } from './settings';
 import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './shell/terminal';
 import { isMessage, isSession, isSessionStats, isSettingsPatch, isString, parseTerminalSize } from './validators';
@@ -303,6 +304,12 @@ export function registerIpcHandlers(): void {
       setSessionStats(sessionsRoot, sessionId, stats);
       return { ok: true };
     })
+  );
+  ipcMain.handle(
+    'session:compact',
+    withMainWindow((_win, sessionId: unknown) =>
+      isString(sessionId) ? compactSession(sessionId) : { ok: false as const, error: 'invalid args' }
+    )
   );
   ipcMain.handle(
     'git:list-branches',

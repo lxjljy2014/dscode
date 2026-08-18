@@ -455,12 +455,9 @@ export function getSessionStats(rootDir: string, sessionId: string): SessionStat
   if (!dir) return undefined;
   return readMeta(dir)?.stats;
 }
-export function upsertMessage(rootDir: string, sessionId: string, message: Message): void {
-  const dir = findSessionDir(rootDir, sessionId);
-  // 会话目录不存在（渲染端应先 persistSession 再 append）时静默跳过，避免孤儿文件
-  if (!dir) return;
-  const file = logFile(dir);
-  const line = JSON.stringify({
+/** 序列化一条消息为 JSONL 行（upsertMessage / rewriteSessionMessages 共用） */
+function serializeMessage(message: Message): string {
+  return JSON.stringify({
     id: message.id,
     role: message.role,
     content: message.content,
@@ -471,6 +468,14 @@ export function upsertMessage(rootDir: string, sessionId: string, message: Messa
     ...(message.attachments && message.attachments.length > 0 ? { attachments: message.attachments } : {}),
     ...(message.contexts && message.contexts.length > 0 ? { contexts: message.contexts } : {})
   });
+}
+
+export function upsertMessage(rootDir: string, sessionId: string, message: Message): void {
+  const dir = findSessionDir(rootDir, sessionId);
+  // 会话目录不存在（渲染端应先 persistSession 再 append）时静默跳过，避免孤儿文件
+  if (!dir) return;
+  const file = logFile(dir);
+  const line = serializeMessage(message);
   const ids = loadKnownIds(file);
   if (ids.has(message.id)) {
     // 幂等重写（流式更新同一消息）：仅此时读全文件定位该行重写
@@ -492,6 +497,16 @@ export function upsertMessage(rootDir: string, sessionId: string, message: Messa
   }
   appendFileSync(file, line + '\n', 'utf8');
   ids.add(message.id);
+}
+
+/** 全量重写会话消息日志（compact 替换消息列表后落盘）；并失效消息 id 缓存 */
+export function rewriteSessionMessages(rootDir: string, sessionId: string, messages: readonly Message[]): void {
+  const dir = findSessionDir(rootDir, sessionId);
+  if (!dir) return;
+  const file = logFile(dir);
+  const lines = messages.map(serializeMessage);
+  writeFileSync(file, lines.length > 0 ? lines.join('\n') + '\n' : '', 'utf8');
+  knownMessageIds.delete(file);
 }
 
 /** 把无工作空间归属的旧会话回填到当前工作目录（并移入对应工作空间目录） */

@@ -5,6 +5,7 @@ import type { Command, MessageAttachment, MessageContext, PermissionMode } from 
 import { useSessionStore } from '../../stores/session';
 import { useSettingsStore } from '../../stores/settings';
 import { usePluginsStore } from '../../stores/plugins';
+import { useAgentStore } from '../../stores/agent';
 import { host } from '../../bridge/host';
 import GitBranchMenu from '../git/GitBranchMenu.vue';
 import PermissionSelector from './PermissionSelector.vue';
@@ -29,6 +30,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const sessionStore = useSessionStore();
 const settingsStore = useSettingsStore();
+const agentStore = useAgentStore();
 const input = ref('');
 
 // ---- 附件 / @ 引用（输入卡片预览，发送时随消息携带） ----
@@ -288,6 +290,11 @@ async function runAction(cmd: Command, rest: string): Promise<ActionResult> {
       }
       model.value = arg;
       notify(`${t('command.modelSwitched')} ${arg}`);
+      return { handled: true };
+    }
+    case 'compact': {
+      const r = await agentStore.compactSession();
+      notify(r.ok ? t('command.compactDone') : (r.error ?? t('command.compactFailed')));
       return { handled: true };
     }
     default:

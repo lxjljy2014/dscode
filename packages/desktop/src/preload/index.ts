@@ -149,6 +149,8 @@ const api = {
     ipcRenderer.invoke('sessions:archive', sessionId, archived),
   sessionsStats: (sessionId: string, stats: SessionStats): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('sessions:stats', sessionId, stats),
+  compactSession: (sessionId: string): Promise<{ ok: true; messages: Message[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('session:compact', sessionId),
 
   // ---- 使用统计 ----
   usageList: (): Promise<UsageRecord[]> => ipcRenderer.invoke('usage:list'),

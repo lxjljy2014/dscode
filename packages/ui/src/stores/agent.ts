@@ -246,6 +246,23 @@ const sessionStats = computed<SessionStats | null>(() => {
     void host.agentConfirmResponse(toolEventId, decision);
   }
 
+  /** 压缩会话历史（/compact）：主进程摘要旧消息并替换为检查点，成功后更新内存态 */
+  async function compactSession(): Promise<{ ok: boolean; error?: string }> {
+    if (!host) return { ok: false, error: 'IPC 不可用' };
+    const session = sessionStore.activeSession;
+    if (!session) return { ok: false, error: '无激活会话' };
+    try {
+      const r = await host.compactSession(session.id);
+      if (r.ok) {
+        session.messages = r.messages;
+        return { ok: true };
+      }
+      return { ok: false, error: r.error };
+    } catch {
+      return { ok: false, error: 'IPC 调用异常' };
+    }
+  }
+
   // ---- agent/workspace 事件订阅（按 sessionId 分发） ----
 
   function onDelta(ev: { sessionId: string; content: string; kind: 'content' | 'reasoning' }) {
@@ -422,5 +439,5 @@ const sessionStats = computed<SessionStats | null>(() => {
 
   subscribeEvents();
 
-  return { generating, pendingConfirm, diffFiles, sessionStats, sendMessage, stopGenerating, respondConfirm };
+  return { generating, pendingConfirm, diffFiles, sessionStats, sendMessage, stopGenerating, respondConfirm, compactSession };
 });

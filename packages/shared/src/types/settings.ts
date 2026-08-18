@@ -36,7 +36,7 @@ export interface ProviderConfig {
 }
 
 /** 斜杠命令的内置动作：命中后直接执行真实操作（而非展开为提示词发送） */
-export type CommandAction = 'permission' | 'plan' | 'model';
+export type CommandAction = 'permission' | 'plan' | 'model' | 'compact';
 
 /** 用户自定义斜杠命令（/name 展开为 prompt） */
 export interface Command {
@@ -254,8 +254,8 @@ export const DEFAULT_COMMANDS: Command[] = [
     id: 'builtin-compact',
     name: 'compact',
     description: '压缩较旧的对话历史',
-    prompt:
-      '请总结本次对话的完整上下文，输出一份精炼摘要：关键目标、已确认的决策、已完成事项与待办事项，供压缩历史后延续工作使用。'
+    action: 'compact',
+    prompt: '压缩较旧的对话历史，生成结构化检查点并替换旧消息。'
   },
   {
     id: 'builtin-goal',
