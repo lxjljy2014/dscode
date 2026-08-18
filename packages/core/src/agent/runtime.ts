@@ -13,7 +13,7 @@ import type { LlmCache } from '../cache/llm-cache';
 import { isConfirmDecision } from '../gate/gate';
 import { toolSchemas } from '../tools';
 import { DiffSnapshotStore } from '../workspace/diff';
-import { estimateTokens } from './token-estimate';
+import { estimateMessageTokens, estimateSystemTokens, estimateTokens, estimateToolsTokens } from './token-estimate';
 import { executeToolBatch } from './tool-batch';
 import type { AgentEventSink } from './types';
 
@@ -268,10 +268,11 @@ export class AgentRuntime {
       let lastContextPush = 0;
       const computeBreakdown = (): { systemTokens: number; toolsTokens: number; messagesTokens: number } => {
         const systemContent = (messages[0] as { content?: string } | undefined)?.content ?? '';
-        const systemTokens = estimateTokens(systemContent);
-        const toolsTokens = estimateTokens(JSON.stringify(tools));
-        const messagesTokens =
-          estimateTokens(JSON.stringify(messages.slice(1))) + estimateTokens(streamingContent) + estimateTokens(streamingReasoning);
+        const systemTokens = estimateSystemTokens(systemContent);
+        const toolsTokens = estimateToolsTokens(tools);
+        let messagesTokens = 0;
+        for (const m of messages.slice(1)) messagesTokens += estimateMessageTokens(m);
+        messagesTokens += estimateTokens(streamingContent) + estimateTokens(streamingReasoning);
         return { systemTokens, toolsTokens, messagesTokens };
       };
       const surfaceTokens = (b: { systemTokens: number; toolsTokens: number; messagesTokens: number }): number =>
@@ -405,12 +406,13 @@ export class AgentRuntime {
           // 锚定投影：本轮准确 prompt 入锚，采样当前表面；之后表面增量（工具结果等）实时叠加到投影
           anchoredPromptTokens = usage.promptTokens;
           sampledSurfaceTokens = surfaceTokens(computeBreakdown());
-          // 上下文构成估算：把准确的 promptTokens 按相对 token 数拆到 系统提示词/工具/对话消息，
-          // 供 ContextMeter 菜单展示各部分对上下文的占用（非精确计费；messagesTokens 补齐使总和 = contextTokens）
+          // 上下文构成估算：把准确的 promptTokens 按启发式构成占比拆分（非精确计费；messages 补齐使总和 = contextTokens）。
+          // 不含流式累计——流式是本次请求的输出，不是本次请求的输入构成。
           const systemContent = (messages[0] as { content?: string } | undefined)?.content ?? '';
-          const rawSystem = estimateTokens(systemContent);
-          const rawTools = estimateTokens(JSON.stringify(tools));
-          const rawMessages = estimateTokens(JSON.stringify(messages.slice(1)));
+          const rawSystem = estimateSystemTokens(systemContent);
+          const rawTools = estimateToolsTokens(tools);
+          let rawMessages = 0;
+          for (const m of messages.slice(1)) rawMessages += estimateMessageTokens(m);
           const rawTotal = rawSystem + rawTools + rawMessages;
           if (rawTotal > 0) {
             s.systemTokens = Math.round((usage.promptTokens * rawSystem) / rawTotal);
