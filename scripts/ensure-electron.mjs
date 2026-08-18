@@ -17,12 +17,14 @@ try {
   process.exit(0); // electron 未安装（部分 CI / 精简安装），跳过
 }
 
+// 镜像选择：本地默认走 npmmirror（国内快）；CI（GitHub Actions 等境外机器）走官方源，避免国内镜像拖慢
+const env = { ...process.env };
+const mirror = process.env.ELECTRON_MIRROR || (process.env.CI ? '' : 'https://npmmirror.com/mirrors/electron/');
+if (mirror) env.ELECTRON_MIRROR = mirror;
+
 const result = spawnSync(process.execPath, [installJs], {
   stdio: 'inherit',
-  env: {
-    ...process.env,
-    ELECTRON_MIRROR: process.env.ELECTRON_MIRROR || 'https://npmmirror.com/mirrors/electron/'
-  }
+  env
 });
 if (result.status !== 0) {
   console.warn('[ensure-electron] 预下载 Electron 失败（退出码 ' + result.status + '），pnpm dev 时会按默认源懒下载');
