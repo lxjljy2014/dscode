@@ -138,7 +138,7 @@ onMounted(() => {
           <!-- 回到底部：圆形悬浮按钮，固定在输入卡片右上方 -->
           <VBtn
             v-if="!stickToBottom"
-            icon="i-lucide:arrow-big-down"
+            icon="i-lucide:chevron-down"
             variant="tonal"
             size="small"
             rounded="circle"
