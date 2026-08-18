@@ -15,8 +15,14 @@ export const usePluginsStore = defineStore('plugins', () => {
     if (loaded.value || !host) return;
     if (!loadPromise) {
       loadPromise = (async () => {
-        plugins.value = await host.pluginsList();
-        loaded.value = true;
+        try {
+          plugins.value = await host.pluginsList();
+          loaded.value = true;
+        } catch (e) {
+          // 失败重置：下一次 load 重试，避免被 rejected Promise 永久卡住
+          loadPromise = null;
+          throw e;
+        }
       })();
     }
     await loadPromise;

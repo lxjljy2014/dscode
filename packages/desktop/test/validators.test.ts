@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isChatMessagePayload, isMessage, isSession, isSettingsPatch, isString, parseTerminalSize } from '../src/main/validators';
+import { isChatMessagePayload, isMessage, isSession, isSessionStats, isSettingsPatch, isString, parseTerminalSize } from '../src/main/validators';
 
 describe('isString', () => {
   it('字符串为真，其余为假', () => {
@@ -185,6 +185,31 @@ describe('isSettingsPatch', () => {
     expect(isSettingsPatch(null)).toBe(false);
     expect(isSettingsPatch('x')).toBe(false);
     expect(isSettingsPatch([])).toBe(false);
+  });
+});
+
+describe('isSessionStats', () => {
+  const full = {
+    rounds: 1, llmMs: 100, toolMs: 50,
+    firstTokenMsSum: 30, firstTokenCount: 1,
+    promptTokens: 500, completionTokens: 200,
+    cacheHits: 1, cacheMisses: 2, cacheHitTokens: 400, cacheMissTokens: 100,
+    contextTokens: 600, systemTokens: 50, toolsTokens: 150, messagesTokens: 400
+  };
+
+  it('全字段合法通过', () => {
+    expect(isSessionStats(full)).toBe(true);
+  });
+
+  it('缺必填字段拒绝', () => {
+    const { cacheHits: _omit, ...rest } = full;
+    expect(isSessionStats(rest)).toBe(false);
+    expect(isSessionStats({ rounds: 1, llmMs: 100, toolMs: 50 })).toBe(false);
+  });
+
+  it('NaN/Infinity 拒绝', () => {
+    expect(isSessionStats({ ...full, rounds: NaN })).toBe(false);
+    expect(isSessionStats({ ...full, promptTokens: Infinity })).toBe(false);
   });
 });
 

@@ -4,17 +4,6 @@ import type { FileNode } from '@dscode/shared';
 import { host } from '../bridge/host';
 import { useSettingsStore } from './settings';
 
-function findFileNode(nodes: FileNode[], path: string): FileNode | null {
-  for (const node of nodes) {
-    if (node.path === path) return node.type === 'file' ? node : null;
-    if (node.children) {
-      const found = findFileNode(node.children, path);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
 /**
  * 工作区域 store：文件树 / 文件内容缓存 / 选中文件。
  * 自 session store 拆出，职责收敛到「工作区文件浏览」。
@@ -25,10 +14,23 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   /** 已加载的文件内容缓存（path → content） */
   const fileContents = ref<Record<string, string>>({});
 
+  /** 文件树扁平索引（path → node）：selectedFile 从 O(n) 递归降为 O(1) 查表 */
+  const nodeIndex = computed(() => {
+    const map = new Map<string, FileNode>();
+    const walk = (nodes: FileNode[]): void => {
+      for (const n of nodes) {
+        map.set(n.path, n);
+        if (n.children) walk(n.children);
+      }
+    };
+    walk(fileTree.value);
+    return map;
+  });
+
   const selectedFile = computed(() => {
     if (!selectedFilePath.value) return null;
-    const node = findFileNode(fileTree.value, selectedFilePath.value);
-    if (!node) return null;
+    const node = nodeIndex.value.get(selectedFilePath.value);
+    if (!node || node.type !== 'file') return null;
     return { ...node, content: fileContents.value[node.path] ?? '' };
   });
 
@@ -43,8 +45,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   async function loadTree(): Promise<void> {
     if (!host) return;
-    // 工作目录切换：清空旧工作区的文件内容缓存，避免无界增长
+    // 工作目录切换：清空旧工作区的文件内容缓存与选中态，避免无界增长/残留脏高亮
     fileContents.value = {};
+    selectedFilePath.value = null;
     fileTree.value = await host.workspaceTree();
   }
 

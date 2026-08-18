@@ -8,6 +8,9 @@ import type { AgentToolEvent, AppSettings, AssistantStep, ChatMessagePayload, Me
 
 export const isString = (v: unknown): v is string => typeof v === 'string';
 
+/** 有限数字（排除 NaN/Infinity，避免污染持久化） */
+const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
 export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
@@ -94,11 +97,11 @@ function isMessageStats(v: unknown): v is Message['stats'] {
   if (!isRecord(v)) return false;
   const r = v as Record<string, unknown>;
   return (
-    typeof r['startAt'] === 'number' &&
-    typeof r['endAt'] === 'number' &&
-    (r['firstTokenMs'] === undefined || typeof r['firstTokenMs'] === 'number') &&
-    (r['promptTokens'] === undefined || typeof r['promptTokens'] === 'number') &&
-    (r['completionTokens'] === undefined || typeof r['completionTokens'] === 'number')
+    isFiniteNumber(r['startAt']) &&
+    isFiniteNumber(r['endAt']) &&
+    (r['firstTokenMs'] === undefined || isFiniteNumber(r['firstTokenMs'])) &&
+    (r['promptTokens'] === undefined || isFiniteNumber(r['promptTokens'])) &&
+    (r['completionTokens'] === undefined || isFiniteNumber(r['completionTokens']))
   );
 }
 
@@ -140,7 +143,7 @@ export function isMessage(v: unknown): v is Message {
     isString(r['id']) &&
     (r['role'] === 'user' || r['role'] === 'assistant') &&
     isString(r['content']) &&
-    typeof r['createdAt'] === 'number' &&
+    isFiniteNumber(r['createdAt']) &&
     (r['errorCode'] === undefined || isString(r['errorCode'])) &&
     (r['steps'] === undefined || isAssistantSteps(r['steps'])) &&
     (r['stats'] === undefined || isMessageStats(r['stats'])) &&
@@ -155,13 +158,21 @@ export function isSessionStats(v: unknown): v is SessionStats {
   if (!isRecord(v)) return false;
   const s = v as Record<string, unknown>;
   return (
-    typeof s['rounds'] === 'number' &&
-    typeof s['llmMs'] === 'number' &&
-    typeof s['toolMs'] === 'number' &&
-    (s['contextTokens'] === undefined || typeof s['contextTokens'] === 'number') &&
-    (s['systemTokens'] === undefined || typeof s['systemTokens'] === 'number') &&
-    (s['toolsTokens'] === undefined || typeof s['toolsTokens'] === 'number') &&
-    (s['messagesTokens'] === undefined || typeof s['messagesTokens'] === 'number')
+    isFiniteNumber(s['rounds']) &&
+    isFiniteNumber(s['llmMs']) &&
+    isFiniteNumber(s['toolMs']) &&
+    isFiniteNumber(s['firstTokenMsSum']) &&
+    isFiniteNumber(s['firstTokenCount']) &&
+    isFiniteNumber(s['promptTokens']) &&
+    isFiniteNumber(s['completionTokens']) &&
+    isFiniteNumber(s['cacheHits']) &&
+    isFiniteNumber(s['cacheMisses']) &&
+    isFiniteNumber(s['cacheHitTokens']) &&
+    isFiniteNumber(s['cacheMissTokens']) &&
+    (s['contextTokens'] === undefined || isFiniteNumber(s['contextTokens'])) &&
+    (s['systemTokens'] === undefined || isFiniteNumber(s['systemTokens'])) &&
+    (s['toolsTokens'] === undefined || isFiniteNumber(s['toolsTokens'])) &&
+    (s['messagesTokens'] === undefined || isFiniteNumber(s['messagesTokens']))
   );
 }
 
@@ -172,8 +183,8 @@ export function isSession(v: unknown): v is Session {
     isString(r['id']) &&
     isString(r['title']) &&
     typeof r['workingDirectory'] === 'string' &&
-    typeof r['createdAt'] === 'number' &&
-    typeof r['updatedAt'] === 'number' &&
+    isFiniteNumber(r['createdAt']) &&
+    isFiniteNumber(r['updatedAt']) &&
     (r['archived'] === undefined || typeof r['archived'] === 'boolean')
   );
 }

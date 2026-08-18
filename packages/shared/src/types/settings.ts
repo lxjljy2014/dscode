@@ -208,7 +208,6 @@ export const DEFAULT_SKILLS: Skill[] = [
 ];
 
 /** 内置默认子智能体：首次启动（无自定义）时预置 */
-/** 内置默认子智能体：首次启动（无自定义）时预置 */
 export const DEFAULT_SUBAGENTS: Subagent[] = [
   {
     id: 'code-review',

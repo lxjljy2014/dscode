@@ -183,6 +183,7 @@
       "write_file": "写入文件",
       "edit_file": "编辑文件",
       "browse": "浏览网页",
+      "run_code": "运行程序",
       "skill": "加载技能"
     },
     "verb": {
@@ -193,6 +194,7 @@
       "write_file": "写入",
       "edit_file": "编辑",
       "browse": "浏览",
+      "run_code": "运行",
       "skill": "加载技能"
     },
     "status": {

@@ -106,14 +106,6 @@ function mergeLegacyDb(dbDir: string, source: { file: string; tables: string[] }
 
 /**
  * 数据迁移（幂等，启动时在数据库/设置被打开之前调用）：
- * 1) 旧位置（userData/根目录/旧 db 目录）的应用文件集中到 ~/.dscode
- * 2) sessions.db → sessions/（sessions.ts 负责 JSONL 化）
- * 3) usage/cache/projects/index 四个旧库 → 合并为一个 dscode.db
- * 4) settings.json → config/（单文件 → 拆分由 config.ts loadSettings 完成）
- * 5) 清理已废弃的空功能域目录
- */
-/**
- * 数据迁移（幂等，启动时在数据库/设置被打开之前调用）：
  * 1) 旧位置（userData/根目录/旧 db 目录/按域目录）的应用文件集中到 ~/.dscode
  * 2) sessions.db → sessions/（sessions.ts 负责 JSONL 化）
  * 3) usage/cache/projects/index 四个旧库 → 合并为一个 dscode.db

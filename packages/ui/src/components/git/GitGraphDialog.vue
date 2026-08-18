@@ -19,7 +19,11 @@ const error = ref('');
 const rows = ref<GitGraphRow[]>([]);
 
 // 图列对齐宽度：最长的图谱前缀（含纯线条行），至少 8 列
-const graphPad = computed(() => Math.max(8, ...rows.value.map(r => r.graph.length)));
+const graphPad = computed(() => {
+  let max = 8;
+  for (const r of rows.value) if (r.graph.length > max) max = r.graph.length;
+  return max;
+});
 
 watch(model, async open => {
   if (!open || !host) return;

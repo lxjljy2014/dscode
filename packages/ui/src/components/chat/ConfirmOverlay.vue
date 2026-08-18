@@ -49,12 +49,20 @@ const selected = ref(0);
 /** 卡片根元素：弹出时聚焦以接收键盘事件 */
 const rootRef = ref<HTMLElement>();
 
+/** 卡片出现前聚焦的元素（消失后归还焦点用） */
+let prevFocus: HTMLElement | null = null;
+
 // 卡片出现时聚焦并重置选中；消失后把焦点还给输入框（供继续输入）
 watch(confirm, async c => {
   if (c) {
     selected.value = 0;
+    prevFocus = document.activeElement as HTMLElement | null;
     await nextTick();
     rootRef.value?.focus();
+  } else if (prevFocus) {
+    await nextTick();
+    prevFocus.focus();
+    prevFocus = null;
   }
 });
 

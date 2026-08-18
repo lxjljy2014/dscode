@@ -439,8 +439,6 @@ export function setSessionArchived(rootDir: string, sessionId: string, archived:
   writeJsonAtomic(metaFile(dir), { ...meta, archived, updatedAt: Date.now() });
 }
 
-/** 追加一条消息（同 id 幂等：重写该行而非重复追加；消息日志保持 append-only 语义） */
-
 /** 更新会话级运行统计（随 meta.json 持久化，重开会话后输入卡片下方统计条恢复展示） */
 export function setSessionStats(rootDir: string, sessionId: string, stats: SessionStats): void {
   const dir = findSessionDir(rootDir, sessionId);

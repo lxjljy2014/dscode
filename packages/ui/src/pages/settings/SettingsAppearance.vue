@@ -14,10 +14,10 @@ const theme = computed<ThemeMode>({
   }
 });
 
-const options: { value: ThemeMode; icon: string; label: string }[] = [
+const options = computed<{ value: ThemeMode; icon: string; label: string }[]>(() => [
   { value: 'light', icon: 'i-lucide:sun', label: t('settingsPage.appearance.light') },
   { value: 'dark', icon: 'i-lucide:moon', label: t('settingsPage.appearance.dark') }
-];
+]);
 </script>
 
 <template>

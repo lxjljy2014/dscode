@@ -89,10 +89,6 @@ export function approvalSignature(name: AgentToolName, argsJson: string): string
 }
 
 /**
- * 统一执行入口：解析 JSON 参数 → schema 校验 → 分发执行（超时/取消经 ctx.signal 传递）→ 异常兜底。
- * 参数校验失败与执行失败都返回结构化错误，供模型下次修正参数。
- */
-/**
  * 统一执行入口：解析 JSON 参数 → schema 校验 → 执行管线（pre → guard → around(execute) → post → onResult）→ 异常兜底。
  * 参数校验失败与执行失败都返回结构化错误，供模型下次修正参数。
  */

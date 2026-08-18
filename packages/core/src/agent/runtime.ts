@@ -368,7 +368,7 @@ export class AgentRuntime {
         if (cacheHit) s.cacheHits += 1;
         else s.cacheMisses += 1;
         if (toolCalls.length === 0) {
-sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion, cachedPromptTokens: totalCachedPrompt });
+          sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion, cachedPromptTokens: totalCachedPrompt });
           sink.done(sessionId);
           return;
         }
@@ -414,7 +414,7 @@ sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalComple
         if (!outcome.continueLoop) return;
         // 工具标记本轮结束（concludesTurn）：本轮不再回模型，直接完成运行
         if (outcome.concluded) {
-sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion, cachedPromptTokens: totalCachedPrompt });
+          sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion, cachedPromptTokens: totalCachedPrompt });
           sink.done(sessionId);
           return;
         }

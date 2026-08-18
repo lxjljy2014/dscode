@@ -183,6 +183,7 @@
       "write_file": "Write file",
       "edit_file": "Edit file",
       "browse": "Browse web",
+      "run_code": "Run program",
       "skill": "Load skill"
     },
     "verb": {
@@ -193,6 +194,7 @@
       "write_file": "Write",
       "edit_file": "Edit",
       "browse": "Browse",
+      "run_code": "Run",
       "skill": "Load"
     },
     "status": {
