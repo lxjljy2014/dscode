@@ -163,6 +163,15 @@ function normalizeProviders(providers: ProviderConfig[]): ProviderConfig[] {
   );
 }
 
+/** 归一化命令：把旧数据的 builtin-compact（提示词模板）迁移为 action 命令 */
+function normalizeCommands(commands: Command[]): Command[] {
+  return commands.map(c =>
+    c.id === 'builtin-compact' && c.action === undefined
+      ? { ...c, action: 'compact' as const }
+      : c
+  );
+}
+
 function decryptProviders(providers: ProviderConfig[], crypto?: SettingsCrypto): ProviderConfig[] {
   if (!crypto) return providers;
   return providers.map(p => {
@@ -204,7 +213,7 @@ function normalizeField(field: keyof AppSettings, value: unknown, fallback: unkn
       // 文件缺失（undefined）回退内置技能；显式空数组尊重用户删除
       return Array.isArray(value) ? value.filter(isSkill) : fallback;
     case 'commands':
-      return Array.isArray(value) ? value.filter(isCommand) : fallback;
+      return normalizeCommands(Array.isArray(value) ? value.filter(isCommand) : (fallback as Command[]));
     case 'hooks':
       return Array.isArray(value) ? value.filter(isHook) : fallback;
     case 'subagents': {

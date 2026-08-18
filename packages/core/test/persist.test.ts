@@ -224,6 +224,15 @@ describe('config 持久化（按域拆分配置文件）', () => {
     ]);
   });
 
+  it('旧 builtin-compact（无 action）加载时迁移为动作命令', async () => {
+    await writeFile(
+      join(configDir, 'commands.json'),
+      JSON.stringify({ commands: [{ id: 'builtin-compact', name: 'compact', description: '压缩', prompt: '旧提示词' }] })
+    );
+    const loaded = loadSettings(configDir, home);
+    expect(loaded.commands.find(c => c.id === 'builtin-compact')?.action).toBe('compact');
+  });
+
   it('memory 落库读回并过滤非法项', () => {
     const saved = saveSettings(configDir, home, {
       memory: [
