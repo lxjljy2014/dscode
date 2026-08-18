@@ -106,7 +106,7 @@ export interface HostApi {
   cacheClear: () => Promise<LlmCacheStats>;
 
   // ---- MCP ----
-  listMcpTools: (command: string, args: string[]) => Promise<McpListToolsResult>;
+  listMcpTools: (serverId: string) => Promise<McpListToolsResult>;
 
   // ---- 插件 ----
   pluginsList: () => Promise<Plugin[]>;

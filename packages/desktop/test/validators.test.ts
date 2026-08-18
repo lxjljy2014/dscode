@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isChatMessagePayload, isMessage, isSession, isString, parseTerminalSize } from '../src/main/validators';
+import { isChatMessagePayload, isMessage, isSession, isSettingsPatch, isString, parseTerminalSize } from '../src/main/validators';
 
 describe('isString', () => {
   it('字符串为真，其余为假', () => {
@@ -170,6 +170,23 @@ describe('parseTerminalSize', () => {
     expect(parseTerminalSize('80', 24)).toBeNull();
     expect(parseTerminalSize(80, '24')).toBeNull();
   });
+});
+
+describe('isSettingsPatch', () => {
+  it('白名单字段通过', () => {
+    expect(isSettingsPatch({ workingDirectory: '/x' })).toBe(true);
+    expect(isSettingsPatch({ permissionMode: 'plan', browsingEnabled: false })).toBe(true);
+    expect(isSettingsPatch({})).toBe(true);
+  });
+
+  it('未知 key / 非对象拒绝', () => {
+    expect(isSettingsPatch({ evil: 1 })).toBe(false);
+    expect(isSettingsPatch({ workingDirectory: '/x', evil: 1 })).toBe(false);
+    expect(isSettingsPatch(null)).toBe(false);
+    expect(isSettingsPatch('x')).toBe(false);
+    expect(isSettingsPatch([])).toBe(false);
+  });
+});
 
 describe('isMessage 工具事件步骤', () => {
   it('接受 run_code / skill 工具事件（历史重建不被拒绝）', () => {
@@ -183,5 +200,4 @@ describe('isMessage 工具事件步骤', () => {
     expect(isMessage(mk('run_code'))).toBe(true);
     expect(isMessage(mk('skill'))).toBe(true);
   });
-});
 });

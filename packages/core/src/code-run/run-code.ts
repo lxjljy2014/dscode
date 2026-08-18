@@ -77,7 +77,8 @@ type WorkerMsg =
   | ToolCallMsg
   | { type: 'done'; value: unknown }
   | { type: 'error'; message: string }
-  | { type: 'tool-result'; id: number; result: { ok: boolean; content?: string; error?: string } };
+  | { type: 'tool-result'; id: number; result: { ok: boolean; content?: string; error?: string } }
+  | { type: 'console'; level: string; args: string[] };
 
 async function runProgram(
   code: string,
@@ -107,6 +108,11 @@ async function runProgram(
             result: result.ok ? { ok: true, content: result.content } : { ok: false, error: result.error },
           });
         })();
+        return;
+      }
+      if (msg.type === 'console') {
+        const fn = msg.level === 'error' ? console.error : msg.level === 'warn' ? console.warn : console.log;
+        fn('[run_code]', ...msg.args);
         return;
       }
       if (msg.type === 'done') {

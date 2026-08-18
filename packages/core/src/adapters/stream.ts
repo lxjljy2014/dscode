@@ -1,5 +1,5 @@
 import type { AgentToolName } from '@dscode/shared';
-import type { AccumulatedToolCall, ChatRequestInput, ChatUsage, ModelAdapter } from './types';
+import type { AccumulatedToolCall, ChatRequestInput, ChatUsage, ModelAdapter, NormalizedDelta } from './types';
 
 /** HTTP 非 2xx 错误（携带状态码与响应体片段，供上层映射 agent:error） */
 export class ApiError extends Error {
@@ -39,6 +39,29 @@ export async function streamChat(
   let usage: ChatUsage | undefined;
   let ended = false;
 
+  /** 应用一个归一化增量（文本/思维链/工具调用/usage），供循环与尾帧共用 */
+  const applyDelta = (delta: NormalizedDelta | null | undefined): void => {
+    if (delta === null) {
+      ended = true;
+      return;
+    }
+    if (!delta) return;
+    if (delta.content) onDelta(delta.content);
+    if (delta.reasoning) onReasoning(delta.reasoning);
+    if (delta.usage) usage = delta.usage;
+    for (const raw of delta.toolCalls ?? []) {
+      const index = raw.index >= 0 ? raw.index : toolCalls.size;
+      let acc = toolCalls.get(index);
+      if (!acc) {
+        acc = { index, id: '', name: '' as AgentToolName, arguments: '' };
+        toolCalls.set(index, acc);
+      }
+      if (typeof raw.id === 'string') acc.id = raw.id;
+      if (typeof raw.name === 'string') acc.name = raw.name as AgentToolName;
+      if (typeof raw.arguments === 'string') acc.arguments += raw.arguments;
+    }
+  };
+
   for (;;) {
     const { done, value } = await reader.read();
     if (done || ended) break;
@@ -48,29 +71,15 @@ export async function streamChat(
       const line = buffer.slice(0, nl).trim();
       buffer = buffer.slice(nl + 1);
       if (!line.startsWith('data:')) continue;
-      const data = line.slice(5).trim();
-      const delta = adapter.parseDelta(data);
-      if (delta === null) {
-        // [DONE]：流结束标志
-        ended = true;
-        break;
-      }
-      if (!delta) continue;
-      if (delta.content) onDelta(delta.content);
-      if (delta.reasoning) onReasoning(delta.reasoning);
-      if (delta.usage) usage = delta.usage;
-      for (const raw of delta.toolCalls ?? []) {
-        const index = raw.index >= 0 ? raw.index : toolCalls.size;
-        let acc = toolCalls.get(index);
-        if (!acc) {
-          acc = { index, id: '', name: '' as AgentToolName, arguments: '' };
-          toolCalls.set(index, acc);
-        }
-        if (typeof raw.id === 'string') acc.id = raw.id;
-        if (typeof raw.name === 'string') acc.name = raw.name as AgentToolName;
-        if (typeof raw.arguments === 'string') acc.arguments += raw.arguments;
-      }
+      applyDelta(adapter.parseDelta(line.slice(5).trim()));
+      if (ended) break;
     }
+  }
+  // 尾帧兜底：flush decoder 残余字节，并处理无结尾换行的最后一行（如流末尾的 usage 帧/多字节 UTF-8 截断）
+  buffer += decoder.decode();
+  const tail = buffer.trim();
+  if (!ended && tail.startsWith('data:')) {
+    applyDelta(adapter.parseDelta(tail.slice(5).trim()));
   }
   return { toolCalls: [...toolCalls.values()].sort((a, b) => a.index - b.index), usage };
 }

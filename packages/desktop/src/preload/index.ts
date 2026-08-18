@@ -155,8 +155,8 @@ const api = {
   cacheClear: (): Promise<LlmCacheStats> => ipcRenderer.invoke('usage:cache-clear'),
 
   // ---- MCP ----
-  listMcpTools: (command: string, args: string[]): Promise<McpListToolsResult> =>
-    ipcRenderer.invoke('mcp:list-tools', command, args),
+  listMcpTools: (serverId: string): Promise<McpListToolsResult> =>
+    ipcRenderer.invoke('mcp:list-tools', serverId),
 
   // ---- 插件 ----
   pluginsList: (): Promise<Plugin[]> => ipcRenderer.invoke('plugins:list'),

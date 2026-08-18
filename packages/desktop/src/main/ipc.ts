@@ -33,10 +33,10 @@ import {
   verifyProvider
 } from '@dscode/core';
 import { resolveConfirm, startAgent, stopAgent } from './agent/agent';
-import { readAttachment } from './attachment';
+import { authorizeAttachmentPaths, isAuthorizedAttachmentPath, readAttachment } from './attachment';
 import { loadAppSettings, saveAppSettings } from './settings';
 import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './shell/terminal';
-import { isMessage, isSession, isSessionStats, isString, parseTerminalSize } from './validators';
+import { isMessage, isSession, isSessionStats, isSettingsPatch, isString, parseTerminalSize } from './validators';
 import { getConfigDir, getDbFile, getPluginsDir, getSessionsDir } from './data-dir';
 
 /**
@@ -77,7 +77,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'settings:set',
     withMainWindow((_win, patch: unknown) => {
-      if (typeof patch !== 'object' || patch === null) return loadAppSettings(settingsDir, homeDir);
+      // 字段白名单校验：拒绝含未知 key 的 patch（防渲染端注入），返回当前设置不变
+      if (!isSettingsPatch(patch)) return loadAppSettings(settingsDir, homeDir);
       const record = patch as Record<string, unknown>;
       const next = saveAppSettings(settingsDir, homeDir, record as SettingsPatch);
       // 工作目录变化且不是家目录 → 记入最近项目
@@ -122,14 +123,19 @@ export function registerIpcHandlers(): void {
         title: '选择文件',
         properties: ['openFile', 'multiSelections']
       });
-      return result.canceled ? null : result.filePaths;
+      const paths = result.canceled ? null : result.filePaths;
+      // 记录本次选中的路径：attachment:read 只回传这些已授权路径，防越权读任意文件
+      authorizeAttachmentPaths(paths);
+      return paths;
     })
   );
   ipcMain.handle(
     'attachment:read',
-    withMainWindow((_win, absPath: unknown) =>
-      isString(absPath) ? readAttachment(absPath) : { ok: false as const, error: 'invalid path' }
-    )
+    withMainWindow((_win, absPath: unknown) => {
+      if (!isString(absPath)) return { ok: false as const, error: 'invalid path' };
+      if (!isAuthorizedAttachmentPath(absPath)) return { ok: false as const, error: '未授权的路径' };
+      return readAttachment(absPath);
+    })
   );
 
   // ---- 保存文件（代码块下载） ----
@@ -177,12 +183,13 @@ export function registerIpcHandlers(): void {
   // ---- MCP ----
   ipcMain.handle(
     'mcp:list-tools',
-    withMainWindow(async (_win, command: unknown, args: unknown) => {
-      if (!isString(command) || !Array.isArray(args) || !args.every(isString)) {
-        return { ok: false as const, error: 'invalid args' };
-      }
+    withMainWindow(async (_win, serverId: unknown) => {
+      // 只接受 server id：command/args 从主进程持久化配置按 id 读取，渲染端不可注入任意命令
+      if (!isString(serverId)) return { ok: false as const, error: 'invalid args' };
+      const server = loadAppSettings(settingsDir, homeDir).mcpServers.find(s => s.id === serverId);
+      if (!server) return { ok: false as const, error: 'unknown server' };
       try {
-        const tools = await listMcpTools({ command, args: args as string[] });
+        const tools = await listMcpTools({ command: server.command, args: server.args });
         return { ok: true as const, tools };
       } catch (e) {
         return { ok: false as const, error: e instanceof Error ? e.message : String(e) };

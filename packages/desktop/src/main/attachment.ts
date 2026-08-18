@@ -2,6 +2,23 @@ import { readFile, stat } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
 import type { AttachmentReadResult } from '@dscode/shared';
 
+/** 本次会话内经「选择文件」对话框授权的绝对路径集合：attachment:read 只放行这些路径，堵住任意文件读取 */
+const authorizedPaths = new Set<string>();
+
+/** 记录一次对话框选中的路径（dialog:pick-files 返回后调用），供 attachment:read 校验 */
+export function authorizeAttachmentPaths(paths: string[] | null): void {
+  if (!paths) return;
+  for (const p of paths) {
+    if (authorizedPaths.size >= 1000) break; // 防无界增长
+    authorizedPaths.add(p);
+  }
+}
+
+/** 判断路径是否经对话框授权（未授权拒绝读取） */
+export function isAuthorizedAttachmentPath(p: string): boolean {
+  return authorizedPaths.has(p);
+}
+
 /**
  * 附件/引用文件读取（主进程）：把用户经原生对话框选中的文件读回渲染端。
  * 图片生成 data URL 预览；文本/代码文件读 UTF-8 内容（@ 引用注入提示词用）。

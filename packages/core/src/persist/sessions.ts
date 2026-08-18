@@ -86,6 +86,33 @@ function readMeta(dir: string): SessionMeta | null {
 /** sessionId → 目录 缓存（按 rootDir 隔离）：避免每次持久化都全量扫描工作空间目录 */
 const dirCache = new Map<string, string>();
 
+/** 会话文件 → 已知消息 id 集合：upsertMessage 追加时 O(1) 判重，避免每次读整文件（消除 O(n²) 追加开销） */
+const knownMessageIds = new Map<string, Set<string>>();
+
+/** 懒加载会话文件的已知消息 id（读一次缓存；追加时增量维护） */
+function loadKnownIds(file: string): Set<string> {
+  let ids = knownMessageIds.get(file);
+  if (ids) return ids;
+  ids = new Set();
+  try {
+    if (existsSync(file)) {
+      for (const l of readFileSync(file, 'utf8').split('\n')) {
+        if (l.length === 0) continue;
+        try {
+          const id = (JSON.parse(l) as { id?: unknown })['id'];
+          if (typeof id === 'string') ids.add(id);
+        } catch {
+          // 损坏行跳过
+        }
+      }
+    }
+  } catch {
+    // 读取失败保持空集合
+  }
+  knownMessageIds.set(file, ids);
+  return ids;
+}
+
 function cacheKey(rootDir: string, sessionId: string): string {
   return rootDir + '\u0000' + sessionId;
 }
@@ -446,20 +473,27 @@ export function upsertMessage(rootDir: string, sessionId: string, message: Messa
     ...(message.attachments && message.attachments.length > 0 ? { attachments: message.attachments } : {}),
     ...(message.contexts && message.contexts.length > 0 ? { contexts: message.contexts } : {})
   });
-  const lines = existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(l => l.length > 0) : [];
-  const idx = lines.findIndex(l => {
-    try {
-      return (JSON.parse(l) as { id?: unknown }).id === message.id;
-    } catch {
-      return false;
+  const ids = loadKnownIds(file);
+  if (ids.has(message.id)) {
+    // 幂等重写（流式更新同一消息）：仅此时读全文件定位该行重写
+    const lines = existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(l => l.length > 0) : [];
+    const idx = lines.findIndex(l => {
+      try {
+        return (JSON.parse(l) as { id?: unknown }).id === message.id;
+      } catch {
+        return false;
+      }
+    });
+    if (idx >= 0) {
+      lines[idx] = line;
+      writeFileSync(file, lines.join('\n') + '\n', 'utf8');
+      return;
     }
-  });
-  if (idx >= 0) {
-    lines[idx] = line;
-    writeFileSync(file, lines.join('\n') + '\n', 'utf8');
-  } else {
-    appendFileSync(file, line + '\n', 'utf8');
+    // id 在缓存但文件里找不到（外部改写/删除）：回退为追加
+    ids.delete(message.id);
   }
+  appendFileSync(file, line + '\n', 'utf8');
+  ids.add(message.id);
 }
 
 /** 把无工作空间归属的旧会话回填到当前工作目录（并移入对应工作空间目录） */

@@ -146,7 +146,9 @@ export class AgentRuntime {
     const { sessionId, model, rawMessages, sink, config, initialStats } = input;
 
     // 先做输入校验，避免非法输入中止正在进行的运行
-    const provider = config.providers[0];
+    // 按 model 反查所属供应商（多供应商：模型名跨供应商定位，不再静默回退到 providers[0] 造成配置被忽略）
+    const provider =
+      (model.length > 0 ? config.providers.find(p => p.models.includes(model)) : undefined) ?? config.providers[0];
     if (!provider || provider.apiKey.length === 0) {
       sink.error(sessionId, 'no-api-key');
       return { ok: true };

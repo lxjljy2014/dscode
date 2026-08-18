@@ -16,6 +16,25 @@ const sessionStore = useSessionStore();
 /** 历史消息兜底：无步骤时直接渲染完整正文的 markdown */
 const renderedContent = computed(() => renderMarkdown(props.message.content, t));
 
+/** 已完成步骤的 markdown 缓存：流式仅重渲染最后一个未完成步骤，历史步骤按内容命中缓存避免 O(n²) 重解析 */
+const stepHtmlCache = new Map<string, string>();
+const STEP_HTML_CACHE_MAX = 300;
+
+function renderTextStep(index: number, content: string): string {
+  const steps = props.message.steps;
+  // 正在流式的最后一个 text 步骤逐 chunk 增长，需实时重渲染；其余步骤内容稳定，走缓存
+  if (props.message.streaming && steps && index === steps.length - 1) return renderMarkdown(content, t);
+  const hit = stepHtmlCache.get(content);
+  if (hit !== undefined) return hit;
+  const html = renderMarkdown(content, t);
+  if (stepHtmlCache.size >= STEP_HTML_CACHE_MAX) {
+    const first = stepHtmlCache.keys().next().value;
+    if (first !== undefined) stepHtmlCache.delete(first);
+  }
+  stepHtmlCache.set(content, html);
+  return html;
+}
+
 /** 文本附件（已读取内容，折叠展示；图片/二进制附件走上方预览区） */
 const textAttachments = computed(() => props.message.attachments?.filter(a => !!a.content) ?? []);
 
@@ -216,7 +235,7 @@ onBeforeUnmount(() => {
               <div class="ds-thought-body">{{ step.content }}</div>
             </details>
             <!-- 正文（说话/总结） -->
-            <div v-else-if="step.kind === 'text'" class="ds-md" v-html="renderMarkdown(step.content, t)" />
+            <div v-else-if="step.kind === 'text'" class="ds-md" v-html="renderTextStep(i, step.content)" />
             <!-- 工具调用 -->
             <ToolEventCard v-else :event="step.event" />
           </template>

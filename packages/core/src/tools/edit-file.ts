@@ -40,14 +40,16 @@ export const editFileTool = defineTool({
     if (count === 0) return { ok: false, error: 'old_string 未在文件中找到' };
     if (count > 1) return { ok: false, error: `old_string 匹配到 ${count} 处，请提供更多上下文使其唯一` };
     try {
-      await writeFile(target, original.replace(oldString, newString), 'utf8');
+      // 函数式替换：避免把 new_string 里的 $&/$$/$`/$' 当特殊模式展开（会静默损坏 shell/Makefile/模板文件）
+      const replaced = original.replace(oldString, () => newString);
+      await writeFile(target, replaced, 'utf8');
       const rel = relative(ctx.cwd, target);
       return {
         ok: true,
         content: `已替换 ${rel} 中的 1 处匹配`,
         changedPaths: [rel],
         meta: { path: rel, replaced: 1 },
-        blocks: [{ type: 'diff', path: rel, oldText: original, newText: original.replace(oldString, newString) }]
+        blocks: [{ type: 'diff', path: rel, oldText: original, newText: replaced }]
       };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };

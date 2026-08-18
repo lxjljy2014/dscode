@@ -74,13 +74,27 @@ export async function streamChatWithRetry(
   onReasoning: (text: string) => void
 ): Promise<RetryStreamResult> {
   let lastError: unknown;
+  // 是否已推送过任何增量：流中途失败后已推内容无法回滚，重试会造成重复输出/重复计费，故已推送后不可重试
+  let emittedAny = false;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await streamChat(adapter, input, signal, onDelta, onReasoning);
+      const res = await streamChat(
+        adapter,
+        input,
+        signal,
+        text => {
+          emittedAny = true;
+          onDelta(text);
+        },
+        text => {
+          emittedAny = true;
+          onReasoning(text);
+        }
+      );
       return { ...res, retries: attempt };
     } catch (error: unknown) {
       lastError = error;
-      if (!isRetryableFailure(error) || attempt >= MAX_RETRIES) throw error;
+      if (emittedAny || !isRetryableFailure(error) || attempt >= MAX_RETRIES) throw error;
       if (!await cancellableDelay(retryDelayMs(attempt + 1), signal)) throw error;
     }
   }

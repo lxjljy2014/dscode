@@ -194,11 +194,17 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  /** 已确保落库（目录 + meta）的会话 id：首条消息时创建一次，后续直接追加消息，省去每条的 meta 重写与一次 IPC */
+  const persistedSessionIds = new Set<string>();
+
   async function persistMessage(session: Session, message: Message): Promise<void> {
     if (!host) return;
     try {
-    // JSONL 会话存储：先确保会话元数据（目录）存在，再追加消息日志
-    await persistSession(session);
+      // JSONL 会话存储：首条消息前确保会话元数据（目录）存在，之后直接追加消息日志
+      if (!persistedSessionIds.has(session.id)) {
+        await persistSession(session);
+        persistedSessionIds.add(session.id);
+      }
       const r = await host.sessionsAppend(session.id, {
         id: message.id,
         role: message.role,

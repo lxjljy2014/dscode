@@ -51,17 +51,25 @@ port.on('message', async (req) => {
         },
       });
     }
-    // 受限沙箱执行：只暴露 tools 命名空间与少量安全全局，剥离 require/process/Buffer 等 Node 权限。
+    // 受限沙箱执行：只暴露 tools 命名空间、窄 console 转发器与少量安全全局。
+    // 注意：vm 上下文不是强安全边界——宿主对象可经 constructor.constructor 逃逸到 process，
+    // 真正的安全依赖 run_code 的 execute 权限门控 + 独立 worker 线程的故障隔离；强隔离需 isolated-vm 或降权子进程。
+    // codeGeneration.strings:false 禁用沙箱内 eval/Function（阻断字符串代码生成逃逸这条最常见路径）。
     // vm 的 timeout 只约束同步段（首个 await 之前），整体挂起由主线程侧 runProgram 的墙钟超时兜底。
-    const sandbox = {
+    const safeConsole = Object.freeze({
+      log: (...a) => port.postMessage({ type: 'console', level: 'log', args: a.map(x => String(x)) }),
+      warn: (...a) => port.postMessage({ type: 'console', level: 'warn', args: a.map(x => String(x)) }),
+      error: (...a) => port.postMessage({ type: 'console', level: 'error', args: a.map(x => String(x)) })
+    });
+    const sandbox = Object.freeze({
       tools,
       description: req.description || '',
-      console,
+      console: safeConsole,
       setTimeout,
       clearTimeout
-    };
+    });
     const body = '(async () => {\\n' + (req.code || '') + '\\n})()';
-    const value = await vm.runInNewContext(body, sandbox, { timeout: 30000 });
+    const value = await vm.runInNewContext(body, sandbox, { timeout: 30000, codeGeneration: { strings: false, wasm: false } });
     // oxlint-disable-next-line unicorn/require-post-message-target-origin -- node worker_threads 的 postMessage 无 targetOrigin
           port.postMessage({ type: 'done', value: value === undefined ? null : value });
   } catch (e) {

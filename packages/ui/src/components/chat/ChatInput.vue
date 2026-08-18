@@ -95,16 +95,27 @@ function removeContext(id: string): void {
   contexts.value = contexts.value.filter(c => c.id !== id);
 }
 
-// 模型列表来自 settings.providers[0].models（设置加载后同步；当前选中值失效时回退列表第一项）
+// 模型列表聚合全部供应商（多供应商：跨供应商列出模型，选中后由主进程按模型名反查供应商）
 const model = ref('');
-const models = computed(() => settingsStore.settings.providers[0]?.models ?? []);
+const models = computed(() => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of settingsStore.settings.providers) {
+    for (const m of p.models) {
+      if (!seen.has(m)) {
+        seen.add(m);
+        out.push(m);
+      }
+    }
+  }
+  return out;
+});
 watch(
-  () => settingsStore.settings.providers,
-  providers => {
-    const list = providers[0]?.models ?? [];
+  () => models.value,
+  list => {
     if (list.length && !list.includes(model.value)) model.value = list[0];
   },
-  { immediate: true, deep: true }
+  { immediate: true }
 );
 
 // 自定义斜杠命令 + 插件贡献的命令（/name 展开为 prompt）

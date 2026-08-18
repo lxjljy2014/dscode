@@ -75,7 +75,7 @@ async function listTools(s: McpServer) {
   loadingId.value = s.id;
   errorByServer.value[s.id] = '';
   try {
-    const r = await host.listMcpTools(s.command, s.args);
+    const r = await host.listMcpTools(s.id);
     if (r.ok) toolsByServer.value[s.id] = r.tools;
     else errorByServer.value[s.id] = r.error;
   } finally {

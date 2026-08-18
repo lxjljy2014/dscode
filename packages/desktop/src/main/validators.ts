@@ -1,4 +1,4 @@
-import type { AgentToolEvent, AssistantStep, ChatMessagePayload, Message, Session, SessionStats } from '@dscode/shared';
+import type { AgentToolEvent, AppSettings, AssistantStep, ChatMessagePayload, Message, Session, SessionStats } from '@dscode/shared';
 
 /**
  * IPC 参数校验的共享收窄函数。
@@ -10,6 +10,27 @@ export const isString = (v: unknown): v is string => typeof v === 'string';
 
 export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
+}
+
+/** AppSettings 允许经 IPC settings:set 写入的字段白名单（防渲染端注入未知/危险字段） */
+const SETTINGS_PATCH_KEYS = new Set<keyof AppSettings>([
+  'workingDirectory',
+  'permissionMode',
+  'providers',
+  'onboardingDone',
+  'commands',
+  'memory',
+  'skills',
+  'hooks',
+  'subagents',
+  'mcpServers',
+  'browsingEnabled'
+]);
+
+/** 校验 settings:set 的 patch：必须是普通对象且所有 key 都在白名单内（未知 key 一律拒绝） */
+export function isSettingsPatch(v: unknown): v is Record<string, unknown> {
+  if (!isRecord(v) || Array.isArray(v)) return false;
+  return Object.keys(v).every(k => SETTINGS_PATCH_KEYS.has(k as keyof AppSettings));
 }
 
 /**

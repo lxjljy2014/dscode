@@ -230,6 +230,13 @@ function readJsonFile(file: string): Record<string, unknown> {
   }
 }
 
+/** 原子写 JSON（临时文件 + rename，避免进程崩溃留下半写文件） */
+function writeJsonAtomic(file: string, data: unknown): void {
+  const tmp = file + '.tmp';
+  writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+  renameSync(tmp, file);
+}
+
 export function defaultSettings(homeDir: string): AppSettings {
   return {
     workingDirectory: homeDir,
@@ -264,7 +271,7 @@ function migrateLegacySettingsFile(configDir: string, homeDir: string): void {
         // 旧文件 providers 已加密，原样搬运到拆分文件（loadSettings 统一解密）
         out[field as string] = normalizeField(field, raw[field as string], defaults[field]);
       }
-      writeFileSync(join(configDir, domain.file), JSON.stringify(out, null, 2), 'utf8');
+      writeJsonAtomic(join(configDir, domain.file), out);
     }
     renameSync(legacy, legacy + '.bak');
   } catch {
@@ -312,7 +319,7 @@ export function saveSettings(
     if (out['providers'] !== undefined) {
       out['providers'] = encryptProviders(out['providers'] as ProviderConfig[], crypto);
     }
-    writeFileSync(join(configDir, domain.file), JSON.stringify(out, null, 2), 'utf8');
+    writeJsonAtomic(join(configDir, domain.file), out);
   }
   return next;
 }

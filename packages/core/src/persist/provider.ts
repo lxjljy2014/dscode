@@ -1,4 +1,5 @@
 import type { ProviderVerifyResult } from '@dscode/shared';
+import { isPrivateHost } from '../net/ssrf';
 
 /**
  * AI 供应商 API key 校验（OpenAI 兼容：GET {baseUrl}/models + Bearer）。
@@ -17,8 +18,9 @@ export async function verifyProvider(baseUrl: unknown, apiKey: unknown): Promise
   } catch {
     return { ok: false, reason: 'invalid-args' };
   }
-  // 只允许 https，避免被引导到任意协议/主机外探测
+  // 只允许 https，且封禁本机/内网地址（防渲染端把主进程当 SSRF 代理探测内网 https 服务）
   if (url.protocol !== 'https:') return { ok: false, reason: 'invalid-args' };
+  if (isPrivateHost(url.hostname)) return { ok: false, reason: 'invalid-args' };
   url.pathname = url.pathname.replace(/\/+$/, '') + '/models';
 
   try {
