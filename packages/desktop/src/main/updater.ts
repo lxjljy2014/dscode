@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import type { UpdaterState } from '@dscode/shared';
+import { mainLabels } from './i18n';
 
 // 主窗口引用（弹提示 / 推送状态）
 let getMainWindow: (() => BrowserWindow | null) | null = null;
@@ -62,12 +63,13 @@ export function initAutoUpdater(mainWindowGetter: () => BrowserWindow | null): v
   autoUpdater.on('update-not-available', () => {
     pushState({ state: 'not-available' });
     if (consumeManualCheck()) {
+      const labels = mainLabels();
       void showDialog({
         type: 'info',
-        title: '检查更新',
-        message: '已是最新版本',
-        detail: `当前版本 v${app.getVersion()}`,
-        buttons: ['确定']
+        title: labels.updater.checkTitle,
+        message: labels.updater.latest,
+        detail: `${labels.updater.currentVersion} v${app.getVersion()}`,
+        buttons: [labels.updater.ok]
       });
     }
   });
@@ -80,12 +82,13 @@ export function initAutoUpdater(mainWindowGetter: () => BrowserWindow | null): v
   autoUpdater.on('error', err => {
     pushState({ state: 'error', message: err instanceof Error ? err.message : String(err) });
     if (consumeManualCheck()) {
+      const labels = mainLabels();
       void showDialog({
         type: 'error',
-        title: '检查更新失败',
-        message: '无法完成自动更新',
+        title: labels.updater.failTitle,
+        message: labels.updater.failMessage,
         detail: err instanceof Error ? err.message : String(err),
-        buttons: ['确定']
+        buttons: [labels.updater.ok]
       });
     }
   });

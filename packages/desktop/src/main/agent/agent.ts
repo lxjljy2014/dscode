@@ -8,7 +8,8 @@ import {
   skillCatalogSection,
   startAgent as startAgentCore,
   stopAgent as stopAgentCore,
-  SYSTEM_PROMPT
+  SYSTEM_PROMPT,
+  SYSTEM_PROMPT_EN
 } from '@dscode/core';
 import type { Hook } from '@dscode/shared';
 import type { AgentEventSink, AgentStartResult, LlmCache } from '@dscode/core';
@@ -94,7 +95,12 @@ export async function startAgent(
   const settings = loadAppSettings(getConfigDir(), app.getPath('home'));
   // 子智能体人设：命中则替换默认系统提示词，记忆/技能仍叠加
   const subagent = subagentId ? settings.subagents.find(s => s.id === subagentId) : undefined;
-  const basePrompt = subagent ? subagent.systemPrompt : SYSTEM_PROMPT;
+  // 默认系统提示词跟随系统语言（子智能体人设始终用其自定义 systemPrompt）
+  const basePrompt = subagent
+    ? subagent.systemPrompt
+    : app.getLocale().toLowerCase().startsWith('zh')
+      ? SYSTEM_PROMPT
+      : SYSTEM_PROMPT_EN;
   // 长期记忆 + 技能注入系统提示词（对应列表为空时保持默认提示词不变）
   const memorySection =
     settings.memory.length > 0

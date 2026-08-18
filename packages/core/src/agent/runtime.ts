@@ -37,6 +37,14 @@ export const SYSTEM_PROMPT = `你是 DSCode 内置的编程助手，在用户的
 - 回答语言与用户提问一致
 - 只做用户要求的事，不擅自扩大改动范围`;
 
+/** 英文系统提示词（非中文环境使用，语义与 SYSTEM_PROMPT 一致） */
+export const SYSTEM_PROMPT_EN = `You are DSCode's built-in coding assistant, working in the user's working directory. You can call tools to read files, list directories, search code, run commands, and write or edit files. Rules:
+- Read relevant files to understand context before modifying code
+- Writing/editing files and running commands go through the system permission gate and may require user confirmation
+- Use relative paths within the working directory
+- Reply in the same language as the user
+- Only do what the user asked; don't expand the scope of changes`;
+
 // approvalSignature 已移至 tools/index.ts（与工具注册表同域，避免 tool-batch ↔ runtime 循环依赖）
 export { approvalSignature } from '../tools';
 

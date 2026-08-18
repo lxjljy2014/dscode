@@ -4,6 +4,7 @@ import type { TrayAction } from '@dscode/shared';
 import { initProjects, listProjectsWithHome } from '@dscode/core';
 import { getDbFile } from './data-dir';
 import { checkForUpdates } from './updater';
+import { mainLabels } from './i18n';
 
 
 // 托盘图标：Windows/Linux 用满幅圆角应用图标缩到小尺寸（16px 适配系统托盘渲染）。
@@ -12,16 +13,6 @@ const TRAY_ICON = join(__dirname, '../../resources/icon-win.png');
 
 // 最近项目子菜单最多展示条数
 const MAX_RECENT_PROJECTS = 8;
-
-// 设置子菜单常用版块（对应路由 /settings/:section）
-const SETTINGS_SECTIONS = [
-  { section: 'general', label: '通用' },
-  { section: 'appearance', label: '外观' },
-  { section: 'model', label: '模型' },
-  { section: 'memory', label: '记忆' },
-  { section: 'skills', label: '技能' },
-  { section: 'usage', label: '使用统计' }
-] as const;
 
 const isMac = process.platform === 'darwin';
 const isLinux = process.platform === 'linux';
@@ -80,28 +71,29 @@ function showMessageBox(
 
 /** 关于对话框：macOS 用原生 about panel，其余平台用消息框（Windows 消息框不支持 type 图标，传自定义图标） */
 function showAbout(hooks: TrayHooks): void {
+  const labels = mainLabels();
   showWindow(hooks);
   if (process.platform === 'darwin') {
     app.setAboutPanelOptions({
       applicationName: 'DSCode',
       applicationVersion: app.getVersion(),
-      copyright: 'Copyright © 2026 DSCode',
-      credits: 'AI 编程助手桌面客户端'
+      copyright: labels.about.copyright,
+      credits: labels.about.subtitle
     });
     app.showAboutPanel();
     return;
   }
   const opts: Electron.MessageBoxOptions = {
     type: 'info',
-    title: '关于 DSCode',
+    title: labels.about.title,
     message: 'DSCode',
     detail: [
-      'AI 编程助手桌面客户端',
-      `版本 ${app.getVersion()}`,
+      labels.about.subtitle,
+      `${labels.about.version} ${app.getVersion()}`,
       '',
-      'Copyright © 2026 DSCode'
+      labels.about.copyright
     ].join('\n'),
-    buttons: ['确定'],
+    buttons: [labels.about.ok],
     noLink: true
   };
   const icon = nativeImage.createFromPath(TRAY_ICON);
@@ -118,6 +110,7 @@ function showAbout(hooks: TrayHooks): void {
  * - 退出：真正结束应用
  */
 function buildMenu(hooks: TrayHooks): Menu {
+  const labels = mainLabels();
   // 幂等初始化（registerIpcHandlers 已 init，这里兜底保证菜单数据可读）
   initProjects(getDbFile());
   const recent = listProjectsWithHome(getDbFile(), app.getPath('home')).projects.slice(0, MAX_RECENT_PROJECTS);
@@ -128,25 +121,25 @@ function buildMenu(hooks: TrayHooks): Menu {
         toolTip: p.path,
         click: () => sendAction(hooks, { action: 'open-workspace', workspace: p.path })
       }))
-    : [{ label: '（无最近项目）', enabled: false }];
+    : [{ label: labels.noRecentProjects, enabled: false }];
 
-  const settingsItems: MenuItemConstructorOptions[] = SETTINGS_SECTIONS.map(s => ({
+  const settingsItems: MenuItemConstructorOptions[] = labels.settingsSections.map(s => ({
     label: s.label,
     click: () => sendAction(hooks, { action: 'open-settings', section: s.section })
   }));
 
   return Menu.buildFromTemplate([
-    { label: '打开 DSCode', click: () => showWindow(hooks) },
+    { label: labels.openDscode, click: () => showWindow(hooks) },
     { type: 'separator' },
-    { label: '新建会话', click: () => sendAction(hooks, { action: 'new-session' }) },
-    { label: '最近项目', submenu: recentItems },
+    { label: labels.newSession, click: () => sendAction(hooks, { action: 'new-session' }) },
+    { label: labels.recentProjects, submenu: recentItems },
     { type: 'separator' },
-    { label: '设置', submenu: settingsItems },
+    { label: labels.settings, submenu: settingsItems },
     { type: 'separator' },
-    { label: '检查更新', click: () => void checkForUpdates() },
-    { label: '关于 DSCode', click: () => showAbout(hooks) },
+    { label: labels.checkUpdates, click: () => void checkForUpdates() },
+    { label: labels.aboutDscode, click: () => showAbout(hooks) },
     { type: 'separator' },
-    { label: '退出', click: () => app.quit() }
+    { label: labels.quit, click: () => app.quit() }
   ]);
 }
 

@@ -38,6 +38,7 @@ import { loadAppSettings, saveAppSettings } from './settings';
 import { ensureTerminal, killTerminal, resizeTerminal, writeTerminal } from './shell/terminal';
 import { isMessage, isSession, isSessionStats, isSettingsPatch, isString, parseTerminalSize } from './validators';
 import { getConfigDir, getDbFile, getPluginsDir, getSessionsDir } from './data-dir';
+import { mainLabels } from './i18n';
 
 /**
  * 业务 IPC 注册（ipcMain.handle / ipcRenderer.invoke；终端输入/尺寸为 ipcMain.on 单向通道）。
@@ -108,7 +109,7 @@ export function registerIpcHandlers(): void {
     'dialog:pick-directory',
     withMainWindow(async win => {
       const result = await dialog.showOpenDialog(win, {
-        title: 'Select working directory',
+        title: mainLabels().dialogs.pickDirectory,
         properties: ['openDirectory', 'createDirectory']
       });
       return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
@@ -120,7 +121,7 @@ export function registerIpcHandlers(): void {
     'dialog:pick-files',
     withMainWindow(async win => {
       const result = await dialog.showOpenDialog(win, {
-        title: '选择文件',
+        title: mainLabels().dialogs.pickFiles,
         properties: ['openFile', 'multiSelections']
       });
       const paths = result.canceled ? null : result.filePaths;
@@ -144,7 +145,7 @@ export function registerIpcHandlers(): void {
     withMainWindow(async (win, defaultName: unknown, content: unknown) => {
       if (!isString(defaultName) || !isString(content)) return { ok: false as const, error: 'invalid args' };
       const result = await dialog.showSaveDialog(win, {
-        title: '保存文件',
+        title: mainLabels().dialogs.saveFile,
         defaultPath: defaultName
       });
       if (result.canceled || !result.filePath) return { ok: false as const, canceled: true as const };
