@@ -34,17 +34,33 @@ asarUnpack:
 # 本机 VS2022 缺 Spectre-mitigated libraries 组件，node-gyp 重建会失败（MSB8040），故关闭 electron-builder rebuild。
 npmRebuild: false
 
+# mac 同时产出 Intel（x64）与 Apple Silicon（arm64）双架构安装包（dmg + zip 各两份）。
+# 不用 universal 单包：合并两个架构时 node-pty 的 pty.node（非 Mach-O 原生二进制）无法合并，
+# 且 node-pty prebuilds 已覆盖 darwin-x64/darwin-arm64，配合 npmRebuild:false 可直接跨架构打包。
 mac:
   icon: icon.png
   category: public.app-category.developer-tools
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
+  # 产物命名带平台与架构标识（如 DSCode-0.1.1-mac-arm64.dmg）
+  artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
+# win 只出 x64（win32-x64 有 node-pty 官方 prebuild）
 win:
   icon: icon-win.png
   target:
-    - nsis
+    - target: nsis
+      arch:
+        - x64
+  # 产物命名带平台与架构标识（如 DSCode-0.1.1-win-x64-setup.exe）
+  artifactName: ${productName}-${version}-${os}-${arch}-setup.${ext}
 
 nsis:
   oneClick: false

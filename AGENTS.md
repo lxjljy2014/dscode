@@ -144,6 +144,6 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 ## 部署 / 打包
 
-`pnpm build` 产出 `packages/desktop/out/`（编译产物）。**已配置 electron-builder**（`packages/desktop/electron-builder.yml`，mac dmg/zip + win nsis + linux AppImage/deb），`pnpm dist`（或 `dist:mac`/`dist:win`/`dist:linux`）产出安装包到 `release/`（已 gitignore）。`node-pty` 用 N-API（ABI 稳定），macOS/Windows 有官方 prebuild、Linux 走 node-gyp 源码编译（需 python3/make/g++），故 `npmRebuild: false`；workspace/前端依赖打进 `out/`，故 `dependencies` 只保留 `node-pty`。
+`pnpm build` 产出 `packages/desktop/out/`（编译产物）。**已配置 electron-builder**（`packages/desktop/electron-builder.yml`，mac dmg/zip + win nsis + linux AppImage/deb），`pnpm dist`（或 `dist:mac`/`dist:win`/`dist:linux`）产出安装包到 `release/`（已 gitignore）。**架构矩阵**：mac 产出 Intel（x64）与 Apple Silicon（arm64）双架构独立安装包（dmg/zip 各两份，arch 在 target 里声明）；win 仅 x64；产物命名带平台与架构标识（如 `DSCode-0.1.1-mac-arm64.dmg`、`DSCode-0.1.1-win-x64-setup.exe`）；不用 universal 单包（node-pty 的 pty.node 非 Mach-O 无法跨架构合并，其 prebuilds 已覆盖 darwin-x64/darwin-arm64/win32-x64，配合 `npmRebuild:false` 跨架构打包无需 rebuild）。`node-pty` 用 N-API（ABI 稳定），macOS/Windows 有官方 prebuild、Linux 走 node-gyp 源码编译（需 python3/make/g++），故 `npmRebuild: false`；workspace/前端依赖打进 `out/`，故 `dependencies` 只保留 `node-pty`。
 
 **分发策略（已定）**：定位为**发布**——已引入 electron-builder 打包与三平台安装器。代码签名/公证仍需真实证书（当前无 Developer ID，构建时跳过签名）；正式发布前补充 macOS 签名/公证与 Windows 签名配置。
