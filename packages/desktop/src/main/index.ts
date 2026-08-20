@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
-import { registerIpcHandlers } from './ipc';
+import { registerIpcHandlers, runDeferredInit } from './ipc';
 import { disposeAgents, stopWindowAgents } from './agent/agent';
 import { migrateLegacyData } from './data-dir';
 import { disposeTerminals, killWindowTerminals } from './shell/terminal';
@@ -29,6 +29,23 @@ const ALLOWED_OPEN_PROTOCOLS = ['https:', 'http:'];
 let mainWindow: BrowserWindow | null = null;
 // 是否为真正退出：托盘「退出」/系统关机时置位，放行窗口 close（否则一律隐藏到托盘）
 let isQuitting = false;
+// 延后初始化只跑一次（窗口可能销毁重建，回填等操作无需重复执行）
+let deferredInitDone = false;
+
+// 单实例锁：应用数据（sqlite 库 / JSONL 会话）不支持多进程并发读写，二次启动只聚焦已有实例
+const hasInstanceLock = app.requestSingleInstanceLock();
+if (!hasInstanceLock) app.quit();
+
+// 已有实例运行时用户再次启动：恢复并聚焦主窗口（窗口已销毁则重建，与托盘恢复行为一致）
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (!mainWindow.isVisible()) mainWindow.show();
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  } else {
+    createWindow();
+  }
+});
 
 /** 校验后把 http(s) 链接交给系统浏览器打开，其余协议一律忽略 */
 function openExternalIfAllowed(url: string): void {
@@ -73,6 +90,11 @@ function createWindow(): void {
 
   win.on('ready-to-show', () => {
     win.show();
+    // 首窗可见后再跑延后初始化（旧会话回填等非关键路径的同步 IO），不阻塞首窗出现
+    if (!deferredInitDone) {
+      deferredInitDone = true;
+      runDeferredInit();
+    }
   });
 
   // 关闭按钮（系统标题栏 / macOS 红绿灯）→ 隐藏到托盘驻留后台；
@@ -117,6 +139,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // 未获单实例锁：本实例已在 quit 流程中，不再初始化（防御 quit 与 ready 的竞态）
+  if (!hasInstanceLock) return;
   // 先把旧 userData 位置的应用数据迁到 ~/.dscode（必须在任何数据库/设置被打开之前）
   migrateLegacyData();
   // 业务 IPC（settings / 最近项目 / 目录选择 / git）

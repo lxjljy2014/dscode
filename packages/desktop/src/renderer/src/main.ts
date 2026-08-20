@@ -16,9 +16,10 @@ app.use(createVuetifyPlugin());
 app.use(createI18nPlugin());
 app.use(router);
 
-// 占位页最短展示时长（ms）：加载快时也保留固定时长，避免启动页一闪而过。
+// 占位页最短展示时长（ms）：加载快时也保留固定时长，避免启动页一闪而过；
+// 但不能为「好看」让用户每次启动白等——控制在感知阈值内（600ms 仅防闪烁）。
 // 实际展示时长 = max(此值, 首屏加载耗时)；boot.ts 的兜底超时需大于两者之和
-const SPLASH_MIN_MS = 3000;
+const SPLASH_MIN_MS = 600;
 
 async function mount(): Promise<void> {
   // performance.now() 自页面导航起计时，即占位页已展示的时长

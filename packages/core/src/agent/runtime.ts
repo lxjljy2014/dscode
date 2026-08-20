@@ -30,6 +30,12 @@ const MAX_TOOL_CONTEXT_CHARS = 200_000;
 /** 单轮 LLM 请求最长等待（含流式全程） */
 const ROUND_TIMEOUT_MS = 5 * 60_000;
 
+/**
+ * 会话级缓存（运行统计 / 本会话免问放行）条目上限：超过按 LRU 淘汰最旧
+ * （Map 插入序即 LRU 序，start 时刷新新鲜度），防主进程长生命周期下两个 Map 只增不减。
+ */
+const MAX_SESSION_CACHE_ENTRIES = 64;
+
 /** 系统提示词：默认值，可经 AgentStartInput.config.systemPrompt 覆盖 */
 export const SYSTEM_PROMPT = `你是 DSCode 内置的编程助手，在用户的工作目录中工作。可以调用工具读取文件、列出目录、搜索代码、执行命令、写入或编辑文件。规则：
 - 修改代码前先阅读相关文件，理解上下文
@@ -128,6 +134,20 @@ export class AgentRuntime {
     return `t-${Date.now()}-${this.toolSeq++}`;
   }
 
+  /** 会话级缓存 LRU：刷新本会话新鲜度，超出上限按插入序淘汰最旧条目 */
+  private touchSessionCache<K, V>(map: Map<K, V>, key: K): void {
+    const cached = map.get(key);
+    if (cached !== undefined) {
+      map.delete(key);
+      map.set(key, cached);
+    }
+    while (map.size > MAX_SESSION_CACHE_ENTRIES) {
+      const oldest = map.keys().next().value;
+      if (oldest === undefined) break;
+      map.delete(oldest);
+    }
+  }
+
   /** 会话统计空值起点（跨运行累计） */
   private statsEntry(sessionId: string): SessionStats {
     let s = this.sessionStats.get(sessionId);
@@ -176,6 +196,9 @@ export class AgentRuntime {
     const controller = new AbortController();
     const run: RunState = { controller, replacing: false, done: Promise.resolve() };
     this.runs.set(sessionId, run);
+    // 会话级缓存 LRU：本会话刷新为最新，超出上限淘汰最旧条目
+    this.touchSessionCache(this.sessionApprovals, sessionId);
+    this.touchSessionCache(this.sessionStats, sessionId);
     // 重启后回灌持久化的会话统计作为累计起点：轮次/token/上下文占用不再被清零
     if (initialStats && !this.sessionStats.has(sessionId)) {
       this.sessionStats.set(sessionId, { ...initialStats });
@@ -534,6 +557,16 @@ export class AgentRuntime {
     this.snapshots.clearSnapshot(sessionId);
   }
 
+  /**
+   * 会话终结（归档）：回收其运行与统计/免问缓存条目。
+   * 统计已随消息持久化（session meta.stats），需要时重启回灌，无需在内存常驻。
+   */
+  disposeSession(sessionId: string): void {
+    this.stop(sessionId);
+    this.sessionApprovals.delete(sessionId);
+    this.sessionStats.delete(sessionId);
+  }
+
   /** 渲染端确认响应入口（agent:confirm-response）；决策结构非法时静默丢弃 */
   resolveConfirm(toolEventId: unknown, decision: unknown): void {
     if (typeof toolEventId !== 'string' || !isConfirmDecision(decision)) return;
@@ -552,6 +585,8 @@ export class AgentRuntime {
       c.resolve({ kind: 'deny' });
       this.pendingConfirms.delete(id);
     }
+    this.sessionApprovals.clear();
+    this.sessionStats.clear();
   }
 }
 
@@ -573,6 +608,11 @@ export function resolveConfirm(toolEventId: unknown, approve: unknown): void {
 
 export function disposeAgents(): void {
   defaultRuntime.dispose();
+}
+
+/** 会话终结（归档）时回收其运行与缓存（默认实例入口，desktop IPC 调用） */
+export function disposeSession(sessionId: string): void {
+  defaultRuntime.disposeSession(sessionId);
 }
 
 /** 恢复会话工作区到最近一次 agent 运行前（默认实例入口，desktop IPC 调用） */

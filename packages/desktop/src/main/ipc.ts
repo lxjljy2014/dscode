@@ -7,6 +7,7 @@ import {
   clearAgentWorkspaceSnapshot,
   commitPaths,
   createSqliteLlmCache,
+  disposeSession,
   initLlmCache,
   checkout,
   createBranch,
@@ -71,7 +72,6 @@ export function registerIpcHandlers(): void {
   initSessions(sessionsRoot);
   initUsage(dbFile);
   initIndex(dbFile);
-  backfillSessions(sessionsRoot, loadAppSettings(settingsDir, homeDir).workingDirectory);
 
   // ---- settings ----
   ipcMain.handle(
@@ -309,6 +309,8 @@ export function registerIpcHandlers(): void {
     withMainWindow((_win, sessionId: unknown, archived: unknown) => {
       if (!isString(sessionId) || typeof archived !== 'boolean') return { ok: false, error: 'invalid args' };
       setSessionArchived(sessionsRoot, sessionId, archived);
+      // 归档即会话终结：回收其运行与统计/免问缓存（取消归档不动缓存，统计已持久化可回灌）
+      if (archived) disposeSession(sessionId);
       return { ok: true };
     })
   );
@@ -389,4 +391,17 @@ export function registerIpcHandlers(): void {
       if (isString(sessionId)) killTerminal(win, sessionId);
     })
   );
+}
+
+/**
+ * 延后初始化（首窗 ready-to-show 后由 index.ts 调用一次）：
+ * 旧会话回填要全量扫描会话目录（每次启动的固定同步 IO 开销），不放在首窗关键路径上。
+ * 回填失败仅告警（backfill 内部幂等，下次启动自动重试）。
+ */
+export function runDeferredInit(): void {
+  try {
+    backfillSessions(getSessionsDir(), loadAppSettings(getConfigDir(), app.getPath('home')).workingDirectory);
+  } catch (e) {
+    console.warn('[dscode] 延后初始化（旧会话回填）失败，下次启动重试：', e);
+  }
 }

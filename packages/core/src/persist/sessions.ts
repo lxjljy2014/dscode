@@ -89,6 +89,20 @@ const dirCache = new Map<string, string>();
 /** 会话文件 → 已知消息 id 集合：upsertMessage 追加时 O(1) 判重，避免每次读整文件（消除 O(n²) 追加开销） */
 const knownMessageIds = new Map<string, Set<string>>();
 
+/** 两个模块级缓存的总条目上限：按插入序淘汰最旧（重复写先 delete 刷新位置），防随会话数无界增长 */
+const MAX_CACHE_ENTRIES = 256;
+
+/** 缓存写入 + 容量淘汰（Map 插入序即淘汰序） */
+function cacheSet<K, V>(map: Map<K, V>, key: K, value: V): void {
+  map.delete(key);
+  map.set(key, value);
+  while (map.size > MAX_CACHE_ENTRIES) {
+    const oldest = map.keys().next().value;
+    if (oldest === undefined) break;
+    map.delete(oldest);
+  }
+}
+
 /** 懒加载会话文件的已知消息 id（读一次缓存；追加时增量维护） */
 function loadKnownIds(file: string): Set<string> {
   let ids = knownMessageIds.get(file);
@@ -109,7 +123,7 @@ function loadKnownIds(file: string): Set<string> {
   } catch {
     // 读取失败保持空集合
   }
-  knownMessageIds.set(file, ids);
+  cacheSet(knownMessageIds, file, ids);
   return ids;
 }
 
@@ -127,7 +141,7 @@ function findSessionDir(rootDir: string, sessionId: string): string | null {
     for (const ws of readdirSync(rootDir)) {
       const dir = join(rootDir, ws, name);
       if (existsSync(join(dir, 'meta.json')) || existsSync(join(dir, 'session.jsonl'))) {
-        dirCache.set(key, dir);
+        cacheSet(dirCache, key, dir);
         return dir;
       }
     }
@@ -387,7 +401,7 @@ export function listSessions(rootDir: string): Session[] {
       const dir = join(rootDir, ws, name);
       const meta = readMeta(dir);
       if (!meta) continue;
-      dirCache.set(cacheKey(rootDir, meta.id), dir);
+      cacheSet(dirCache, cacheKey(rootDir, meta.id), dir);
       const messages: Message[] = [];
       for (const line of readLogLines(dir)) {
         const msg = parseMessageLine(line);
@@ -415,7 +429,7 @@ export function upsertSession(rootDir: string, session: Session): void {
   mkdirSync(rootDir, { recursive: true });
   const dir = sessionPath(rootDir, session.workingDirectory, session.id);
   mkdirSync(dir, { recursive: true });
-  dirCache.set(cacheKey(rootDir, session.id), dir);
+  cacheSet(dirCache, cacheKey(rootDir, session.id), dir);
   // 归档状态只在 setSessionArchived 中变更：常规落库保留已有归档值（对齐 sqlite 版 ON CONFLICT 不覆盖 archived）
   const existing = readMeta(dir);
   const archived = existing ? existing.archived : session.archived === true;
@@ -535,7 +549,7 @@ export function backfillSessions(rootDir: string, workingDirectory: string): voi
           mkdirSync(join(rootDir, workspaceSlug(workingDirectory)), { recursive: true });
           renameSync(dir, target);
         }
-        dirCache.set(cacheKey(rootDir, meta.id), target);
+        cacheSet(dirCache, cacheKey(rootDir, meta.id), target);
         writeJsonAtomic(metaFile(target), { ...meta, workingDirectory });
       } catch {
         // 迁移失败（占用等）忽略，下次启动重试
