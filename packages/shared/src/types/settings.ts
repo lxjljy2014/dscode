@@ -129,6 +129,10 @@ export interface AppSettings {
   mcpServers: McpServer[];
   /** 是否启用网页浏览工具（browse） */
   browsingEnabled: boolean;
+  /** 上下文压力自动压缩：运行结束时占用达到阈值百分比自动压缩对话历史（默认开启） */
+  autoCompact: boolean;
+  /** 自动压缩阈值（占供应商上下文窗口的百分比，50–95，默认 80） */
+  autoCompactThreshold: number;
 }
 
 /** DeepSeek 预置供应商：引导页在 providers 为空时预填（apiKey 留空待用户填写） */

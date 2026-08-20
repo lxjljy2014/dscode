@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { isAbsolute } from 'node:path';
 import type { GitGraphResult, GitListResult, GitOpResult } from '@dscode/shared';
 
 const execFileP = promisify(execFile);
@@ -56,6 +57,23 @@ export async function checkout(cwd: string, branch: string): Promise<GitOpResult
 export async function createBranch(cwd: string, name: string): Promise<GitOpResult> {
   try {
     await runGit(cwd, ['checkout', '-b', name]);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 提交指定路径的改动：先 `git add -- <paths>`，再 `git commit -m <msg> -- <paths>`（只提交这些路径，用户暂存区的无关改动不受影响） */
+export async function commitPaths(cwd: string, paths: string[], message: string): Promise<GitOpResult> {
+  // 防御：只接受 cwd 内相对路径（与 diff 面板给出的路径口径一致），拒绝绝对/上跳路径
+  const safe = paths.filter(p => p.length > 0 && !p.startsWith('..') && !isAbsolute(p));
+  if (safe.length === 0 || message.trim().length === 0) return { ok: false, error: 'nothing to commit' };
+  try {
+    if (!(await isGitRepo(cwd))) {
+      return { ok: false, error: 'not a git repository' };
+    }
+    await runGit(cwd, ['add', '--', ...safe]);
+    await runGit(cwd, ['commit', '-m', message, '--', ...safe]);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

@@ -1,5 +1,5 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative } from 'node:path';
 import type { DiffFile, DiffLine } from '@dscode/shared';
 import { MAX_FILE_BYTES } from '../constants';
 import { SKIP_DIRS } from './paths';
@@ -198,21 +198,71 @@ export function buildDiffFile(relPath: string, oldText: string | null, newText: 
   };
 }
 
+/** 内存中最多保留多少个会话的快照（运行结束后保留供回滚；超限淘汰最旧，约束内存占用） */
+export const MAX_SESSION_SNAPSHOTS = 8;
+
 /**
  * 每会话一份快照存储（实例化，避免模块级全局单例的串扰）。
  * 由 AgentRuntime 各持有一份，便于多实例与单测隔离。
+ * 运行结束后快照保留（下一次运行启动时覆盖），供「恢复到运行前」回滚使用。
  */
 export class DiffSnapshotStore {
   private snapshots = new Map<string, Map<string, string>>();
+  private cwds = new Map<string, string>();
 
   /** agent 启动时建立快照 */
   async initSnapshot(sessionId: string, cwd: string): Promise<void> {
+    // 先删再 set 刷新 Map 插入顺序（LRU 淘汰按插入序）
+    this.snapshots.delete(sessionId);
+    this.cwds.delete(sessionId);
     this.snapshots.set(sessionId, await collectTextFiles(cwd, MAX_SNAPSHOT_FILES));
+    this.cwds.set(sessionId, cwd);
+    while (this.snapshots.size > MAX_SESSION_SNAPSHOTS) {
+      const oldest = this.snapshots.keys().next().value;
+      if (oldest === undefined) break;
+      this.clearSnapshot(oldest);
+    }
   }
 
-  /** agent 运行结束后清理快照 */
+  /** 是否存在会话快照 */
+  hasSnapshot(sessionId: string): boolean {
+    return this.snapshots.has(sessionId);
+  }
+
+  /** 清理会话快照（显式放弃回滚能力：提交改动后调用；全量 dispose 由运行时负责） */
   clearSnapshot(sessionId: string): void {
     this.snapshots.delete(sessionId);
+    this.cwds.delete(sessionId);
+  }
+
+  /**
+   * 恢复会话工作区到快照状态（撤销 agent 运行的文件改动）：
+   * 修改/删除的文件写回原文，运行期间新增的文件删除。
+   * 只恢复「快照 vs 当前」有差异的文件，未涉及文件一律不动。
+   * 返回恢复的文件数与恢复后的剩余 diff（正常应为空，非空说明个别文件恢复失败）。
+   */
+  async restoreSnapshot(sessionId: string): Promise<{ restored: number; files: DiffFile[] }> {
+    const snap = this.snapshots.get(sessionId);
+    const cwd = this.cwds.get(sessionId);
+    if (!snap || !cwd) return { restored: 0, files: [] };
+    const diffs = await this.recomputeDiff(sessionId, cwd);
+    for (const f of diffs) {
+      // 防御：快照键由 relative() 生成、必然是 cwd 内相对路径，异常路径直接跳过
+      if (f.path.startsWith('..') || isAbsolute(f.path)) continue;
+      const full = join(cwd, f.path);
+      try {
+        if (snap.has(f.path)) {
+          await mkdir(dirname(full), { recursive: true });
+          await writeFile(full, snap.get(f.path)!, 'utf8');
+        } else {
+          // 快照中不存在 = 运行期间新增的文件：回滚即删除
+          await rm(full, { force: true });
+        }
+      } catch {
+        // 单文件恢复失败（权限/占用）：继续其余文件，最终 diff 会暴露未恢复项
+      }
+    }
+    return { restored: diffs.length, files: await this.recomputeDiff(sessionId, cwd) };
   }
 
   /** 对比快照与当前内容，返回 diff 文件列表（推送由调用方负责） */

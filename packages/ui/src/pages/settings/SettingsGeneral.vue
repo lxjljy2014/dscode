@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n';
 import { supportedLocales } from '../../plugins/i18n';
 import type { LocaleSetting } from '../../stores/ui';
 import { useUiStore } from '../../stores/ui';
+import { useSettingsStore } from '../../stores/settings';
 
 const { t } = useI18n();
 const ui = useUiStore();
+const settingsStore = useSettingsStore();
 
 // 界面语言：system + 支持的语言列表
 const languageItems = computed(() => [
@@ -20,6 +22,16 @@ const language = computed<LocaleSetting>({
 });
 
 const languageLabel = computed(() => languageItems.value.find(item => item.value === ui.locale)?.title ?? '');
+
+// 上下文压力自动压缩（真实设置，主进程持久化）
+const autoCompact = computed({
+  get: () => settingsStore.settings.autoCompact,
+  set: value => void settingsStore.save({ autoCompact: value })
+});
+const autoCompactThreshold = computed({
+  get: () => settingsStore.settings.autoCompactThreshold,
+  set: value => void settingsStore.save({ autoCompactThreshold: value })
+});
 
 // 以下为占位设置项：仅组件内状态，接入真实配置后改从设置 store 读写
 const inheritProfile = ref(true);
@@ -115,6 +127,41 @@ const proxyExceptions = ref('');
           </div>
         </div>
         <VSwitch v-model="enhancedFindGrep" inset color="primary" density="compact" hide-details />
+      </div>
+    </VCard>
+
+    <!-- 上下文自动压缩 -->
+    <VCard class="px-4 py-3.5">
+      <div class="flex items-center justify-between gap-6">
+        <div class="min-w-0">
+          <div class="text-sm font-medium">{{ t('settingsPage.general.autoCompact') }}</div>
+          <div class="mt-0.5 text-xs leading-5 text-muted">
+            {{ t('settingsPage.general.autoCompactDesc') }}
+          </div>
+        </div>
+        <VSwitch v-model="autoCompact" inset color="primary" density="compact" hide-details />
+      </div>
+
+      <div v-if="autoCompact" class="mt-3.5 border-t border-line pt-3.5">
+        <div class="flex items-center justify-between gap-6">
+          <div class="min-w-0">
+            <div class="text-sm font-medium">{{ t('settingsPage.general.autoCompactThreshold') }}</div>
+            <div class="mt-0.5 text-xs leading-5 text-muted">
+              {{ t('settingsPage.general.autoCompactThresholdDesc') }}
+            </div>
+          </div>
+          <span class="shrink-0 font-mono text-sm">{{ autoCompactThreshold }}%</span>
+        </div>
+        <VSlider
+          v-model="autoCompactThreshold"
+          :min="50"
+          :max="95"
+          :step="5"
+          color="primary"
+          thumb-label
+          hide-details
+          class="mt-1"
+        />
       </div>
     </VCard>
 

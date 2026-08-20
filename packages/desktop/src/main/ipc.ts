@@ -4,6 +4,8 @@ import type { SettingsPatch } from '@dscode/shared';
 import {
   backfillSessions,
   buildIndex,
+  clearAgentWorkspaceSnapshot,
+  commitPaths,
   createSqliteLlmCache,
   initLlmCache,
   checkout,
@@ -23,6 +25,7 @@ import {
   listUsage,
   readWorkspaceFile,
   removeProject,
+  restoreAgentWorkspace,
   scanTree,
   searchIndex,
   setSessionArchived,
@@ -264,6 +267,21 @@ export function registerIpcHandlers(): void {
       return isString(relPath) ? readWorkspaceFile(cwd, relPath) : { ok: false, error: 'invalid path' };
     })
   );
+  // 回滚 agent 文件改动：恢复到最近一次运行启动时的状态（运行中拒绝；快照随应用重启丢失）
+  ipcMain.handle(
+    'workspace:restore',
+    withMainWindow((_win, sessionId: unknown) =>
+      isString(sessionId) ? restoreAgentWorkspace(sessionId) : { ok: false as const, error: 'invalid args' }
+    )
+  );
+  // 放弃快照（提交改动后调用：变更面板清空、回滚入口消失）
+  ipcMain.handle(
+    'workspace:clear-snapshot',
+    withMainWindow((_win, sessionId: unknown) => {
+      if (isString(sessionId)) clearAgentWorkspaceSnapshot(sessionId);
+      return { ok: true };
+    })
+  );
 
   // ---- 会话持久化 ----
   ipcMain.handle(
@@ -330,6 +348,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'git:graph',
     withMainWindow((_win, cwd: unknown) => (isString(cwd) ? graph(cwd) : { ok: false, error: 'invalid cwd' }))
+  );
+  // 提交指定路径的改动（diff 面板给出的相对路径集合；只提交这些路径，不动用户暂存区其它内容）
+  ipcMain.handle(
+    'git:commit',
+    withMainWindow((_win, cwd: unknown, paths: unknown, message: unknown) => {
+      const validPaths =
+        Array.isArray(paths) && paths.length <= 500 && paths.every(p => isString(p) && p.length > 0);
+      return validPaths && isString(cwd) && isString(message) && message.trim().length > 0
+        ? commitPaths(cwd, paths as string[], message)
+        : { ok: false, error: 'invalid args' };
+    })
   );
 
   // ---- 终端 ----

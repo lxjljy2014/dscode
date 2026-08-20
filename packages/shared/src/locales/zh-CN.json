@@ -174,7 +174,20 @@
     "deletedFile": "已删除",
     "foldedLines": "…已折叠 {n} 行",
     "foldedFiles": "…已折叠 {n} 个文件",
-    "fileTruncated": "…（文件过大，已截断显示）"
+    "fileTruncated": "…（文件过大，已截断显示）",
+    "fileCount": "{n} 个文件有改动",
+    "restore": "恢复到运行前",
+    "restoreConfirmTitle": "恢复工作区文件",
+    "restoreConfirmBody": "将把 {n} 个文件恢复到本次 agent 运行开始前的状态：修改/删除的文件写回原文，运行期间新增的文件会被删除。未提交的改动将丢失。",
+    "restoreDone": "已恢复 {n} 个文件",
+    "restoreFailed": "恢复失败",
+    "restoreRunning": "agent 运行中，暂不能回滚",
+    "restoreNoSnapshot": "没有可恢复的快照（应用重启后会丢失）",
+    "commit": "提交",
+    "commitTitle": "提交 {n} 个文件的改动",
+    "commitPlaceholder": "提交信息（如：fix: 修复登录跳转）",
+    "commitDone": "已提交",
+    "commitFailed": "提交失败"
   },
   "agent": {
     "tool": {
@@ -294,6 +307,10 @@
       "proxyExceptions": "代理例外",
       "proxyExceptionsDesc": "匹配这些主机的请求将直连，不经过 HTTP 代理。多个规则用英文逗号分隔。修改后需重启应用生效。",
       "proxyExceptionsPlaceholder": "例如 localhost, 127.0.0.1, *.internal",
+      "autoCompact": "自动压缩对话历史",
+      "autoCompactDesc": "运行结束时若上下文占用达到阈值（按所属供应商的上下文窗口计算），自动压缩较旧的对话历史。",
+      "autoCompactThreshold": "触发阈值",
+      "autoCompactThresholdDesc": "上下文占用达到窗口的该百分比后触发，范围 50–95。",
       "comingSoon": "即将推出"
     },
     "appearance": {

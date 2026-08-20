@@ -300,6 +300,19 @@ describe('config 持久化（按域拆分配置文件）', () => {
     expect(saveSettings(configDir, home, { browsingEnabled: false }).browsingEnabled).toBe(false);
     expect(loadSettings(configDir, home).browsingEnabled).toBe(false);
   });
+
+  it('autoCompact 默认开启、阈值默认 80 且收敛到 50–95', () => {
+    const fresh = defaultSettings(home);
+    expect(fresh.autoCompact).toBe(true);
+    expect(fresh.autoCompactThreshold).toBe(80);
+    // 可关闭并读回
+    expect(saveSettings(configDir, home, { autoCompact: false }).autoCompact).toBe(false);
+    expect(loadSettings(configDir, home).autoCompact).toBe(false);
+    // 阈值越界收敛：过低抬到 50、过高压到 95；非法值回退当前值
+    expect(saveSettings(configDir, home, { autoCompactThreshold: 10 }).autoCompactThreshold).toBe(50);
+    expect(saveSettings(configDir, home, { autoCompactThreshold: 99 }).autoCompactThreshold).toBe(95);
+    expect(saveSettings(configDir, home, { autoCompactThreshold: 'bad' as unknown as number }).autoCompactThreshold).toBe(95);
+  });
 });
 
 describe('sessions 持久化（JSONL：meta.json + session.jsonl）', () => {

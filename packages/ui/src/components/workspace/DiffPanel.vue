@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import type { DiffFile } from '@dscode/shared';
@@ -8,7 +8,7 @@ import FileTree from './FileTree.vue';
 
 const { t } = useI18n();
 const store = useAgentStore();
-const { diffFiles } = storeToRefs(store);
+const { diffFiles, generating } = storeToRefs(store);
 
 const tab = defineModel<'changes' | 'files'>({ default: 'changes' });
 
@@ -22,6 +22,51 @@ function visibleLines(f: DiffFile) {
 }
 function hiddenLineCount(f: DiffFile) {
   return Math.max(0, f.lines.length - MAX_DIFF_LINES);
+}
+
+// ---- 回滚 / 提交 ----
+
+/** 操作反馈（snackbar） */
+const feedback = ref('');
+const feedbackShow = ref(false);
+function notify(text: string) {
+  feedback.value = text;
+  feedbackShow.value = true;
+}
+
+/** 回滚确认对话框 */
+const restoreDialog = ref(false);
+const restoring = ref(false);
+async function doRestore() {
+  restoring.value = true;
+  const r = await store.restoreWorkspace();
+  restoring.value = false;
+  if (r.ok) {
+    restoreDialog.value = false;
+    notify(t('diff.restoreDone', { n: r.restored ?? 0 }));
+  } else {
+    // 运行中/无快照给定向文案，其余透出主进程原始错误
+    const key = r.error === 'running' ? 'diff.restoreRunning' : r.error === 'no-snapshot' ? 'diff.restoreNoSnapshot' : null;
+    notify(key ? t(key) : (r.error ?? t('diff.restoreFailed')));
+  }
+}
+
+/** 提交对话框 */
+const commitDialog = ref(false);
+const commitMessage = ref('');
+const committing = ref(false);
+const commitDisabled = computed(() => commitMessage.value.trim().length === 0 || committing.value);
+async function doCommit() {
+  committing.value = true;
+  const r = await store.commitChanges(commitMessage.value.trim());
+  committing.value = false;
+  if (r.ok) {
+    commitDialog.value = false;
+    commitMessage.value = '';
+    notify(t('diff.commitDone'));
+  } else {
+    notify(r.error ?? t('diff.commitFailed'));
+  }
 }
 </script>
 
@@ -37,6 +82,26 @@ function hiddenLineCount(f: DiffFile) {
         {{ t('diff.files') }}
       </VTab>
     </VTabs>
+
+    <!-- 变更工具条：文件数 + 提交/回滚入口（仅变更页且有 diff 时展示） -->
+    <div
+      v-if="tab === 'changes' && diffFiles.length"
+      class="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-1"
+    >
+      <span class="truncate text-xs text-muted">
+        {{ t('diff.fileCount', { n: diffFiles.length }) }}
+      </span>
+      <div class="flex shrink-0 items-center gap-1">
+        <VBtn size="x-small" variant="text" class="text-xs" :disabled="generating" @click="commitDialog = true">
+          <span class="i-lucide:git-commit-horizontal mr-1 text-3.5" />
+          {{ t('diff.commit') }}
+        </VBtn>
+        <VBtn size="x-small" variant="text" class="text-xs" :disabled="generating" @click="restoreDialog = true">
+          <span class="i-lucide:undo-2 mr-1 text-3.5" />
+          {{ t('diff.restore') }}
+        </VBtn>
+      </div>
+    </div>
 
     <VTabsWindow v-model="tab" class="min-h-0 flex-1">
       <!-- 变更 -->
@@ -116,5 +181,58 @@ function hiddenLineCount(f: DiffFile) {
         <FileTree />
       </VTabsWindowItem>
     </VTabsWindow>
+
+    <!-- 回滚确认 -->
+    <VDialog v-model="restoreDialog" max-width="420">
+      <VCard>
+        <VCardTitle class="text-sm">
+          {{ t('diff.restoreConfirmTitle') }}
+        </VCardTitle>
+        <VCardText class="text-xs leading-5 text-muted">
+          {{ t('diff.restoreConfirmBody', { n: diffFiles.length }) }}
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" size="small" @click="restoreDialog = false">
+            {{ t('dialog.cancel') }}
+          </VBtn>
+          <VBtn color="error" variant="flat" size="small" :loading="restoring" @click="doRestore">
+            {{ t('diff.restore') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- 提交 -->
+    <VDialog v-model="commitDialog" max-width="460">
+      <VCard>
+        <VCardTitle class="text-sm">
+          {{ t('diff.commitTitle', { n: diffFiles.length }) }}
+        </VCardTitle>
+        <VCardText>
+          <VTextField
+            v-model="commitMessage"
+            density="compact"
+            variant="outlined"
+            :placeholder="t('diff.commitPlaceholder')"
+            autofocus
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" size="small" @click="commitDialog = false">
+            {{ t('dialog.cancel') }}
+          </VBtn>
+          <VBtn color="primary" variant="flat" size="small" :disabled="commitDisabled" :loading="committing" @click="doCommit">
+            {{ t('diff.commit') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- 操作反馈 -->
+    <VSnackbar v-model="feedbackShow" :timeout="2600" location="top">
+      {{ feedback }}
+    </VSnackbar>
   </div>
 </template>

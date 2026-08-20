@@ -2,6 +2,7 @@ import type {
   AgentToolName,
   ChatMessagePayload,
   ConfirmDecision,
+  DiffFile,
   PermissionMode,
   ProviderConfig,
   SessionStats,
@@ -210,7 +211,8 @@ export class AgentRuntime {
       config.llmCache
     ).finally(() => {
       if (this.runs.get(sessionId) === run) this.runs.delete(sessionId);
-      this.snapshots.clearSnapshot(sessionId);
+      // 快照保留（下一次运行启动时覆盖）：DiffPanel 的「恢复到运行前」依赖它；
+      // 内存占用由 MAX_SESSION_SNAPSHOTS 淘汰最旧兜底
       // 运行结束未处理的确认一律视为拒绝，仅清理本会话，避免误伤其它会话
       for (const [id, c] of this.pendingConfirms) {
         if (c.sessionId === sessionId) {
@@ -514,6 +516,24 @@ export class AgentRuntime {
     }
   }
 
+  /**
+   * 恢复会话工作区到最近一次 agent 运行启动时的状态（撤销该次运行的文件改动）。
+   * 运行进行中不可回滚（快照随运行变化）；应用重启后快照丢失（diff 面板同为瞬态，两者一致）。
+   */
+  async restoreWorkspace(sessionId: string): Promise<
+    { ok: true; restored: number; files: DiffFile[] } | { ok: false; error: 'no-snapshot' | 'running' }
+  > {
+    if (this.runs.has(sessionId)) return { ok: false, error: 'running' };
+    if (!this.snapshots.hasSnapshot(sessionId)) return { ok: false, error: 'no-snapshot' };
+    const r = await this.snapshots.restoreSnapshot(sessionId);
+    return { ok: true, ...r };
+  }
+
+  /** 放弃会话快照（提交改动后调用）：DiffPanel 变更面板随之清空，回滚入口消失 */
+  clearWorkspaceSnapshot(sessionId: string): void {
+    this.snapshots.clearSnapshot(sessionId);
+  }
+
   /** 渲染端确认响应入口（agent:confirm-response）；决策结构非法时静默丢弃 */
   resolveConfirm(toolEventId: unknown, decision: unknown): void {
     if (typeof toolEventId !== 'string' || !isConfirmDecision(decision)) return;
@@ -553,4 +573,16 @@ export function resolveConfirm(toolEventId: unknown, approve: unknown): void {
 
 export function disposeAgents(): void {
   defaultRuntime.dispose();
+}
+
+/** 恢复会话工作区到最近一次 agent 运行前（默认实例入口，desktop IPC 调用） */
+export function restoreAgentWorkspace(sessionId: string): Promise<
+  { ok: true; restored: number; files: DiffFile[] } | { ok: false; error: 'no-snapshot' | 'running' }
+> {
+  return defaultRuntime.restoreWorkspace(sessionId);
+}
+
+/** 放弃会话快照（提交改动后调用，默认实例入口） */
+export function clearAgentWorkspaceSnapshot(sessionId: string): void {
+  defaultRuntime.clearWorkspaceSnapshot(sessionId);
 }

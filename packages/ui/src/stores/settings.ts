@@ -20,7 +20,9 @@ const DEFAULTS: AppSettings = {
   hooks: [],
   subagents: [],
   mcpServers: [],
-  browsingEnabled: true
+  browsingEnabled: true,
+  autoCompact: true,
+  autoCompactThreshold: 80
 };
 
 /** 应用只在宿主内运行，桥接缺失视为环境错误 */

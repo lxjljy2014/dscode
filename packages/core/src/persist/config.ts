@@ -33,7 +33,10 @@ export interface SettingsCrypto {
 
 /** 配置域 → 文件名 + 归属字段（providers 独立文件，便于 apiKey 加密管理） */
 export const CONFIG_DOMAINS: ReadonlyArray<{ file: string; fields: (keyof AppSettings)[] }> = [
-  { file: 'general.json', fields: ['workingDirectory', 'permissionMode', 'onboardingDone', 'browsingEnabled'] },
+  {
+    file: 'general.json',
+    fields: ['workingDirectory', 'permissionMode', 'onboardingDone', 'browsingEnabled', 'autoCompact', 'autoCompactThreshold']
+  },
   { file: 'providers.json', fields: ['providers'] },
   { file: 'memory.json', fields: ['memory'] },
   { file: 'skills.json', fields: ['skills'] },
@@ -205,6 +208,13 @@ function normalizeField(field: keyof AppSettings, value: unknown, fallback: unkn
       return typeof value === 'boolean' ? value : fallback;
     case 'browsingEnabled':
       return typeof value === 'boolean' ? value : fallback;
+    case 'autoCompact':
+      return typeof value === 'boolean' ? value : fallback;
+    case 'autoCompactThreshold':
+      // 百分比收敛到 50–95：过低会频繁压缩，过高起不到保护作用
+      return typeof value === 'number' && Number.isFinite(value)
+        ? Math.min(95, Math.max(50, Math.round(value)))
+        : fallback;
     case 'providers':
       return normalizeProviders(Array.isArray(value) ? value.filter(isProviderConfig) : (fallback as ProviderConfig[]));
     case 'memory':
@@ -258,7 +268,9 @@ export function defaultSettings(homeDir: string): AppSettings {
     hooks: [],
     subagents: [...DEFAULT_SUBAGENTS],
     mcpServers: [],
-    browsingEnabled: true
+    browsingEnabled: true,
+    autoCompact: true,
+    autoCompactThreshold: 80
   };
 }
 

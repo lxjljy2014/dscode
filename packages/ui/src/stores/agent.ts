@@ -14,6 +14,7 @@ import type {
 } from '@dscode/shared';
 import { host } from '../bridge/host';
 import { useSessionStore } from './session';
+import { useSettingsStore } from './settings';
 
 let idSeq = 0;
 function nextId(prefix: string): string {
@@ -59,6 +60,7 @@ function injectFileContents(
  */
 export const useAgentStore = defineStore('agent', () => {
   const sessionStore = useSessionStore();
+  const settingsStore = useSettingsStore();
   const generating = ref(false);
 
   /** 待用户确认的工具调用（覆盖输入框的确认卡片数据源；运行时未响应前保持） */
@@ -77,6 +79,9 @@ export const useAgentStore = defineStore('agent', () => {
     completionTokens?: number;
   }
   const runningStats = new Map<string, RunningStats>();
+
+  /** 各会话最近一次运行使用的模型（自动压缩按所属供应商的 contextWindow 判定阈值） */
+  const sessionModels = new Map<string, string>();
 
   /** 收敛一次回复的运行统计：结束时间 + 用时 + 首token + token 速率所需数据 */
   function finalizeStats(reply: Message) {
@@ -130,6 +135,7 @@ const sessionStats = computed<SessionStats | null>(() => {
     let session = sessionStore.activeSession;
     if (!session) session = sessionStore.materializeSession();
     if (!session) return;
+    if (model) sessionModels.set(session.id, model);
 
     const userMsg: Message = {
       id: nextId('m'),
@@ -292,6 +298,64 @@ const sessionStats = computed<SessionStats | null>(() => {
     }
   }
 
+  /** 回滚 agent 文件改动：恢复到最近一次运行启动前的状态（DiffPanel「恢复到运行前」） */
+  async function restoreWorkspace(): Promise<{ ok: boolean; restored?: number; error?: string }> {
+    if (!host) return { ok: false, error: 'IPC 不可用' };
+    const sessionId = sessionStore.activeSessionId;
+    if (!sessionId) return { ok: false, error: '无激活会话' };
+    try {
+      const r = await host.workspaceRestore(sessionId);
+      if (r.ok) {
+        diffBySession.set(sessionId, r.files);
+        return { ok: true, restored: r.restored };
+      }
+      return { ok: false, error: r.error };
+    } catch {
+      return { ok: false, error: 'IPC 调用异常' };
+    }
+  }
+
+  /** 提交 diff 面板列出的改动（只提交这些路径），成功后放弃快照（变更面板清空、回滚入口消失） */
+  async function commitChanges(message: string): Promise<{ ok: boolean; error?: string }> {
+    if (!host) return { ok: false, error: 'IPC 不可用' };
+    const sessionId = sessionStore.activeSessionId;
+    if (!sessionId) return { ok: false, error: '无激活会话' };
+    const paths = diffFiles.value.map(f => f.path);
+    if (paths.length === 0) return { ok: false, error: '无待提交改动' };
+    try {
+      const r = await host.gitCommit(settingsStore.settings.workingDirectory, paths, message);
+      if (!r.ok) return { ok: false, error: r.error };
+      await host.workspaceClearSnapshot(sessionId);
+      diffBySession.set(sessionId, []);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'IPC 调用异常' };
+    }
+  }
+
+  /**
+   * 上下文压力自动压缩：运行结束时占用达到阈值（占所属供应商 contextWindow 的百分比）自动压缩。
+   * 触发条件逐层收紧，避免无意义/循环压缩：消息过少（压缩保留最近 3 条 + 检查点）不压、
+   * 非激活会话不压（压缩状态行只对激活会话展示）、压缩/生成进行中不压。
+   */
+  async function maybeAutoCompact(sessionId: string): Promise<void> {
+    if (!host || compacting.value || generating.value) return;
+    const s = settingsStore.settings;
+    if (!s.autoCompact) return;
+    const session = sessionStore.sessions.find(x => x.id === sessionId);
+    if (!session || session.id !== sessionStore.activeSessionId) return;
+    if (session.messages.length <= 6) return;
+    const contextTokens = session.stats?.contextTokens ?? 0;
+    if (contextTokens <= 0) return;
+    const model = sessionModels.get(sessionId) ?? '';
+    const provider = s.providers.find(p => p.models.includes(model)) ?? s.providers[0];
+    // 未配置 contextWindow 的供应商按 128K 兜底（常见上下文规模，宁可早压不越界）
+    const contextWindow = provider?.contextWindow ?? 128_000;
+    if (contextTokens >= contextWindow * (s.autoCompactThreshold / 100)) {
+      await compactSession();
+    }
+  }
+
   // ---- agent/workspace 事件订阅（按 sessionId 分发） ----
 
   function onDelta(ev: { sessionId: string; content: string; kind: 'content' | 'reasoning' }) {
@@ -402,6 +466,8 @@ const sessionStats = computed<SessionStats | null>(() => {
     }
     generating.value = false;
     pendingConfirm.value = null;
+    // 运行正常结束：检查上下文压力，达到阈值自动压缩对话历史
+    void maybeAutoCompact(ev.sessionId);
   }
 
   function onError(ev: { sessionId: string; code: string; detail?: string }) {
@@ -467,5 +533,17 @@ const sessionStats = computed<SessionStats | null>(() => {
 
   subscribeEvents();
 
-  return { generating, pendingConfirm, compacting, diffFiles, sessionStats, sendMessage, stopGenerating, respondConfirm, compactSession };
+  return {
+    generating,
+    pendingConfirm,
+    compacting,
+    diffFiles,
+    sessionStats,
+    sendMessage,
+    stopGenerating,
+    respondConfirm,
+    compactSession,
+    restoreWorkspace,
+    commitChanges
+  };
 });

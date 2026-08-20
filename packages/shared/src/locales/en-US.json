@@ -174,7 +174,20 @@
     "deletedFile": "Deleted",
     "foldedLines": "…folded {n} lines",
     "foldedFiles": "…folded {n} files",
-    "fileTruncated": "…(file too large, truncated)"
+    "fileTruncated": "…(file too large, truncated)",
+    "fileCount": "{n} files changed",
+    "restore": "Restore to pre-run",
+    "restoreConfirmTitle": "Restore workspace files",
+    "restoreConfirmBody": "This will restore {n} files to their state before the agent run started: modified/deleted files are written back, files created during the run are deleted. Uncommitted changes will be lost.",
+    "restoreDone": "Restored {n} files",
+    "restoreFailed": "Restore failed",
+    "restoreRunning": "Cannot restore while the agent is running",
+    "restoreNoSnapshot": "No snapshot to restore (lost on app restart)",
+    "commit": "Commit",
+    "commitTitle": "Commit changes in {n} files",
+    "commitPlaceholder": "Commit message (e.g. fix: correct login redirect)",
+    "commitDone": "Committed",
+    "commitFailed": "Commit failed"
   },
   "agent": {
     "tool": {
@@ -294,6 +307,10 @@
       "proxyExceptions": "Proxy exceptions",
       "proxyExceptionsDesc": "Requests to matching hosts connect directly, bypassing the HTTP proxy. Separate multiple rules with commas. Restart required after changes.",
       "proxyExceptionsPlaceholder": "e.g. localhost, 127.0.0.1, *.internal",
+      "autoCompact": "Auto-compact conversation history",
+      "autoCompactDesc": "When a run finishes and context usage reaches the threshold (relative to the provider's context window), older conversation history is compacted automatically.",
+      "autoCompactThreshold": "Trigger threshold",
+      "autoCompactThresholdDesc": "Trigger when context usage reaches this percentage of the window; range 50–95.",
       "comingSoon": "Coming soon"
     },
     "appearance": {

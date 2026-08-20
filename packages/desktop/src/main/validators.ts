@@ -28,7 +28,9 @@ const SETTINGS_PATCH_KEYS = new Set<keyof AppSettings>([
   'hooks',
   'subagents',
   'mcpServers',
-  'browsingEnabled'
+  'browsingEnabled',
+  'autoCompact',
+  'autoCompactThreshold'
 ]);
 
 /** 校验 settings:set 的 patch：必须是普通对象且所有 key 都在白名单内（未知 key 一律拒绝） */

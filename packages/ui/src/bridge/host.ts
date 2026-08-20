@@ -91,6 +91,12 @@ export interface HostApi {
   // ---- 工作区 ----
   workspaceTree: () => Promise<FileNode[]>;
   workspaceReadFile: (relPath: string) => Promise<{ ok: true; content: string } | { ok: false; error: string }>;
+  /** 回滚 agent 文件改动：恢复到最近一次运行启动时的状态，返回恢复文件数与剩余 diff */
+  workspaceRestore: (
+    sessionId: string
+  ) => Promise<{ ok: true; restored: number; files: DiffFile[] } | { ok: false; error: string }>;
+  /** 放弃快照（提交改动后调用：变更面板清空、回滚入口消失） */
+  workspaceClearSnapshot: (sessionId: string) => Promise<{ ok: boolean }>;
 
   // ---- 会话持久化 ----
   sessionsList: () => Promise<Session[]>;
@@ -135,6 +141,8 @@ export interface HostApi {
   gitCheckout: (cwd: string, branch: string) => Promise<GitOpResult>;
   gitCreateBranch: (cwd: string, name: string) => Promise<GitOpResult>;
   gitGraph: (cwd: string) => Promise<GitGraphResult>;
+  /** 提交指定路径的改动（只提交这些路径，不动用户暂存区其它内容） */
+  gitCommit: (cwd: string, paths: string[], message: string) => Promise<GitOpResult>;
 
   // ---- 终端 ----
   terminalEnsure: (sessionId: string, cwd: string) => Promise<TerminalEnsureResult>;

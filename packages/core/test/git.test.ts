@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { checkout, createBranch, graph, isGitRepo, listBranches } from '../src/git/git';
+import { checkout, commitPaths, createBranch, graph, isGitRepo, listBranches } from '../src/git/git';
 
 const execFileP = promisify(execFile);
 
@@ -72,6 +72,34 @@ describe('git 封装（真实临时仓库）', () => {
 
   it('非 git 仓库返回错误', async () => {
     const r = await listBranches(nonGit);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe('not a git repository');
+  });
+});
+
+describe('commitPaths（真实临时仓库）', () => {
+  it('提交指定路径，未列出的改动留在工作区', async () => {
+    await writeFile(join(repo, 'in.txt'), 'included', 'utf8');
+    await writeFile(join(repo, 'out.txt'), 'excluded', 'utf8');
+    const r = await commitPaths(repo, ['in.txt'], 'feat: 提交 in');
+    expect(r.ok).toBe(true);
+    // 提交只包含 in.txt：最近一次提交的文件列表
+    const files = (await git(['show', '--name-only', '--pretty=format:'])).trim();
+    expect(files).toBe('in.txt');
+    // out.txt 仍是未提交的工作区改动
+    const status = await git(['status', '--porcelain']);
+    expect(status).toContain('out.txt');
+    expect(status).not.toContain('in.txt');
+  });
+
+  it('路径为空 / 消息为空 / 含上跳路径时拒绝', async () => {
+    expect((await commitPaths(repo, [], 'msg')).ok).toBe(false);
+    expect((await commitPaths(repo, ['in.txt'], '  ')).ok).toBe(false);
+    expect((await commitPaths(repo, ['../escape.txt'], 'msg')).ok).toBe(false);
+  });
+
+  it('非 git 仓库返回错误', async () => {
+    const r = await commitPaths(nonGit, ['x.txt'], 'msg');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toBe('not a git repository');
   });
