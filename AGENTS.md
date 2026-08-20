@@ -24,13 +24,13 @@ packages/
 │       └── renderer/ # Vue 应用组装入口（App.vue / router.ts / main.ts / boot.ts）
 ├── core/             # @dscode/core —— 纯 TS 核心逻辑（无 Electron/DOM 依赖，Node 内建可用；desktop 与将来 TUI 直接复用）
 │   └── src/
-│       ├── agent/    # 运行时编排：runtime.ts（SSE 流式+工具循环+30 轮上限）、types.ts（AgentEventSink 事件抽象，宿主各自实现）、compact.ts（/compact 对话压缩：较旧消息摘要为结构化检查点、逐字保留最近 3 条）、token-estimate.ts（token 锚定投影估算：按 provider 精确 promptTokens 锚定 + 增量估算）
-│       ├── tools/    # 工具注册表：Tool 接口（描述+实现一体）+ 每工具一文件 ×9（read_file/list_dir/search/run_command/write_file/edit_file/browse/run_code/skill），注册表 Record<AgentToolName, Tool> 编译期保证完整
+│       ├── agent/    # 运行时编排：runtime.ts（SSE 流式+工具循环+30 轮上限）、types.ts（AgentEventSink 事件抽象，宿主各自实现）、compact.ts（/compact 对话压缩：较旧消息摘要为结构化检查点、逐字保留最近 3 条）、token-estimate.ts（token 锚定投影估算：按 provider 精确 promptTokens 锚定 + 增量估算）、tool-batch.ts（工具批调度：门控串行 → 并行滚动池/独占屏障 → 模型顺序提交）
+│       ├── tools/    # 工具注册表：Tool 接口（描述+实现一体，可声明 concurrency/timeoutMs）+ 每工具一文件 ×9（read_file/list_dir/search/run_command/write_file/edit_file/browse/run_code/skill），注册表 Record<AgentToolName, Tool> 编译期保证完整
 │       ├── gate/     # 权限门控（只读放行/四权限模式；确认卡片三选项：允许一次/本会话/拒绝，拒绝停止整个任务，120s 超时自动拒绝）
-│       ├── adapters/ # 模型适配：ModelAdapter 接口（请求构造 + SSE 增量归一化）+ openai-compatible/deepseek + 通用 streamChat
+│       ├── adapters/ # 模型适配：ModelAdapter 接口（请求构造 + SSE 增量归一化）+ openai-compatible/deepseek + 通用 streamChat + retry.ts（streamChatWithRetry：瞬时故障指数退避重试）
 │       ├── net/      # SSRF 防护（ssrf.ts 的 isPrivateHost）：browse / provider:verify / browser:fetch 共用，封禁环回/内网/链路本地/保留地址（覆盖尾点、::ffff: 映射、十/十六/八进制 IP 表示等绕过）
-│       ├── workspace/# 文件树扫描/读文件、paths.ts（SKIP_DIRS+resolveSafePath）、diff.ts（快照 + LCS 行级 diff）
-│       ├── git/      # git CLI 封装（execFile 参数数组）
+│       ├── workspace/# 文件树扫描/读文件、paths.ts（SKIP_DIRS+resolveSafePath）、diff.ts（快照 + LCS 行级 diff + restoreSnapshot 回滚到运行前；快照运行结束后保留、LRU 上限 8 会话）
+│       ├── git/      # git CLI 封装（execFile 参数数组；分支/图谱/checkout，commitPaths 只提交指定路径）
 │       ├── code-run/ # run_code 工具（Code Mode：只暴露单工具，程序在 worker 线程内经生成的 SDK 绑定调用其它工具，一次调用代替 N 次模型往返）
 │       ├── mcp/      # MCP 客户端（client.ts：stdio JSON-RPC，spawn 子进程 + readline，tools/list 摘要）
 │       ├── plugins/  # 插件加载（loader.ts）
@@ -44,7 +44,7 @@ packages/
     └── src/
         ├── pages/       # 页面级：OnboardingView、WorkspaceView、settings/ 设置页组件 ×6
         ├── components/  # 业务组件按域分：chat/（聊天流）、workspace/（工作区布局/diff/文件树/终端）、git/（分支/图谱）、common/（通用）
-        ├── stores/      # ui.ts（主题/语言/侧栏显隐/面板尺寸）、session.ts（会话/最近工作空间/持久化）、agent.ts（agent 编排/事件分发/diff）、workspace.ts（文件树/文件内容）、settings.ts（工作目录/权限模式，主进程持久化）
+        ├── stores/      # ui.ts（主题/语言/侧栏显隐/面板尺寸）、session.ts（会话/最近工作空间/持久化）、agent.ts（agent 编排/事件分发/diff/回滚与提交/上下文压力自动压缩）、workspace.ts（文件树/文件内容）、settings.ts（工作目录/权限模式/自动压缩开关，主进程持久化）
         ├── bridge/      # host.ts：宿主桥接 API 抽象（HostApi 类型 + window.dscode 封装）
         ├── plugins/     # vuetify.ts、i18n.ts（createXxxPlugin 工厂函数）
         └── theme/       # tokens.ts（主题色唯一事实源）、global.css（滚动条/选区/拖拽区）
@@ -132,17 +132,17 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
   - `attachment:read` —— 附件读取（仅允许此前 `dialog:pick-files` 选定的已授权路径，防越权读任意文件）
   - `provider:verify` —— API key 校验（主进程 fetch `GET {baseUrl}/models`）
   - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（运行时在 `@dscode/core`（SSE 流式 + 工具循环 + 门控 + 模型适配，事件经 AgentEventSink 上抛），`desktop/src/main/agent/agent.ts` 实现 sink 映射到 IPC；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求；渲染端在输入框上弹出三选项确认卡片，响应为 ConfirmDecision：allow-once/allow-session/deny，allow-session 会话内免问，deny 由运行时中止整个任务，120s 超时自动拒绝）/ `agent:done` / `agent:session-stats`（会话运行统计：轮数/LLM与工具耗时/首token/tokens/缓存命中率，输入卡片下方统计条展示）/ `agent:context`（上下文 token 实时投影：context/system/tools/messages 分项 token 数，按 provider 精确 promptTokens 锚定 + 增量估算）/ `agent:error`（code: no-api-key/api/network/aborted/running/unknown；unknown 等携带 detail 真实原因，渲染端随错误气泡展示），均带 sessionId；同会话重复 `agent:start` 会先中止旧运行再启动新运行（窗口重载后重发不报错）；窗口关闭时其发起的运行被回收（见 `stopWindowAgents`）
-  - `workspace:tree` / `workspace:read-file` —— 真实文件树扫描与文件读取（路径限定工作目录内）；`workspace:diff` 事件 —— 写/执行工具后主进程按「agent 启动快照 vs 当前内容」LCS 行级 diff 推送
+  - `workspace:tree` / `workspace:read-file` —— 真实文件树扫描与文件读取（路径限定工作目录内）；`workspace:diff` 事件 —— 写/执行工具后主进程按「agent 启动快照 vs 当前内容」LCS 行级 diff 推送；`workspace:restore` 回滚 agent 文件改动（恢复到最近一次运行启动时的状态，改/删写回原文、新增删除；运行中拒绝，快照随应用重启丢失）、`workspace:clear-snapshot` 放弃快照（提交改动后调用，变更面板清空）
   - `sessions:list` / `sessions:create` / `sessions:append` —— 会话持久化（JSONL 文件：`~/.dscode/sessions/<workspace-slug>/<session-id>/{meta.json, session.jsonl}`，每会话独立文件、追加式日志；消息的 steps（思维链/正文/工具调用交错的有序步骤）以 JSON 行随消息落库，重启后按此恢复折叠块与工具卡；旧消息无 steps 走正文兜底；旧 sqlite sessions.db 首次启动自动迁移；会话级 toolEvents 数组仍为瞬态不落库）
   - `session:compact` —— `/compact` 对话压缩（逻辑在 core `agent/compact.ts`：较旧消息摘要为结构化检查点、逐字保留最近 3 条，返回压缩后消息列表）
-  - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` —— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合
+  - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` / `git:commit`（只提交指定路径，不动用户暂存区其它内容）—— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合
   - `terminal:ensure` / `terminal:write` / `terminal:resize` / `terminal:kill` —— 集成终端（主进程 node-pty，多会话按渲染端生成的 sessionId 管理、按窗口归属统一回收，见 `main/shell/terminal.ts`）；pty 输出经 `terminal:data` / `terminal:exit` 事件（带 sessionId）推给渲染端，write/resize 为高频单向 `on` 通道
   - 其余通道（`index:build` / `index:search` / `index:stats` 代码索引、`usage:list` / `usage:cache-stats` / `usage:cache-clear` 用量与缓存、`mcp:list-tools`、`browser:fetch`（与 browse/provider:verify 一样经 core `net/ssrf.ts` 防护）、`projects:remove`、`sessions:archive` / `sessions:stats`）同样定义在 ipc.ts
   - 每个 handler 校验 sender 属于主窗口 + 参数类型；新增业务 IPC 沿用此模式
 
 ## 测试与质量
 
-- 单测框架 **vitest**，覆盖 `@dscode/core`（纯逻辑层）与 `@dscode/desktop`（主进程纯逻辑）两处：`pnpm test` 依次运行两者（也可 `pnpm --filter <pkg> test` 单独跑）。测试文件位于 `packages/{core,desktop}/test/*.test.ts`，各自 `vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 tsc 的 `src/**/*` 类型检查范围）。当前覆盖（截至 0.1.2 共 245 个：core 213 + desktop 32）：core —— 门控、LCS diff、适配器 delta 归一化、SSE 流式（stream）、SSRF 防护、路径防穿越/symlink、persist 落库/加密、供应商校验、usage 用量、LLM 缓存（key 确定性/往返/命中统计/容量）、MCP 协议、插件加载、代码索引、git CLI、workspace 扫描、browse 工具、edit_file、compact；desktop —— IPC 校验器、safeStorage 加密封装、钩子触发、附件授权路径。E2E 测试设施暂无。
+- 单测框架 **vitest**，覆盖 `@dscode/core`（纯逻辑层）与 `@dscode/desktop`（主进程纯逻辑）两处：`pnpm test` 依次运行两者（也可 `pnpm --filter <pkg> test` 单独跑）。测试文件位于 `packages/{core,desktop}/test/*.test.ts`，各自 `vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 tsc 的 `src/**/*` 类型检查范围）。当前覆盖（截至 0.1.3 共 253 个：core 221 + desktop 32）：core —— 门控、LCS diff、快照回滚（restoreSnapshot/LRU）、适配器 delta 归一化、SSE 流式（stream）、SSRF 防护、路径防穿越/symlink、persist 落库/加密/归一化（autoCompact 阈值收敛）、供应商校验、usage 用量、LLM 缓存（key 确定性/往返/命中统计/容量）、MCP 协议、插件加载、代码索引、git CLI（含 commitPaths 定向提交）、workspace 扫描、browse 工具、edit_file、compact；desktop —— IPC 校验器、safeStorage 加密封装、钩子触发、附件授权路径。E2E 测试设施暂无。
 - **lint 双轨并存**（配置都在仓库根）：
   - `oxlint`（`.oxlintrc.json`）：Rust 实现、毫秒级；内置 vue 插件 lint `.vue` 的 `<script>` 块（模板规则暂缺，官方语言插件路线图中）；自动读取 `.gitignore` 排除产物。**负责全部 TS/JS 文件**
   - `eslint`（`eslint.config.js`，flat config，基于 `@soybeanjs/eslint-config-vue`）：**仅覆盖 `.vue` 文件**（soybean 的 defineConfig 硬编码 `files: ['**/*.vue']`），提供模板相关规则；全局 ignores 必须放在数组第一项的无 files config 里（soybean 自带的 ignores 带 files 不生效，会误扫 `out/`）
