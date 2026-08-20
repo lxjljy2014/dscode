@@ -97,8 +97,15 @@ export interface HostApi {
   sessionsCreate: (session: Session) => Promise<{ ok: boolean }>;
   sessionsAppend: (sessionId: string, message: Message) => Promise<{ ok: boolean }>;
   sessionsStats: (sessionId: string, stats: SessionStats) => Promise<{ ok: boolean }>;
-  /** 压缩会话历史（/compact）：摘要旧消息并替换为检查点，返回新的消息列表 */
-  compactSession: (sessionId: string) => Promise<{ ok: true; messages: Message[] } | { ok: false; error: string }>;
+  /** 压缩会话历史（/compact）：摘要旧消息并替换为检查点，返回新的消息列表与压缩后的上下文占用投影 */
+  compactSession: (sessionId: string) => Promise<
+    | {
+        ok: true;
+        messages: Message[];
+        context: { contextTokens: number; systemTokens: number; toolsTokens: number; messagesTokens: number };
+      }
+    | { ok: false; error: string }
+  >;
   /** 归档/恢复会话（archived=true 归档；false 恢复） */
   sessionSetArchived: (sessionId: string, archived: boolean) => Promise<{ ok: boolean }>;
 

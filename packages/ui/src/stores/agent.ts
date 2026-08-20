@@ -246,20 +246,49 @@ const sessionStats = computed<SessionStats | null>(() => {
     void host.agentConfirmResponse(toolEventId, decision);
   }
 
+  /** 会话统计零值基底（onContext 投影与压缩后刷新共用：字段缺省时兜底） */
+  function emptyStats(): SessionStats {
+    return {
+      rounds: 0,
+      llmMs: 0,
+      toolMs: 0,
+      firstTokenMsSum: 0,
+      firstTokenCount: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      cacheHitTokens: 0,
+      cacheMissTokens: 0
+    };
+  }
+
+  /** /compact 进行中：会话流末尾显示压缩状态行（摘要是一次 LLM 调用，秒级到分钟级） */
+  const compacting = ref(false);
+
   /** 压缩会话历史（/compact）：主进程摘要旧消息并替换为检查点，成功后更新内存态 */
   async function compactSession(): Promise<{ ok: boolean; error?: string }> {
     if (!host) return { ok: false, error: 'IPC 不可用' };
     const session = sessionStore.activeSession;
     if (!session) return { ok: false, error: '无激活会话' };
+    compacting.value = true;
     try {
       const r = await host.compactSession(session.id);
       if (r.ok) {
         session.messages = r.messages;
+        // 上下文占用立即回落（ContextMeter 显示压缩后的新投影；累计统计保留）
+        if (!session.stats) session.stats = emptyStats();
+        session.stats.contextTokens = r.context.contextTokens;
+        session.stats.systemTokens = r.context.systemTokens;
+        session.stats.toolsTokens = r.context.toolsTokens;
+        session.stats.messagesTokens = r.context.messagesTokens;
         return { ok: true };
       }
       return { ok: false, error: r.error };
     } catch {
       return { ok: false, error: 'IPC 调用异常' };
+    } finally {
+      compacting.value = false;
     }
   }
 
@@ -413,9 +442,7 @@ const sessionStats = computed<SessionStats | null>(() => {
   function onContext(ev: { sessionId: string; contextTokens: number; systemTokens: number; toolsTokens: number; messagesTokens: number }) {
     const session = sessionStore.sessions.find(s => s.id === ev.sessionId);
     if (!session) return;
-    if (!session.stats) {
-      session.stats = { rounds: 0, llmMs: 0, toolMs: 0, firstTokenMsSum: 0, firstTokenCount: 0, promptTokens: 0, completionTokens: 0, cacheHits: 0, cacheMisses: 0, cacheHitTokens: 0, cacheMissTokens: 0 };
-    }
+    if (!session.stats) session.stats = emptyStats();
     session.stats.contextTokens = ev.contextTokens;
     session.stats.systemTokens = ev.systemTokens;
     session.stats.toolsTokens = ev.toolsTokens;
@@ -440,5 +467,5 @@ const sessionStats = computed<SessionStats | null>(() => {
 
   subscribeEvents();
 
-  return { generating, pendingConfirm, diffFiles, sessionStats, sendMessage, stopGenerating, respondConfirm, compactSession };
+  return { generating, pendingConfirm, compacting, diffFiles, sessionStats, sendMessage, stopGenerating, respondConfirm, compactSession };
 });

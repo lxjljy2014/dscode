@@ -11,7 +11,7 @@ import {
   SYSTEM_PROMPT,
   SYSTEM_PROMPT_EN
 } from '@dscode/core';
-import type { Hook } from '@dscode/shared';
+import type { AppSettings, Hook } from '@dscode/shared';
 import type { AgentEventSink, AgentStartResult, LlmCache } from '@dscode/core';
 import { loadAppSettings } from '../settings';
 import { getConfigDir, getDbFile, getSessionsDir } from '../data-dir';
@@ -94,23 +94,6 @@ export async function startAgent(
     return { ok: false, error: 'invalid-args' };
   }
   const settings = loadAppSettings(getConfigDir(), app.getPath('home'));
-  // 子智能体人设：命中则替换默认系统提示词，记忆/技能仍叠加
-  const subagent = subagentId ? settings.subagents.find(s => s.id === subagentId) : undefined;
-  // 默认系统提示词跟随系统语言（子智能体人设始终用其自定义 systemPrompt）
-  const basePrompt = subagent
-    ? subagent.systemPrompt
-    : app.getLocale().toLowerCase().startsWith('zh')
-      ? SYSTEM_PROMPT
-      : SYSTEM_PROMPT_EN;
-  // 长期记忆 + 技能注入系统提示词（对应列表为空时保持默认提示词不变）
-  const memorySection =
-    settings.memory.length > 0
-      ? '\n\n用户长期记忆（回答时优先参考，若与当前任务无关可忽略）：\n' +
-        settings.memory.map((m, i) => `${i + 1}. ${m.content}`).join('\n')
-      : '';
-  // 技能只注入目录（名称 + 一句话说明），模型判断任务相关时先调用 skill 工具加载完整指令再执行
-  // （借鉴官方 harness：目录进提示词 + 按需加载正文，避免全量指令占上下文）
-  const skillSection = skillCatalogSection(settings.skills);
   // 会话开始钩子
   fireHooks(settings.hooks, 'session_start', settings.workingDirectory);
   const result = await startAgentCore({
@@ -128,7 +111,7 @@ export async function startAgent(
       permissionModeSource: () =>
         loadAppSettings(getConfigDir(), app.getPath('home')).permissionMode,
       providers: settings.providers,
-      systemPrompt: basePrompt + memorySection + skillSection,
+      systemPrompt: buildAgentSystemPrompt(settings, subagentId),
       browsingEnabled: settings.browsingEnabled,
       skills: settings.skills,
       llmCache: getLlmCache(),
@@ -138,6 +121,28 @@ export async function startAgent(
   });
   if (result.ok) winBySession.set(sessionId, win);
   return result;
+}
+
+/**
+ * 组装 agent 系统提示词：默认提示词跟随系统语言（子智能体人设替换基底）+ 长期记忆 + 技能目录注入。
+ * compact 等无运行场景复用同一组装，保证上下文占用估算与真实运行同口径。
+ */
+export function buildAgentSystemPrompt(settings: AppSettings, subagentId?: string): string {
+  const subagent = subagentId ? settings.subagents.find(s => s.id === subagentId) : undefined;
+  const basePrompt = subagent
+    ? subagent.systemPrompt
+    : app.getLocale().toLowerCase().startsWith('zh')
+      ? SYSTEM_PROMPT
+      : SYSTEM_PROMPT_EN;
+  // 长期记忆（对应列表为空时保持默认提示词不变）
+  const memorySection =
+    settings.memory.length > 0
+      ? '\n\n用户长期记忆（回答时优先参考，若与当前任务无关可忽略）：\n' +
+        settings.memory.map((m, i) => `${i + 1}. ${m.content}`).join('\n')
+      : '';
+  // 技能只注入目录（名称 + 一句话说明），模型判断任务相关时先调用 skill 工具加载完整指令再执行
+  // （借鉴官方 harness：目录进提示词 + 按需加载正文，避免全量指令占上下文）
+  return basePrompt + memorySection + skillCatalogSection(settings.skills);
 }
 
 /** 停止会话的 agent 运行 */

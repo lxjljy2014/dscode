@@ -127,7 +127,7 @@
     "modelCurrent": "Current model: ",
     "modelSwitched": "Model switched to: ",
     "modelInvalid": "Unknown model: {value} (available: {list})",
-    "compactDone": "Conversation history compacted",
+    "compactRunning": "Compacting conversation history…",
     "compactFailed": "Compaction failed"
   },
   "project": {

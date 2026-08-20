@@ -1,4 +1,5 @@
 import type { Message } from '@dscode/shared';
+import { estimateMessageTokens, estimateSystemTokens, estimateToolsTokens } from './token-estimate';
 
 /**
  * 对话压缩（compact）纯逻辑：把较旧的一段对话浓缩为一份结构化摘要，替换为「检查点」用户消息，
@@ -86,4 +87,32 @@ export function applyCompaction(
     createdAt: Date.now()
   };
   return [...messages.slice(0, range.start), checkpoint, ...messages.slice(range.end + 1)];
+}
+
+/** 上下文占用投影：与运行时 ContextMeter 的构成口径一致（system + tools + messages） */
+export interface ContextProjection {
+  contextTokens: number;
+  systemTokens: number;
+  toolsTokens: number;
+  messagesTokens: number;
+}
+
+/**
+ * 压缩后估算新的上下文占用：压缩释放了旧消息但短期内不会再发起 agent 运行，
+ * 由宿主用与运行时相同的估算函数对压缩后消息算一遍投影，让 ContextMeter 立即回落。
+ * 近似口径：messages 按持久化消息的 role+content 估算（工具调用重建细节不计入），
+ * 下一次真实运行的 usage.promptTokens 会重新锚定精确值。
+ */
+export function estimateContextProjection(
+  systemPrompt: string,
+  tools: unknown[],
+  messages: readonly Message[]
+): ContextProjection {
+  const systemTokens = estimateSystemTokens(systemPrompt);
+  const toolsTokens = estimateToolsTokens(tools);
+  const messagesTokens = messages.reduce(
+    (sum, m) => sum + estimateMessageTokens({ role: m.role, content: m.content }),
+    0
+  );
+  return { contextTokens: systemTokens + toolsTokens + messagesTokens, systemTokens, toolsTokens, messagesTokens };
 }

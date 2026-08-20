@@ -14,7 +14,7 @@ const { t } = useI18n();
 const sessionStore = useSessionStore();
 const agentStore = useAgentStore();
 const { activeSession } = storeToRefs(sessionStore);
-const { generating } = storeToRefs(agentStore);
+const { generating, compacting } = storeToRefs(agentStore);
 
 const messages = computed(() => activeSession.value?.messages ?? []);
 
@@ -96,6 +96,10 @@ function scrollToBottomHard() {
 // 新增消息（发送 / fork）→ 强吸底（偏移量未测完，含延迟兜底）
 watch(() => messages.value.length, scrollToBottomHard, { flush: 'post' });
 
+// 压缩替换整个消息数组（引用变化，长度可能不变如 4→4，上面的 length watch 不触发）→ 强吸底；
+// 普通 push 不换数组引用，不会误触发
+watch(messages, scrollToBottomHard, { flush: 'post' });
+
 // 流式内容增长 / 工具事件 → 轻量吸底（不重排虚拟窗口，避免一跳一跳）
 watch(
   () => [
@@ -108,6 +112,9 @@ watch(
 
 // 切换会话 / 组件重挂载（设置页返回、重启后恢复）→ 强吸底
 watch(activeSession, scrollToBottomHard, { flush: 'post' });
+
+// 压缩状态行在会话流末尾：出现时占高会把贴底视图顶起一小段，轻量吸回
+watch(compacting, () => scrollToBottom());
 
 onMounted(() => {
   scrollToBottomHard();
@@ -128,6 +135,14 @@ onMounted(() => {
             </div>
           </template>
         </VVirtualScroll>
+
+        <!-- /compact 进行中：会话流末尾的系统状态行（作为会话的一部分，与消息同宽度容器） -->
+        <div v-if="compacting" class="ds-fade-in mx-auto w-full max-w-200 shrink-0 px-6 pb-2">
+          <div class="flex items-center gap-1.5 text-xs text-muted">
+            <span class="i-lucide:loader-circle text-3.5 animate-spin" />
+            {{ t('command.compactRunning') }}
+          </div>
+        </div>
       </div>
 
       <div class="shrink-0 px-6 pb-3 pt-1">

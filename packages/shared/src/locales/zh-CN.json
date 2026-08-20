@@ -127,7 +127,7 @@
     "modelCurrent": "当前模型：",
     "modelSwitched": "已切换模型：",
     "modelInvalid": "未知模型：{value}（可用 {list}）",
-    "compactDone": "已压缩对话历史",
+    "compactRunning": "正在压缩对话历史…",
     "compactFailed": "压缩失败"
   },
   "project": {

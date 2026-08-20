@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Message } from '@dscode/shared';
-import { applyCompaction, buildCompactionRequest, CHECKPOINT_PREAMBLE, COMPACT_INSTRUCTION, selectCompactableRange } from '../src/agent/compact';
+import { applyCompaction, buildCompactionRequest, CHECKPOINT_PREAMBLE, COMPACT_INSTRUCTION, estimateContextProjection, selectCompactableRange } from '../src/agent/compact';
 
 function msg(id: string, role: 'user' | 'assistant', content: string): Message {
   return { id, role, content, createdAt: 1 };
@@ -39,5 +39,18 @@ describe('compact 纯逻辑', () => {
     expect(out[0]?.content).toContain(CHECKPOINT_PREAMBLE);
     expect(out[0]?.content).toContain('结构化摘要');
     expect(out[3]?.id).toBe('m5'); // 最近消息保留
+  });
+
+  it('estimateContextProjection：构成分项之和 = 总占用，且随消息减少而回落', () => {
+    const before = estimateContextProjection('系统提示词', [{ name: 't' }], msgs(5));
+    expect(before.contextTokens).toBe(before.systemTokens + before.toolsTokens + before.messagesTokens);
+    expect(before.systemTokens).toBeGreaterThan(0);
+    expect(before.toolsTokens).toBeGreaterThan(0);
+    expect(before.messagesTokens).toBeGreaterThan(0);
+
+    const after = estimateContextProjection('系统提示词', [{ name: 't' }], msgs(2));
+    expect(after.systemTokens).toBe(before.systemTokens); // 系统提示词不变
+    expect(after.toolsTokens).toBe(before.toolsTokens); // 工具不变
+    expect(after.messagesTokens).toBeLessThan(before.messagesTokens); // 消息变少占用回落
   });
 });

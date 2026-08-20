@@ -223,7 +223,7 @@ function effortToReasoning(e: Effort): 'off' | 'high' | 'max' | undefined {
   }
 }
 
-/** 命令执行结果反馈（snackbar） */
+/** 命令执行结果反馈（snackbar，仅错误类提示） */
 const feedback = ref('');
 const feedbackShow = ref(false);
 function notify(text: string) {
@@ -293,8 +293,9 @@ async function runAction(cmd: Command, rest: string): Promise<ActionResult> {
       return { handled: true };
     }
     case 'compact': {
+      // 进行中的压缩状态行在会话流末尾（ChatView，状态由 agent store 管理）；此处只报失败原因
       const r = await agentStore.compactSession();
-      notify(r.ok ? t('command.compactDone') : (r.error ?? t('command.compactFailed')));
+      if (!r.ok) notify(r.error ?? t('command.compactFailed'));
       return { handled: true };
     }
     default:
@@ -313,7 +314,20 @@ function applyCommand(cmd: Command) {
 /** 选中当前高亮命令并应用到输入框 */
 function selectActiveCommand(): void {
   const cmd = filteredCommands.value[commandActive.value];
-  if (cmd) applyCommand(cmd);
+  if (!cmd) {
+    // 无匹配命令：关闭卡片并按普通文本发送（与未打开卡片时的行为一致，避免 Enter 被空卡片吞掉）
+    commandOpen.value = false;
+    submit();
+    return;
+  }
+  // 动作命令且输入恰为 /<name>（无参数）：Enter 直接提交执行，省去「选中→再回车」两步——
+  // 否则第一次 Enter 只补一个不可见的尾随空格，看起来像「没反应」
+  if (cmd.action && input.value.trim() === `/${cmd.name}`) {
+    commandOpen.value = false;
+    submit();
+    return;
+  }
+  applyCommand(cmd);
 }
 
 /** 点击 / 按钮：在末尾补一个 / 触发命令卡片（组合框保持输入框焦点） */
@@ -392,12 +406,13 @@ function submit() {
   const hasPending = attachments.value.length > 0 || contexts.value.length > 0;
   if ((!trimmed && !hasPending) || props.generating) return;
   const parsed = trimmed ? parseCommand(trimmed) : null;
-  // 内置动作命令：直接执行，不发消息（/plan <message> 会把消息作为本轮提示词发送）
+  // 内置动作命令：直接执行，不发消息（/plan <message> 会把消息作为本轮提示词发送）。
+  // 立即清空输入框——执行是异步的（如 /compact 要调 LLM 摘要），残留命令文本会让人以为没反应
   if (parsed?.cmd.action) {
+    input.value = '';
     void runAction(parsed.cmd, parsed.rest).then(result => {
       if (!result.handled) return;
       if (result.send) sendNow(result.send);
-      else input.value = '';
     });
     return;
   }
