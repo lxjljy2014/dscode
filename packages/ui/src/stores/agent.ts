@@ -315,15 +315,19 @@ const sessionStats = computed<SessionStats | null>(() => {
     }
   }
 
-  /** 提交 diff 面板列出的改动（只提交这些路径），成功后放弃快照（变更面板清空、回滚入口消失） */
-  async function commitChanges(message: string): Promise<{ ok: boolean; error?: string }> {
+  /**
+   * 提交 diff 面板列出的改动（只提交这些路径），成功后放弃快照（变更面板清空、回滚入口消失）。
+   * paths 缺省提交全部；勾选提交时只提交勾选文件（其余改动保留在工作区）。
+   */
+  async function commitChanges(message: string, paths?: string[]): Promise<{ ok: boolean; error?: string }> {
     if (!host) return { ok: false, error: 'IPC 不可用' };
     const sessionId = sessionStore.activeSessionId;
     if (!sessionId) return { ok: false, error: '无激活会话' };
-    const paths = diffFiles.value.map(f => f.path);
-    if (paths.length === 0) return { ok: false, error: '无待提交改动' };
+    const selected = new Set(paths);
+    const commitPaths = (paths ? diffFiles.value.filter(f => selected.has(f.path)).map(f => f.path) : diffFiles.value.map(f => f.path));
+    if (commitPaths.length === 0) return { ok: false, error: '无待提交改动' };
     try {
-      const r = await host.gitCommit(settingsStore.settings.workingDirectory, paths, message);
+      const r = await host.gitCommit(settingsStore.settings.workingDirectory, commitPaths, message);
       if (!r.ok) return { ok: false, error: r.error };
       await host.workspaceClearSnapshot(sessionId);
       diffBySession.set(sessionId, []);

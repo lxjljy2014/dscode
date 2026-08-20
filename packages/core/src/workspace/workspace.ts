@@ -1,5 +1,5 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve } from 'node:path';
 import type { FileNode } from '@dscode/shared';
 import { MAX_FILE_BYTES } from '../constants';
 import { SKIP_DIRS, resolveSafePath } from './paths';
@@ -59,5 +59,82 @@ export async function readWorkspaceFile(
     return { ok: true, content: await readFile(target, 'utf8') };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// ---- 工作区文件操作（文件树右键菜单：新建/重命名；均限定工作目录内） ----
+
+/** 新建空文件（父目录不存在时自动创建；目标已存在时报错） */
+export async function createWorkspaceFile(
+  cwd: string,
+  relPath: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const target = await resolveSafePath(cwd, relPath);
+  if (!target) return { ok: false, error: '路径不在工作目录内' };
+  try {
+    if (await exists(target)) return { ok: false, error: '目标已存在' };
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, '', 'utf8');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 新建目录（recursive；目标已存在时报错） */
+export async function createWorkspaceDir(
+  cwd: string,
+  relPath: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const target = await resolveSafePath(cwd, relPath);
+  if (!target) return { ok: false, error: '路径不在工作目录内' };
+  try {
+    if (await exists(target)) return { ok: false, error: '目标已存在' };
+    await mkdir(target, { recursive: true });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 重命名/移动（目标已存在、目标越界均报错） */
+export async function renameWorkspaceEntry(
+  cwd: string,
+  from: string,
+  to: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const src = await resolveSafePath(cwd, from);
+  const dst = await resolveSafePath(cwd, to);
+  if (!src || !dst) return { ok: false, error: '路径不在工作目录内' };
+  try {
+    if (!(await exists(src))) return { ok: false, error: '原路径不存在' };
+    if (await exists(dst)) return { ok: false, error: '目标已存在' };
+    await mkdir(dirname(dst), { recursive: true });
+    await rename(src, dst);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 删除前置校验：路径存在且在工作目录内，返回绝对路径（删除动作由宿主执行，如移入回收站） */
+export async function resolveWorkspaceEntryForDelete(
+  cwd: string,
+  relPath: string
+): Promise<{ ok: true; target: string } | { ok: false; error: string }> {
+  const target = await resolveSafePath(cwd, relPath);
+  if (!target) return { ok: false, error: '路径不在工作目录内' };
+  if (!(await exists(target))) return { ok: false, error: '目标不存在' };
+  // 根目录本身不可删（relPath 为空/点号时 join 得 cwd）
+  if (target === resolve(cwd)) return { ok: false, error: '不能删除工作目录根' };
+  return { ok: true, target };
+}
+
+async function exists(p: string): Promise<boolean> {
+  try {
+    await stat(p);
+    return true;
+  } catch {
+    return false;
   }
 }

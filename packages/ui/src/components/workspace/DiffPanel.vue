@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import type { DiffFile } from '@dscode/shared';
+import type { DiffFile, DiffLine } from '@dscode/shared';
 import { useAgentStore } from '../../stores/agent';
+import { highlightLine, langFromPath } from '../../utils/highlight';
 import FileTree from './FileTree.vue';
 
 const { t } = useI18n();
@@ -23,6 +24,76 @@ function visibleLines(f: DiffFile) {
 function hiddenLineCount(f: DiffFile) {
   return Math.max(0, f.lines.length - MAX_DIFF_LINES);
 }
+
+// ---- 视图切换（统一 / 并排）与行级语法高亮 ----
+
+const viewMode = ref<'unified' | 'split'>('unified');
+
+/** 统一视图：每个文件的高亮行 HTML（computed 缓存，避免每次渲染重跑 hljs） */
+const unifiedHtml = computed(() => {
+  const map = new Map<string, string[]>();
+  for (const f of visibleDiffFiles.value) {
+    const lang = langFromPath(f.path);
+    map.set(
+      f.path,
+      visibleLines(f).map(l => (l.type === 'hunk' ? l.content : highlightLine(l.content, lang)))
+    );
+  }
+  return map;
+});
+
+/** 并排视图行：左列旧内容（del+context）、右列新内容（add+context），hunk 跨两列 */
+interface SplitRow {
+  hunk?: string;
+  left?: DiffLine;
+  right?: DiffLine;
+  leftHtml: string;
+  rightHtml: string;
+}
+
+/**
+ * 统一 diff 行序列 → 并排行对：连续的 del 块与紧随的 add 块按序配对（GitHub 式对齐），
+ * 短的一侧留空；context 行左右同现。
+ */
+function toSplitRows(f: DiffFile): SplitRow[] {
+  const lang = langFromPath(f.path);
+  const lines = visibleLines(f);
+  const rows: SplitRow[] = [];
+  let i = 0;
+  const make = (left?: DiffLine, right?: DiffLine, hunk?: string): SplitRow => ({
+    left,
+    right,
+    hunk,
+    leftHtml: left && left.type !== 'hunk' ? highlightLine(left.content, lang) : '',
+    rightHtml: right && right.type !== 'hunk' ? highlightLine(right.content, lang) : ''
+  });
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (line.type === 'hunk') {
+      rows.push(make(undefined, undefined, line.content));
+      i++;
+      continue;
+    }
+    if (line.type === 'context') {
+      rows.push(make(line, line));
+      i++;
+      continue;
+    }
+    const dels: DiffLine[] = [];
+    const adds: DiffLine[] = [];
+    while (i < lines.length && lines[i]!.type === 'del') dels.push(lines[i++]!);
+    while (i < lines.length && lines[i]!.type === 'add') adds.push(lines[i++]!);
+    const pairs = Math.max(dels.length, adds.length);
+    for (let k = 0; k < pairs; k++) rows.push(make(dels[k], adds[k]));
+  }
+  return rows;
+}
+
+const splitRows = computed(() => {
+  const map = new Map<string, SplitRow[]>();
+  for (const f of visibleDiffFiles.value) map.set(f.path, toSplitRows(f));
+  return map;
+});
 
 // ---- 回滚 / 提交 ----
 
@@ -51,14 +122,25 @@ async function doRestore() {
   }
 }
 
-/** 提交对话框 */
+/** 提交对话框（可勾选文件，未勾选的改动保留在工作区） */
 const commitDialog = ref(false);
 const commitMessage = ref('');
 const committing = ref(false);
-const commitDisabled = computed(() => commitMessage.value.trim().length === 0 || committing.value);
+const commitSelected = ref<string[]>([]);
+// 打开对话框时默认全选
+watch(commitDialog, open => {
+  if (open) commitSelected.value = diffFiles.value.map(f => f.path);
+});
+const commitAllSelected = computed(() => commitSelected.value.length === diffFiles.value.length);
+function toggleAllCommit() {
+  commitSelected.value = commitAllSelected.value ? [] : diffFiles.value.map(f => f.path);
+}
+const commitDisabled = computed(
+  () => commitMessage.value.trim().length === 0 || commitSelected.value.length === 0 || committing.value
+);
 async function doCommit() {
   committing.value = true;
-  const r = await store.commitChanges(commitMessage.value.trim());
+  const r = await store.commitChanges(commitMessage.value.trim(), [...commitSelected.value]);
   committing.value = false;
   if (r.ok) {
     commitDialog.value = false;
@@ -83,7 +165,7 @@ async function doCommit() {
       </VTab>
     </VTabs>
 
-    <!-- 变更工具条：文件数 + 提交/回滚入口（仅变更页且有 diff 时展示） -->
+    <!-- 变更工具条：文件数 + 视图切换 + 提交/回滚入口（仅变更页且有 diff 时展示） -->
     <div
       v-if="tab === 'changes' && diffFiles.length"
       class="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-1"
@@ -92,6 +174,14 @@ async function doCommit() {
         {{ t('diff.fileCount', { n: diffFiles.length }) }}
       </span>
       <div class="flex shrink-0 items-center gap-1">
+        <VBtnToggle v-model="viewMode" mandatory density="compact" class="mr-1">
+          <VBtn value="unified" size="x-small" :title="t('diff.viewUnified')">
+            <span class="i-lucide:rows-3 text-3.5" />
+          </VBtn>
+          <VBtn value="split" size="x-small" :title="t('diff.viewSplit')">
+            <span class="i-lucide:columns-2 text-3.5" />
+          </VBtn>
+        </VBtnToggle>
         <VBtn size="x-small" variant="text" class="text-xs" :disabled="generating" @click="commitDialog = true">
           <span class="i-lucide:git-commit-horizontal mr-1 text-3.5" />
           {{ t('diff.commit') }}
@@ -126,7 +216,8 @@ async function doCommit() {
               </span>
             </div>
 
-            <div class="py-1 font-mono text-xs leading-[22px]">
+            <!-- 统一视图 -->
+            <div v-if="viewMode === 'unified'" class="py-1 font-mono text-xs leading-[22px]">
               <template v-for="(line, i) in visibleLines(f)" :key="i">
                 <!-- hunk 头 -->
                 <div v-if="line.type === 'hunk'" class="px-3 text-faint select-none">
@@ -157,7 +248,56 @@ async function doCommit() {
                   >
                     {{ line.type === 'add' ? '+' : line.type === 'del' ? '-' : '' }}
                   </span>
-                  <span class="whitespace-pre-wrap pr-3 text-fg">{{ line.content }}</span>
+                  <!-- eslint-disable-next-line vue/no-v-html -- hljs 输出已完成 HTML 转义 -->
+                  <span class="whitespace-pre-wrap pr-3 text-fg" v-html="unifiedHtml.get(f.path)?.[i]"></span>
+                </div>
+              </template>
+              <div v-if="hiddenLineCount(f) > 0" class="px-3 text-faint select-none">
+                {{ t('diff.foldedLines', { n: hiddenLineCount(f) }) }}
+              </div>
+            </div>
+
+            <!-- 并排视图：左旧右新，del/add 块按序配对 -->
+            <div v-else class="py-1 font-mono text-xs leading-[22px]">
+              <template v-for="(row, i) in splitRows.get(f.path) ?? []" :key="i">
+                <div v-if="row.hunk" class="px-3 text-faint select-none">
+                  {{ row.hunk }}
+                </div>
+                <div v-else class="flex">
+                  <!-- 左列（旧） -->
+                  <div
+                    class="flex w-1/2 min-w-0"
+                    :class="{ 'bg-diff-del/12': row.left?.type === 'del' }"
+                  >
+                    <span class="w-9 shrink-0 select-none pr-2 text-right text-faint">
+                      {{ row.left?.oldLineNo ?? '' }}
+                    </span>
+                    <span
+                      class="w-4 shrink-0 select-none text-center"
+                      :class="row.left?.type === 'del' ? 'text-diff-del' : 'text-faint'"
+                    >
+                      {{ row.left?.type === 'del' ? '-' : '' }}
+                    </span>
+                    <!-- eslint-disable-next-line vue/no-v-html -- hljs 输出已完成 HTML 转义 -->
+                    <span class="min-w-0 flex-1 whitespace-pre-wrap pr-2 text-fg" v-html="row.leftHtml"></span>
+                  </div>
+                  <!-- 右列（新） -->
+                  <div
+                    class="flex w-1/2 min-w-0 border-l border-line"
+                    :class="{ 'bg-diff-add/12': row.right?.type === 'add' }"
+                  >
+                    <span class="w-9 shrink-0 select-none pr-2 text-right text-faint">
+                      {{ row.right?.newLineNo ?? '' }}
+                    </span>
+                    <span
+                      class="w-4 shrink-0 select-none text-center"
+                      :class="row.right?.type === 'add' ? 'text-diff-add' : 'text-faint'"
+                    >
+                      {{ row.right?.type === 'add' ? '+' : '' }}
+                    </span>
+                    <!-- eslint-disable-next-line vue/no-v-html -- hljs 输出已完成 HTML 转义 -->
+                    <span class="min-w-0 flex-1 whitespace-pre-wrap pr-2 text-fg" v-html="row.rightHtml"></span>
+                  </div>
                 </div>
               </template>
               <div v-if="hiddenLineCount(f) > 0" class="px-3 text-faint select-none">
@@ -204,10 +344,10 @@ async function doCommit() {
     </VDialog>
 
     <!-- 提交 -->
-    <VDialog v-model="commitDialog" max-width="460">
+    <VDialog v-model="commitDialog" max-width="520">
       <VCard>
         <VCardTitle class="text-sm">
-          {{ t('diff.commitTitle', { n: diffFiles.length }) }}
+          {{ t('diff.commitTitle', { n: commitSelected.length }) }}
         </VCardTitle>
         <VCardText>
           <VTextField
@@ -216,7 +356,28 @@ async function doCommit() {
             variant="outlined"
             :placeholder="t('diff.commitPlaceholder')"
             autofocus
+            class="mb-2"
           />
+          <div class="mb-1 flex items-center justify-between">
+            <span class="text-xs text-muted">{{ t('diff.commitSelectFiles') }}</span>
+            <VBtn size="x-small" variant="text" class="text-xs" @click="toggleAllCommit">
+              {{ commitAllSelected ? t('diff.deselectAll') : t('diff.selectAll') }}
+            </VBtn>
+          </div>
+          <div class="max-h-48 overflow-y-auto rounded border border-line px-2 py-1">
+            <VCheckbox
+              v-for="f in diffFiles"
+              :key="f.path"
+              v-model="commitSelected"
+              :value="f.path"
+              density="compact"
+              hide-details
+            >
+              <template #label>
+                <span class="truncate font-mono text-xs text-fg">{{ f.path }}</span>
+              </template>
+            </VCheckbox>
+          </div>
         </VCardText>
         <VCardActions>
           <VSpacer />

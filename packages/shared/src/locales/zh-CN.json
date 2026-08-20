@@ -188,7 +188,29 @@
     "commitTitle": "提交 {n} 个文件的改动",
     "commitPlaceholder": "提交信息（如：fix: 修复登录跳转）",
     "commitDone": "已提交",
-    "commitFailed": "提交失败"
+    "commitFailed": "提交失败",
+    "commitSelectFiles": "选择要提交的文件（未勾选的改动保留在工作区）",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "viewUnified": "统一视图",
+    "viewSplit": "并排视图"
+  },
+  "fileTree": {
+    "newFile": "新建文件",
+    "newFolder": "新建文件夹",
+    "rename": "重命名",
+    "delete": "删除",
+    "deleteConfirmTitle": "删除「{name}」",
+    "deleteConfirmBody": "将移入系统回收站，可从中恢复。",
+    "createFileTitle": "新建文件",
+    "createDirTitle": "新建文件夹",
+    "renameTitle": "重命名",
+    "namePlaceholder": "名称（相对当前目录）",
+    "create": "创建",
+    "created": "已创建",
+    "renamed": "已重命名",
+    "deleted": "已删除",
+    "operationFailed": "操作失败"
   },
   "agent": {
     "tool": {

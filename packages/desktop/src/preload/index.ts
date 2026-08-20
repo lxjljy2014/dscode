@@ -147,6 +147,18 @@ const api = {
   /** 放弃快照（提交改动后调用：变更面板清空、回滚入口消失） */
   workspaceClearSnapshot: (sessionId: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('workspace:clear-snapshot', sessionId),
+  /** 新建空文件（文件树右键菜单） */
+  workspaceCreateFile: (relPath: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:create-file', relPath),
+  /** 新建目录（文件树右键菜单） */
+  workspaceCreateDir: (relPath: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:create-dir', relPath),
+  /** 重命名/移动工作区条目（文件树右键菜单） */
+  workspaceRename: (from: string, to: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:rename', from, to),
+  /** 删除工作区条目（移入系统回收站，文件树右键菜单） */
+  workspaceDelete: (relPath: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:delete', relPath),
 
   // ---- 会话持久化 ----
   sessionsList: (): Promise<Session[]> => ipcRenderer.invoke('sessions:list'),

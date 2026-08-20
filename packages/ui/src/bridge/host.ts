@@ -97,6 +97,14 @@ export interface HostApi {
   ) => Promise<{ ok: true; restored: number; files: DiffFile[] } | { ok: false; error: string }>;
   /** 放弃快照（提交改动后调用：变更面板清空、回滚入口消失） */
   workspaceClearSnapshot: (sessionId: string) => Promise<{ ok: boolean }>;
+  /** 新建空文件（文件树右键菜单） */
+  workspaceCreateFile: (relPath: string) => Promise<{ ok: boolean; error?: string }>;
+  /** 新建目录（文件树右键菜单） */
+  workspaceCreateDir: (relPath: string) => Promise<{ ok: boolean; error?: string }>;
+  /** 重命名/移动工作区条目（文件树右键菜单） */
+  workspaceRename: (from: string, to: string) => Promise<{ ok: boolean; error?: string }>;
+  /** 删除工作区条目（移入系统回收站，文件树右键菜单） */
+  workspaceDelete: (relPath: string) => Promise<{ ok: boolean; error?: string }>;
 
   // ---- 会话持久化 ----
   sessionsList: () => Promise<Session[]>;

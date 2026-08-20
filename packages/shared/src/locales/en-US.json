@@ -188,7 +188,29 @@
     "commitTitle": "Commit changes in {n} files",
     "commitPlaceholder": "Commit message (e.g. fix: correct login redirect)",
     "commitDone": "Committed",
-    "commitFailed": "Commit failed"
+    "commitFailed": "Commit failed",
+    "commitSelectFiles": "Files to commit (unchecked changes stay in the workspace)",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "viewUnified": "Unified view",
+    "viewSplit": "Split view"
+  },
+  "fileTree": {
+    "newFile": "New file",
+    "newFolder": "New folder",
+    "rename": "Rename",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete \"{name}\"",
+    "deleteConfirmBody": "It will be moved to the system trash and can be restored from there.",
+    "createFileTitle": "New file",
+    "createDirTitle": "New folder",
+    "renameTitle": "Rename",
+    "namePlaceholder": "Name (relative to current directory)",
+    "create": "Create",
+    "created": "Created",
+    "renamed": "Renamed",
+    "deleted": "Deleted",
+    "operationFailed": "Operation failed"
   },
   "agent": {
     "tool": {

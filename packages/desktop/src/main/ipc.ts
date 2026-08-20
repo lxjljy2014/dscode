@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import type { SettingsPatch } from '@dscode/shared';
 import {
@@ -7,6 +7,8 @@ import {
   clearAgentWorkspaceSnapshot,
   commitPaths,
   createSqliteLlmCache,
+  createWorkspaceDir,
+  createWorkspaceFile,
   disposeSession,
   initLlmCache,
   checkout,
@@ -26,6 +28,8 @@ import {
   listUsage,
   readWorkspaceFile,
   removeProject,
+  renameWorkspaceEntry,
+  resolveWorkspaceEntryForDelete,
   restoreAgentWorkspace,
   scanTree,
   searchIndex,
@@ -280,6 +284,43 @@ export function registerIpcHandlers(): void {
     withMainWindow((_win, sessionId: unknown) => {
       if (isString(sessionId)) clearAgentWorkspaceSnapshot(sessionId);
       return { ok: true };
+    })
+  );
+  // ---- 文件树右键操作（新建/重命名/删除；删除移入系统回收站而非永久删除） ----
+  ipcMain.handle(
+    'workspace:create-file',
+    withMainWindow(async (_win, relPath: unknown) => {
+      const cwd = loadAppSettings(settingsDir, homeDir).workingDirectory;
+      return isString(relPath) ? createWorkspaceFile(cwd, relPath) : { ok: false, error: 'invalid path' };
+    })
+  );
+  ipcMain.handle(
+    'workspace:create-dir',
+    withMainWindow(async (_win, relPath: unknown) => {
+      const cwd = loadAppSettings(settingsDir, homeDir).workingDirectory;
+      return isString(relPath) ? createWorkspaceDir(cwd, relPath) : { ok: false, error: 'invalid path' };
+    })
+  );
+  ipcMain.handle(
+    'workspace:rename',
+    withMainWindow(async (_win, from: unknown, to: unknown) => {
+      const cwd = loadAppSettings(settingsDir, homeDir).workingDirectory;
+      return isString(from) && isString(to) ? renameWorkspaceEntry(cwd, from, to) : { ok: false, error: 'invalid args' };
+    })
+  );
+  ipcMain.handle(
+    'workspace:delete',
+    withMainWindow(async (_win, relPath: unknown) => {
+      if (!isString(relPath)) return { ok: false, error: 'invalid path' };
+      const cwd = loadAppSettings(settingsDir, homeDir).workingDirectory;
+      const r = await resolveWorkspaceEntryForDelete(cwd, relPath);
+      if (!r.ok) return r;
+      try {
+        await shell.trashItem(r.target);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
     })
   );
 
