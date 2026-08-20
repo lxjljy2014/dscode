@@ -92,4 +92,4 @@ jobs:
             --notes "DSCode ${GITHUB_REF_NAME#v} 发布（CI 自动构建，未签名）。" \
             --verify-tag
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
