@@ -1,5 +1,5 @@
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative } from 'node:path';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { DiffFile, DiffLine } from '@dscode/shared';
 import { MAX_FILE_BYTES } from '../constants';
 import { SKIP_DIRS } from './paths';
@@ -44,7 +44,8 @@ export async function collectTextFiles(cwd: string, maxFiles = Number.POSITIVE_I
       try {
         const st = await stat(full);
         if (st.size > MAX_FILE_BYTES) continue;
-        files.set(relative(cwd, full), await readFile(full, 'utf8'));
+        // 快照键统一 posix 分隔符（Windows 下 relative() 产出反斜杠，会导致跨平台路径键不一致）
+        files.set(relative(cwd, full).split(sep).join('/'), await readFile(full, 'utf8'));
       } catch {
         // 二进制/不可读文件跳过
       }
