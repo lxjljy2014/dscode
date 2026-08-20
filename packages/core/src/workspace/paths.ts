@@ -6,8 +6,41 @@ import { dirname, join, sep } from 'node:path';
  * 被工具集、工作区扫描与 diff 快照共同引用。
  */
 
-/** 遍历与搜索时跳过的目录 */
-export const SKIP_DIRS = new Set(['node_modules', '.git', 'out', 'dist']);
+/**
+ * 遍历与搜索时跳过的目录：包管理器产物、构建产物、缓存与 IDE 元数据。
+ * 这些目录体积大且几乎不含用户源码，跳过可显著降低遍历成本与文件数预算消耗。
+ */
+export const SKIP_DIRS = new Set([
+  // JS/TS
+  'node_modules',
+  'bun_modules',
+  'bower_components',
+  // 构建 / 产物
+  'out',
+  'dist',
+  'build',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.parcel-cache',
+  'coverage',
+  'target',
+  '.gradle',
+  // Python
+  'venv',
+  '.venv',
+  '__pycache__',
+  '.pytest_cache',
+  '.mypy_cache',
+  '.tox',
+  // JVM / 其它
+  'vendor',
+  '.terraform',
+  // VCS
+  '.git',
+  '.svn',
+  '.hg'
+]);
 
 async function exists(p: string): Promise<boolean> {
   try {
