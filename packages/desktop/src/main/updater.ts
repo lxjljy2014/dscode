@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { app, autoUpdater as nativeUpdater, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import type { UpdaterState } from '@dscode/shared';
 import { mainLabels } from './i18n';
@@ -8,6 +8,9 @@ let getMainWindow: (() => BrowserWindow | null) | null = null;
 // 手动检查（托盘触发）计数：无更新/失败时弹提示；启动自动检查则静默。
 // 用计数而非布尔，避免自动/手动并发时 update-not-available/error 回调互相覆盖弹窗状态
 let manualChecksPending = 0;
+
+// macOS 点击「重启更新」后，Squirrel 正常应立即退出并安装；超时仍存活视为安装失败
+const INSTALL_CONFIRM_TIMEOUT_MS = 5000;
 
 function consumeManualCheck(): boolean {
   if (manualChecksPending > 0) {
@@ -93,6 +96,14 @@ export function initAutoUpdater(mainWindowGetter: () => BrowserWindow | null): v
     }
   });
 
+  // macOS：electron-updater 把安装委托给 Squirrel.Mac（原生 autoUpdater），其错误（典型如
+  // 未签名构建的 "Could not get code signature"）不经 electron-updater 的 error 事件暴露——
+  // 不转发的话 UI 停留在 downloaded 死按钮。此处只推状态，不弹窗（由 install 兜底提示）。
+  nativeUpdater.on('error', err => {
+    console.error('[updater] Squirrel 原生错误', err);
+    pushState({ state: 'error', message: err instanceof Error ? err.message : String(err) });
+  });
+
   // 渲染端触发：开始下载 / 重启安装 / 拉取当前状态
   ipcMain.handle('updater:download', e => {
     if (!isMainWindowSender(e)) return;
@@ -100,6 +111,20 @@ export function initAutoUpdater(mainWindowGetter: () => BrowserWindow | null): v
   });
   ipcMain.handle('updater:install', e => {
     if (!isMainWindowSender(e)) return;
+    // macOS 上 Squirrel 未就绪时 quitAndInstall 只是注册等待、无可见动作（未签名即永不就绪）。
+    // 超时兜底：若干秒后本进程仍存活（Squirrel 未执行重启），明确弹窗告知失败原因与手动更新指引。
+    if (process.platform === 'darwin') {
+      setTimeout(() => {
+        const labels = mainLabels();
+        void showDialog({
+          type: 'warning',
+          title: labels.updater.installFailTitle,
+          message: labels.updater.installFailMessage,
+          detail: labels.updater.installFailHint,
+          buttons: [labels.updater.ok]
+        });
+      }, INSTALL_CONFIRM_TIMEOUT_MS);
+    }
     autoUpdater.quitAndInstall();
   });
   ipcMain.handle('updater:get-state', e => {

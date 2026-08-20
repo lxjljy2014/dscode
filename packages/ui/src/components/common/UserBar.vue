@@ -18,6 +18,10 @@ const version = computed(() => {
   return s.state === 'available' || s.state === 'downloading' || s.state === 'downloaded' ? s.version : '';
 });
 const percent = computed(() => (updaterState.value.state === 'downloading' ? updaterState.value.percent : 0));
+/** 错误详情（error 态展示；message 可能是英文技术信息，前缀本地化说明） */
+const errorMessage = computed(() =>
+  updaterState.value.state === 'error' ? updaterState.value.message ?? '' : ''
+);
 
 async function download(): Promise<void> {
   await host?.updaterDownload();
@@ -86,6 +90,12 @@ onBeforeUnmount(() => unsubscribe?.());
           class="text-primary"
           @click="install()"
         />
+      </template>
+    </VTooltip>
+    <!-- 更新失败：感叹图标提示（含 Squirrel 原生错误，如未签名构建无法自动安装） -->
+    <VTooltip v-else-if="state === 'error'" :text="t('updater.error') + (errorMessage ? `：${errorMessage}` : '')" location="top">
+      <template #activator="{ props }">
+        <VBtn v-bind="props" icon="i-lucide:circle-alert" variant="text" size="x-small" class="text-warning" />
       </template>
     </VTooltip>
 

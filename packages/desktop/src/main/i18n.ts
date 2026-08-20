@@ -20,7 +20,17 @@ export interface MainLabels {
   aboutDscode: string;
   quit: string;
   about: { title: string; subtitle: string; version: string; copyright: string; ok: string };
-  updater: { checkTitle: string; latest: string; currentVersion: string; failTitle: string; failMessage: string; ok: string };
+  updater: {
+    checkTitle: string;
+    latest: string;
+    currentVersion: string;
+    failTitle: string;
+    failMessage: string;
+    installFailTitle: string;
+    installFailMessage: string;
+    installFailHint: string;
+    ok: string;
+  };
   dialogs: { pickDirectory: string; pickFiles: string; saveFile: string };
 }
 
@@ -42,7 +52,17 @@ const ZH: MainLabels = {
   aboutDscode: '关于 DSCode',
   quit: '退出',
   about: { title: '关于 DSCode', subtitle: 'AI 编程助手桌面客户端', version: '版本', copyright: 'Copyright © 2026 DSCode', ok: '确定' },
-  updater: { checkTitle: '检查更新', latest: '已是最新版本', currentVersion: '当前版本', failTitle: '检查更新失败', failMessage: '无法完成自动更新', ok: '确定' },
+  updater: {
+    checkTitle: '检查更新',
+    latest: '已是最新版本',
+    currentVersion: '当前版本',
+    failTitle: '检查更新失败',
+    failMessage: '无法完成自动更新',
+    installFailTitle: '更新安装失败',
+    installFailMessage: '更新已下载但未能自动安装（应用可能未签名，macOS 自动更新安装要求应用已代码签名）',
+    installFailHint: '请到发布页下载最新安装包手动更新',
+    ok: '确定'
+  },
   dialogs: { pickDirectory: '选择工作目录', pickFiles: '选择文件', saveFile: '保存文件' }
 };
 
@@ -64,7 +84,18 @@ const EN: MainLabels = {
   aboutDscode: 'About DSCode',
   quit: 'Quit',
   about: { title: 'About DSCode', subtitle: 'AI coding assistant desktop client', version: 'Version', copyright: 'Copyright © 2026 DSCode', ok: 'OK' },
-  updater: { checkTitle: 'Check for updates', latest: 'You are up to date', currentVersion: 'Current version', failTitle: 'Update check failed', failMessage: 'Unable to complete the update check', ok: 'OK' },
+  updater: {
+    checkTitle: 'Check for updates',
+    latest: 'You are up to date',
+    currentVersion: 'Current version',
+    failTitle: 'Update check failed',
+    failMessage: 'Unable to complete the update check',
+    installFailTitle: 'Update install failed',
+    installFailMessage:
+      'The update was downloaded but could not be installed automatically (the app may be unsigned; macOS auto-update install requires code signing)',
+    installFailHint: 'Please download the latest installer from the releases page',
+    ok: 'OK'
+  },
   dialogs: { pickDirectory: 'Select working directory', pickFiles: 'Select files', saveFile: 'Save file' }
 };
 

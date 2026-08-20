@@ -11,7 +11,8 @@
   "updater": {
     "available": "New version v{version} available, click to download",
     "downloading": "Downloading {percent}%",
-    "downloaded": "Update ready, click to restart"
+    "downloaded": "Update ready, click to restart",
+    "error": "Update failed"
   },
   "common": {
     "userName": "Developer"
