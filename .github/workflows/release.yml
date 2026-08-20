@@ -32,6 +32,10 @@ jobs:
         run: pnpm dist:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Actions runner 冷缓存直连 GitHub 下载 electron zip / electron-builder 二进制
+          # 易因共享 IP 的 API 限流失败（本地有缓存所以能过）；统一走 npmmirror 镜像
+          ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
+          ELECTRON_BUILDER_BINARIES_MIRROR: 'https://npmmirror.com/mirrors/electron-builder-binaries/'
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -57,6 +61,9 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build Windows (nsis x64)
         run: pnpm dist:win
+        env:
+          ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
+          ELECTRON_BUILDER_BINARIES_MIRROR: 'https://npmmirror.com/mirrors/electron-builder-binaries/'
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
