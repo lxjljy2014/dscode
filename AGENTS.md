@@ -19,17 +19,21 @@ packages/
 │   ├── electron.vite.config.ts
 │   ├── uno.config.ts
 │   └── src/
-│       ├── main/     # Electron 主进程（index.ts 窗口；ipc.ts 业务 handler 枢纽 + agent EventSink 的 IPC 实现；agent/ agent 的 Electron 薄壳；shell/terminal.ts 集成终端 node-pty 会话）
+│       ├── main/     # Electron 主进程（index.ts 窗口；ipc.ts 业务 handler 枢纽 + agent EventSink 的 IPC 实现；agent/ agent 的 Electron 薄壳；shell/terminal.ts 集成终端 node-pty 会话；i18n.ts 主进程原生 UI 文案（托盘/关于/更新提示/原生对话框，跟随系统语言 app.getLocale，与渲染层语言设置无关）；compact.ts /compact 薄壳；tray.ts 托盘驻留；updater.ts 检查更新；attachment.ts 附件授权路径）
 │       ├── preload/  # contextBridge 暴露 window.dscode（实现 HostApi 桥接）
 │       └── renderer/ # Vue 应用组装入口（App.vue / router.ts / main.ts / boot.ts）
 ├── core/             # @dscode/core —— 纯 TS 核心逻辑（无 Electron/DOM 依赖，Node 内建可用；desktop 与将来 TUI 直接复用）
 │   └── src/
-│       ├── agent/    # 运行时编排：runtime.ts（SSE 流式+工具循环+30 轮上限）、types.ts（AgentEventSink 事件抽象，宿主各自实现）
+│       ├── agent/    # 运行时编排：runtime.ts（SSE 流式+工具循环+30 轮上限）、types.ts（AgentEventSink 事件抽象，宿主各自实现）、compact.ts（/compact 对话压缩：较旧消息摘要为结构化检查点、逐字保留最近 3 条）、token-estimate.ts（token 锚定投影估算：按 provider 精确 promptTokens 锚定 + 增量估算）
 │       ├── tools/    # 工具注册表：Tool 接口（描述+实现一体）+ 每工具一文件 ×9（read_file/list_dir/search/run_command/write_file/edit_file/browse/run_code/skill），注册表 Record<AgentToolName, Tool> 编译期保证完整
 │       ├── gate/     # 权限门控（只读放行/四权限模式；确认卡片三选项：允许一次/本会话/拒绝，拒绝停止整个任务，120s 超时自动拒绝）
 │       ├── adapters/ # 模型适配：ModelAdapter 接口（请求构造 + SSE 增量归一化）+ openai-compatible/deepseek + 通用 streamChat
+│       ├── net/      # SSRF 防护（ssrf.ts 的 isPrivateHost）：browse / provider:verify / browser:fetch 共用，封禁环回/内网/链路本地/保留地址（覆盖尾点、::ffff: 映射、十/十六/八进制 IP 表示等绕过）
 │       ├── workspace/# 文件树扫描/读文件、paths.ts（SKIP_DIRS+resolveSafePath）、diff.ts（快照 + LCS 行级 diff）
 │       ├── git/      # git CLI 封装（execFile 参数数组）
+│       ├── code-run/ # run_code 工具（Code Mode：只暴露单工具，程序在 worker 线程内经生成的 SDK 绑定调用其它工具，一次调用代替 N 次模型往返）
+│       ├── mcp/      # MCP 客户端（client.ts：stdio JSON-RPC，spawn 子进程 + readline，tools/list 摘要）
+│       ├── plugins/  # 插件加载（loader.ts）
 │       ├── persist/  # 会话/最近项目/用量（node:sqlite）、settings（JSON 归一化）、供应商校验
 │       └── cache/    # LLM 回复缓存（省成本：按模型+消息+工具哈希，命中重放不调 API；命中率在「使用统计」页展示）
 ├── shared/           # @dscode/shared —— 纯契约层（浏览器安全）：类型定义 + i18n 语言包 + DEEPSEEK_PRESET 预置
@@ -85,9 +89,9 @@ pnpm test           # 运行 @dscode/core 与 @dscode/desktop 的 vitest 单测
 
 CI 已配置（`.github/workflows/ci.yml`，GitHub Actions：`pnpm install --frozen-lockfile` + typecheck + lint + test + build）。仓库双推：fetch/push 到 github.com/lxjljy2014/dscode（同时 push 到 gitee.com/lixjun/dscode），GitHub Actions 在 GitHub 侧生效；本地提交前仍至少跑 `pnpm typecheck` + `pnpm lint` + `pnpm test` 验证。
 
-Electron 二进制下载：electron@43 起无 postinstall、改为首次 require 时懒下载，`.pnpmfile.cjs` 注入的 `ELECTRON_MIRROR` 不会被子进程继承；实际由根 `postinstall` 里的 `scripts/ensure-electron.mjs` 显式跑 `electron/install.js`（幂等）并把 `ELECTRON_MIRROR`（npmmirror）注入到真正下载的进程。`.npmrc` 的 `electron_mirror` 对 pnpm 无效，不要回退到那种写法。注意 `.pnpmfile.cjs` 内容变化会使 lockfile 的 `pnpmfileChecksum` 失效，需执行一次 `pnpm install --no-frozen-lockfile` 更新。
+Electron 二进制下载：electron@43 起无 postinstall、改为首次 require 时懒下载，`.pnpmfile.cjs` 注入的 `ELECTRON_MIRROR` 不会被子进程继承；实际由根 `postinstall` 里的 `scripts/ensure-electron.mjs` 显式跑 `electron/install.js`（幂等）并把 `ELECTRON_MIRROR` 注入到真正下载的进程——镜像按环境选择：本地默认 npmmirror（国内快），检测到 `CI` 环境变量时走官方源（境外 CI 避免国内镜像拖慢）。`.npmrc` 的 `electron_mirror` 对 pnpm 无效，不要回退到那种写法。注意 `.pnpmfile.cjs` 内容变化会使 lockfile 的 `pnpmfileChecksum` 失效，需执行一次 `pnpm install --no-frozen-lockfile` 更新。
 
-`pnpm-workspace.yaml` 里的 `allowBuilds` 是 pnpm 11 的依赖构建白名单（当前已登记：`electron`、`esbuild`、`sass-embedded`、`@parcel/watcher`、`node-pty`）：**新增带 postinstall 的原生依赖必须在此登记，否则其 build scripts 不会执行**；`minimumReleaseAgeExclude` 用于绕过 electron 的发布年龄检查（目前登记了 `electron@43.4.0`）。
+`pnpm-workspace.yaml` 里的 `allowBuilds` 是 pnpm 11 的依赖构建白名单（当前已登记：`electron`、`esbuild`、`sass-embedded`、`@parcel/watcher`、`node-pty`）：**新增带 postinstall 的原生依赖必须在此登记，否则其 build scripts 不会执行**；`minimumReleaseAgeExclude` 用于绕过依赖的发布年龄检查（目前登记了 `electron@43.4.0`、`vuetify@4.1.10`）。
 
 node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行位（644），导致 pty 启动报 `posix_spawnp failed`；根 `postinstall`（`scripts/fix-node-pty-exec.mjs`，pnpm 会执行 root 项目的 postinstall）负责修复，不要删。
 
@@ -124,18 +128,21 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 - **业务 IPC 通道**（全部 `ipcMain.handle` / `ipcRenderer.invoke`，定义在 `desktop/src/main/ipc.ts`，渲染端类型见 `@dscode/ui` 的 `host.ts`）：
   - `settings:get` / `settings:set` —— 工作目录 + 权限模式（`~/.dscode/config/` 下按域拆分的 JSON 持久化（general/providers/skills 等）；set 时工作目录变化自动记入最近项目）
   - `projects:list` —— 最近项目（`node:sqlite`，`~/.dscode/db/dscode.db`（usage/cache/projects/index 共用一库，按表组织），无原生依赖）
-  - `dialog:pick-directory` —— 选择工作目录（取消返回 null）
+  - `dialog:pick-directory` / `dialog:pick-files` / `dialog:save-file` —— 原生对话框（选择工作目录/选择附件/保存文件，取消返回 null）
+  - `attachment:read` —— 附件读取（仅允许此前 `dialog:pick-files` 选定的已授权路径，防越权读任意文件）
   - `provider:verify` —— API key 校验（主进程 fetch `GET {baseUrl}/models`）
-  - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（运行时在 `@dscode/core`（SSE 流式 + 工具循环 + 门控 + 模型适配，事件经 AgentEventSink 上抛），`desktop/src/main/agent/agent.ts` 实现 sink 映射到 IPC；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求；渲染端在输入框上弹出三选项确认卡片，响应为 ConfirmDecision：allow-once/allow-session/deny，allow-session 会话内免问，deny 由运行时中止整个任务，120s 超时自动拒绝）/ `agent:done` / `agent:session-stats`（会话运行统计：轮数/LLM与工具耗时/首token/tokens/缓存命中率，输入卡片下方统计条展示）/ `agent:error`（code: no-api-key/api/network/aborted/running/unknown；unknown 等携带 detail 真实原因，渲染端随错误气泡展示），均带 sessionId；同会话重复 `agent:start` 会先中止旧运行再启动新运行（窗口重载后重发不报错）；窗口关闭时其发起的运行被回收（见 `stopWindowAgents`）
+  - `agent:start` / `agent:stop` / `agent:confirm-response` —— agent 运行（运行时在 `@dscode/core`（SSE 流式 + 工具循环 + 门控 + 模型适配，事件经 AgentEventSink 上抛），`desktop/src/main/agent/agent.ts` 实现 sink 映射到 IPC；配置由主进程读 settings，渲染端只传 sessionId/model/messages，不可注入 baseUrl/key）；事件推流 `agent:delta`（文本增量）/ `agent:tool`（工具状态流转）/ `agent:confirm`（写/执行确认请求；渲染端在输入框上弹出三选项确认卡片，响应为 ConfirmDecision：allow-once/allow-session/deny，allow-session 会话内免问，deny 由运行时中止整个任务，120s 超时自动拒绝）/ `agent:done` / `agent:session-stats`（会话运行统计：轮数/LLM与工具耗时/首token/tokens/缓存命中率，输入卡片下方统计条展示）/ `agent:context`（上下文 token 实时投影：context/system/tools/messages 分项 token 数，按 provider 精确 promptTokens 锚定 + 增量估算）/ `agent:error`（code: no-api-key/api/network/aborted/running/unknown；unknown 等携带 detail 真实原因，渲染端随错误气泡展示），均带 sessionId；同会话重复 `agent:start` 会先中止旧运行再启动新运行（窗口重载后重发不报错）；窗口关闭时其发起的运行被回收（见 `stopWindowAgents`）
   - `workspace:tree` / `workspace:read-file` —— 真实文件树扫描与文件读取（路径限定工作目录内）；`workspace:diff` 事件 —— 写/执行工具后主进程按「agent 启动快照 vs 当前内容」LCS 行级 diff 推送
   - `sessions:list` / `sessions:create` / `sessions:append` —— 会话持久化（JSONL 文件：`~/.dscode/sessions/<workspace-slug>/<session-id>/{meta.json, session.jsonl}`，每会话独立文件、追加式日志；消息的 steps（思维链/正文/工具调用交错的有序步骤）以 JSON 行随消息落库，重启后按此恢复折叠块与工具卡；旧消息无 steps 走正文兜底；旧 sqlite sessions.db 首次启动自动迁移；会话级 toolEvents 数组仍为瞬态不落库）
+  - `session:compact` —— `/compact` 对话压缩（逻辑在 core `agent/compact.ts`：较旧消息摘要为结构化检查点、逐字保留最近 3 条，返回压缩后消息列表）
   - `git:list-branches` / `git:checkout` / `git:create-branch` / `git:graph` —— git CLI（`child_process.execFile` 参数数组，不经 shell）；结果统一 `{ok}` 判别联合
   - `terminal:ensure` / `terminal:write` / `terminal:resize` / `terminal:kill` —— 集成终端（主进程 node-pty，多会话按渲染端生成的 sessionId 管理、按窗口归属统一回收，见 `main/shell/terminal.ts`）；pty 输出经 `terminal:data` / `terminal:exit` 事件（带 sessionId）推给渲染端，write/resize 为高频单向 `on` 通道
+  - 其余通道（`index:build` / `index:search` / `index:stats` 代码索引、`usage:list` / `usage:cache-stats` / `usage:cache-clear` 用量与缓存、`mcp:list-tools`、`browser:fetch`（与 browse/provider:verify 一样经 core `net/ssrf.ts` 防护）、`projects:remove`、`sessions:archive` / `sessions:stats`）同样定义在 ipc.ts
   - 每个 handler 校验 sender 属于主窗口 + 参数类型；新增业务 IPC 沿用此模式
 
 ## 测试与质量
 
-- 单测框架 **vitest**，覆盖 `@dscode/core`（纯逻辑层）与 `@dscode/desktop`（主进程纯逻辑）两处：`pnpm test` 依次运行两者（也可 `pnpm --filter <pkg> test` 单独跑）。测试文件位于 `packages/{core,desktop}/test/*.test.ts`，各自 `vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 tsc 的 `src/**/*` 类型检查范围）。当前覆盖：core —— 门控、LCS diff、适配器 delta 归一化、路径防穿越/symlink、persist 落库/加密、usage 用量、LLM 缓存（key 确定性/往返/命中统计/容量）、MCP 协议、插件加载、代码索引、browse 工具；desktop —— IPC 校验器、safeStorage 加密封装、钩子触发。E2E 测试设施暂无。
+- 单测框架 **vitest**，覆盖 `@dscode/core`（纯逻辑层）与 `@dscode/desktop`（主进程纯逻辑）两处：`pnpm test` 依次运行两者（也可 `pnpm --filter <pkg> test` 单独跑）。测试文件位于 `packages/{core,desktop}/test/*.test.ts`，各自 `vitest.config.ts`（`environment: 'node'`，只收 `test/**/*.test.ts`，不进入 tsc 的 `src/**/*` 类型检查范围）。当前覆盖（截至 0.1.2 共 245 个：core 213 + desktop 32）：core —— 门控、LCS diff、适配器 delta 归一化、SSE 流式（stream）、SSRF 防护、路径防穿越/symlink、persist 落库/加密、供应商校验、usage 用量、LLM 缓存（key 确定性/往返/命中统计/容量）、MCP 协议、插件加载、代码索引、git CLI、workspace 扫描、browse 工具、edit_file、compact；desktop —— IPC 校验器、safeStorage 加密封装、钩子触发、附件授权路径。E2E 测试设施暂无。
 - **lint 双轨并存**（配置都在仓库根）：
   - `oxlint`（`.oxlintrc.json`）：Rust 实现、毫秒级；内置 vue 插件 lint `.vue` 的 `<script>` 块（模板规则暂缺，官方语言插件路线图中）；自动读取 `.gitignore` 排除产物。**负责全部 TS/JS 文件**
   - `eslint`（`eslint.config.js`，flat config，基于 `@soybeanjs/eslint-config-vue`）：**仅覆盖 `.vue` 文件**（soybean 的 defineConfig 硬编码 `files: ['**/*.vue']`），提供模板相关规则；全局 ignores 必须放在数组第一项的无 files config 里（soybean 自带的 ignores 带 files 不生效，会误扫 `out/`）
@@ -144,6 +151,8 @@ node-pty 的预编译产物里 `spawn-helper` 从 npm 解包后丢失可执行�
 
 ## 部署 / 打包
 
-`pnpm build` 产出 `packages/desktop/out/`（编译产物）。**已配置 electron-builder**（`packages/desktop/electron-builder.yml`，mac dmg/zip + win nsis + linux AppImage/deb），`pnpm dist`（或 `dist:mac`/`dist:win`/`dist:linux`）产出安装包到 `release/`（已 gitignore）。**架构矩阵**：mac 产出 Intel（x64）与 Apple Silicon（arm64）双架构独立安装包（dmg/zip 各两份，arch 在 target 里声明）；win 仅 x64；产物命名带平台与架构标识（如 `DSCode-0.1.1-mac-arm64.dmg`、`DSCode-0.1.1-win-x64-setup.exe`）；不用 universal 单包（node-pty 的 pty.node 非 Mach-O 无法跨架构合并，其 prebuilds 已覆盖 darwin-x64/darwin-arm64/win32-x64，配合 `npmRebuild:false` 跨架构打包无需 rebuild）。`node-pty` 用 N-API（ABI 稳定），macOS/Windows 有官方 prebuild、Linux 走 node-gyp 源码编译（需 python3/make/g++），故 `npmRebuild: false`；workspace/前端依赖打进 `out/`，故 `dependencies` 只保留 `node-pty`。
+`pnpm build` 产出 `packages/desktop/out/`（编译产物）。**已配置 electron-builder**（`packages/desktop/electron-builder.yml`，mac dmg/zip + win nsis + linux AppImage/deb），`pnpm dist`（或 `dist:mac`/`dist:win`/`dist:linux`）产出安装包到 `release/`（已 gitignore）。**架构矩阵**：mac 产出 Intel（x64）与 Apple Silicon（arm64）双架构独立安装包（dmg/zip 各两份，arch 在 target 里声明）；win 仅 x64；产物命名带平台与架构标识（如 `DSCode-0.1.2-mac-arm64.dmg`、`DSCode-0.1.2-win-x64-setup.exe`）；不用 universal 单包（node-pty 的 pty.node 非 Mach-O 无法跨架构合并，其 prebuilds 已覆盖 darwin-x64/darwin-arm64/win32-x64，配合 `npmRebuild:false` 跨架构打包无需 rebuild）。`node-pty` 用 N-API（ABI 稳定），macOS/Windows 有官方 prebuild、Linux 走 node-gyp 源码编译（需 python3/make/g++），故 `npmRebuild: false`；workspace/前端依赖打进 `out/`，故 `dependencies` 只保留 `node-pty`。
 
 **分发策略（已定）**：定位为**发布**——已引入 electron-builder 打包与三平台安装器。代码签名/公证仍需真实证书（当前无 Developer ID，构建时跳过签名）；正式发布前补充 macOS 签名/公证与 Windows 签名配置。
+
+**发布流程**：发版前更新根目录 `CHANGELOG.md`；推送 `v*` tag 触发 `.github/workflows/release.yml`——自动构建 mac（dmg+zip，x64/arm64）与 win（nsis x64）安装包并上传 GitHub Release（Actions 仅在 GitHub 侧生效）。
