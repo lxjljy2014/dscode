@@ -216,4 +216,111 @@ describe('子任务派发（runtime 集成）', () => {
     // 6 次主轮 + 5 次子任务响应（第 6 次派发被拒不再请求子 LLM）+ 1 次收尾 = 12
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(12), { timeout: 5000 });
   });
+
+  it('可写子任务（writable + full-access）：子任务写文件并计入父 diff', async () => {
+    // fetch 序列：1) 主轮：task（指定可写子智能体）2) 子轮：write_file（真写盘）3) 子轮：结论 4) 主轮：最终回答
+    const responses = [
+      sseChunk([{ id: 'c1', name: 'task', arguments: '{"description":"生成","prompt":"写一个文件","subagent":"执行者"}' }]),
+      sseChunk([{ id: 'sub-c1', name: 'write_file', arguments: '{"path":"gen.ts","content":"export const x = 1;\\n"}' }]),
+      sseText('已生成 gen.ts'),
+      sseText('完成')
+    ];
+    let call = 0;
+    const fetchMock = vi.fn(async () => mockSseResponse([responses[call++]!]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const diffPushes: string[][] = [];
+    const toolEvents: Array<{ name: string; status: string; content?: string }> = [];
+    const sink: AgentEventSink = {
+      ...noopSink,
+      tool: (_s, e) => toolEvents.push({ name: e.name, status: e.status, content: e.content }),
+      diff: (_s, files) => diffPushes.push(files.map(f => f.path))
+    };
+    const rt = new AgentRuntime();
+    await rt.start({
+      ...baseInput,
+      sink,
+      config: {
+        workingDirectory: cwd,
+        permissionMode: 'full-access',
+        providers: [provider],
+        subagents: [{ id: 'w', name: '执行者', description: '', systemPrompt: '你是执行者', writable: true }]
+      }
+    });
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4), { timeout: 3000 });
+    // 子任务真的写了文件
+    const { existsSync, readFileSync } = await import('node:fs');
+    await vi.waitFor(() => expect(existsSync(join(cwd, 'gen.ts'))).toBe(true), { timeout: 2000 });
+    expect(readFileSync(join(cwd, 'gen.ts'), 'utf8')).toBe('export const x = 1;\n');
+    // 可写子任务结束后全量 diff 捡漏：父会话收到含该文件的 diff 推送
+    await vi.waitFor(
+      () => expect(diffPushes.some(paths => paths.includes('gen.ts'))).toBe(true),
+      { timeout: 3000 }
+    );
+    // task 完成事件携带子结论
+    const taskDone = toolEvents.find(e => e.name === 'task' && e.status === 'done');
+    expect(taskDone?.content).toBe('已生成 gen.ts');
+  });
+
+  it('可写子任务在 confirm 模式下收敛为只读（需审批的工具不暴露）', async () => {
+    // 父运行 confirm：writable=true 也不给写工具——子调 write_file 得到结构化错误、不执行
+    const responses = [
+      sseChunk([{ id: 'c1', name: 'task', arguments: '{"description":"写","prompt":"写文件","subagent":"执行者"}' }]),
+      sseChunk([{ id: 'sub-c1', name: 'write_file', arguments: '{"path":"nope.txt","content":"x"}' }]),
+      sseText('无法写文件，只完成了调查'),
+      sseText('完成')
+    ];
+    let call = 0;
+    const fetchMock = vi.fn(async () => mockSseResponse([responses[call++]!]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const sink: AgentEventSink = { ...noopSink, delta: () => {} };
+    const rt = new AgentRuntime();
+    await rt.start({
+      ...baseInput,
+      sink,
+      config: {
+        workingDirectory: cwd,
+        permissionMode: 'confirm',
+        providers: [provider],
+        subagents: [{ id: 'w', name: '执行者', description: '', systemPrompt: '你是执行者', writable: true }]
+      }
+    });
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4), { timeout: 3000 });
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(join(cwd, 'nope.txt'))).toBe(false);
+  });
+
+  it('可写子任务在 auto-edit 模式下：文件编辑放行、命令执行仍被拦', async () => {
+    // 序列：主 task → 子 write_file（放行，写盘）→ 子 run_command（execute 需确认，不暴露 → 拦）→ 子结论 → 主最终
+    const responses = [
+      sseChunk([{ id: 'c1', name: 'task', arguments: '{"description":"改","prompt":"改文件","subagent":"执行者"}' }]),
+      sseChunk([{ id: 'sub-c1', name: 'write_file', arguments: '{"path":"edited.ts","content":"new\\n"}' }]),
+      sseChunk([{ id: 'sub-c2', name: 'run_command', arguments: '{"command":"echo hi"}' }]),
+      sseText('已改文件，命令未执行'),
+      sseText('完成')
+    ];
+    let call = 0;
+    const fetchMock = vi.fn(async () => mockSseResponse([responses[call++]!]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const sink: AgentEventSink = { ...noopSink, delta: () => {} };
+    const rt = new AgentRuntime();
+    await rt.start({
+      ...baseInput,
+      sink,
+      config: {
+        workingDirectory: cwd,
+        permissionMode: 'auto-edit',
+        providers: [provider],
+        subagents: [{ id: 'w', name: '执行者', description: '', systemPrompt: '你是执行者', writable: true }]
+      }
+    });
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5), { timeout: 3000 });
+    const { existsSync } = await import('node:fs');
+    await vi.waitFor(() => expect(existsSync(join(cwd, 'edited.ts'))).toBe(true), { timeout: 2000 });
+  });
 });

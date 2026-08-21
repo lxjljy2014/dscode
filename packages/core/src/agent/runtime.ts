@@ -12,7 +12,7 @@ import type {
 import { ApiError, resolveAdapter, streamChatWithRetry } from '../adapters';
 import type { ChatUsage } from '../adapters/types';
 import type { LlmCache } from '../cache/llm-cache';
-import { isConfirmDecision } from '../gate/gate';
+import { isConfirmDecision, needsConfirm } from '../gate/gate';
 import { TOOLS, toolSchemas } from '../tools';
 import type { Tool, ToolContext } from '../tools';
 import type { SubagentTaskRequest, SubagentTaskResult } from '../tools/types';
@@ -44,8 +44,8 @@ const MAX_SESSION_CACHE_ENTRIES = 64;
 const MAX_SUBTASKS_PER_RUN = 5;
 /** 子任务默认轮数上限 */
 const DEFAULT_SUBAGENT_MAX_TURNS = 12;
-/** 子任务结论返回主上下文的字符上限 */
-const SUBAGENT_RESULT_MAX_CHARS = 8 * 1024;
+/** 子任务结论返回主上下文的字符上限（父侧另有 200K 工具结果总预算兜底） */
+const SUBAGENT_RESULT_MAX_CHARS = 32 * 1024;
 /** 子任务默认工具集（只读；不含 task 防递归委派） */
 const SUBAGENT_DEFAULT_TOOLS: readonly string[] = ['read_file', 'list_dir', 'search', 'browse'];
 
@@ -279,6 +279,7 @@ export class AgentRuntime {
     // 子任务派发环境：捕获父运行配置，供 task 工具 spawn 独立上下文的只读子运行
     const subagentEnv = {
       workingDirectory: config.workingDirectory,
+      permissionMode: config.permissionMode,
       providers: config.providers,
       browsingEnabled: config.browsingEnabled !== false,
       llmCache: config.llmCache,
@@ -299,7 +300,8 @@ export class AgentRuntime {
         sink,
         llmCache: config.llmCache,
         mcpTools: config.mcpTools,
-        // task 工具的派发实现：继承父运行环境，父取消信号联动子运行
+        // task 工具的派发实现：继承父运行环境，父取消信号联动子运行；
+        // 父 sink 用于可写子任务结束后的全量 diff 捡漏推送
         spawnSubagent: (req, toolSignal) =>
           this.runSubagentTask(
             sessionId,
@@ -308,7 +310,8 @@ export class AgentRuntime {
             resolvedModel,
             () => subtaskCount++,
             req,
-            toolSignal ?? run.controller.signal
+            toolSignal ?? run.controller.signal,
+            sink
           )
       }
     ).finally(() => {
@@ -329,15 +332,22 @@ export class AgentRuntime {
   // ---- agent 循环 ----
 
   /**
-   * 执行一次子任务（task 工具派发）：以独立 sessionId 与独立上下文窗口运行只读工具循环，
+   * 执行一次子任务（task 工具派发）：以独立 sessionId 与独立上下文窗口运行工具循环，
    * 静默 sink 收集全部正文流，结束后仅把结论文本返回给父运行的 task 工具结果。
-   * 安全约束：工具白名单（缺省只读集，task 始终排除防递归）、轮数上限、单父运行次数上限、
-   * 父/task 取消信号联动子运行；子任务不触发确认（只读工具全模式放行，异常确认直接拒绝）。
+   *
+   * 权限模型（借鉴 dsh 的「继承 + 冻结 + 审批确定性拒绝」）：
+   * - 缺省只读工具集；子智能体配置 writable=true 时工具面按父运行权限模式收敛——
+   *   full-access=全部、auto-edit=+文件编辑、confirm=仍只读（子任务无确认 UI，
+   *   需审批的操作不暴露给模型，比挂起等确认更安全）
+   * - task 始终排除出白名单（防递归委派）；可写子任务结束后对父会话做全量 diff
+   *   重算，子任务的文件改动自动进父 diff 面板（可见、可回滚、可提交）
+   * - 其余约束：轮数上限、单父运行次数上限、父/task 取消信号联动子运行
    */
   private async runSubagentTask(
     parentSessionId: string,
     env: {
       workingDirectory: string;
+      permissionMode: PermissionMode;
       providers: ProviderConfig[];
       browsingEnabled: boolean;
       llmCache?: LlmCache;
@@ -347,7 +357,8 @@ export class AgentRuntime {
     parentModel: string,
     nextSubtaskCount: () => number,
     req: SubagentTaskRequest,
-    signal: AbortSignal
+    signal: AbortSignal,
+    parentSink: AgentEventSink
   ): Promise<SubagentTaskResult> {
     // 次数上限（闭包计数父运行生命周期内累计；调用即自增，返回本次序号）
     const used = nextSubtaskCount();
@@ -377,9 +388,20 @@ export class AgentRuntime {
       }
     }
 
-    // 工具白名单：配置集（缺省只读集）∩ 真实存在的内置工具，排除 task（防递归）
-    const configured = conf?.allowedTools && conf.allowedTools.length > 0 ? conf.allowedTools : SUBAGENT_DEFAULT_TOOLS;
-    const allowedTools = new Set(configured.filter(n => n !== 'task' && n in TOOLS));
+    // 工具白名单（可见性即执行性）：
+    // 显式 allowedTools 优先；否则 writable=true 给全部内置工具、缺省只读集；
+    // 之上再按父权限模式收敛（needsConfirm=true 的工具不暴露——子任务确认必拒，
+    // 不暴露比挂起等确认更安全），并排除 task 防递归。
+    const writable = conf?.writable === true;
+    const configured =
+      conf?.allowedTools && conf.allowedTools.length > 0
+        ? conf.allowedTools
+        : writable
+          ? Object.keys(TOOLS)
+          : SUBAGENT_DEFAULT_TOOLS;
+    const allowedTools = new Set(
+      configured.filter(n => n !== 'task' && n in TOOLS && !needsConfirm(n, env.permissionMode))
+    );
     if (allowedTools.size === 0) allowedTools.add('read_file'); // 兜底：白名单清空时至少可读
 
     // 子运行注册（获得 runs Map 的 abort 语义）与父取消联动
@@ -399,7 +421,7 @@ export class AgentRuntime {
       },
       tool: () => {},
       confirm: (_sid, toolEventId) => {
-        // 只读工具不应触发确认；防御性拒绝（外部确认也无 UI 入口）
+        // 白名单已排除需确认工具；防御性拒绝（外部确认也无 UI 入口）
         this.resolveConfirm(toolEventId, { kind: 'deny' });
       },
       usage: () => {},
@@ -413,7 +435,7 @@ export class AgentRuntime {
     };
 
     try {
-      await this.runLoop(subSessionId, env.workingDirectory, 'confirm', undefined, provider, model, [
+      await this.runLoop(subSessionId, env.workingDirectory, env.permissionMode, undefined, provider, model, [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: req.prompt }
       ], {
@@ -428,6 +450,17 @@ export class AgentRuntime {
       failure = e instanceof Error ? e.message : String(e);
     } finally {
       signal.removeEventListener('abort', onParentAbort);
+    }
+
+    // 可写子任务的 diff 捡漏：全量对比父快照 vs 磁盘（recomputeDiff 缺省路径），
+    // 子任务写的文件自动进父 diff 面板；失败不影响结果回传
+    if (writable) {
+      try {
+        const files = await this.snapshots.recomputeDiff(parentSessionId, env.workingDirectory);
+        parentSink.diff(parentSessionId, files);
+      } catch {
+        // diff 重算失败（IO 等）：不阻断结论回传，父下次 diff 重算仍会捡到
+      }
     }
 
     if (signal.aborted || subController.signal.aborted) return { ok: false, content: '子任务已中止' };

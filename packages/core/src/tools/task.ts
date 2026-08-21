@@ -15,7 +15,7 @@ export const taskTool = defineTool({
   // 子任务整体兜底超时（单轮 LLM 5 分钟 × 轮次的最坏情况封顶）
   timeoutMs: 10 * 60_000,
   description:
-    '派发子任务：以独立上下文窗口运行只读工具循环（读文件/搜索/浏览），完成后仅返回结论摘要，中间过程不占用当前上下文。适合大范围代码探索、独立调研；需要修改文件时请主任务自行执行，不要交给子任务',
+    '派发子任务：以独立上下文窗口运行工具循环（默认只读），完成后仅返回结论，中间过程不占用当前上下文。适合大范围代码探索、独立调研；修改文件请主任务自行执行，除非配置了可写的子智能体（subagent 参数指定）',
   presentation: {
     presentCall: args => ({
       card: 'generic',
@@ -25,7 +25,7 @@ export const taskTool = defineTool({
   parameters: {
     description: { type: 'string', description: '任务简述（一句话，供展示）', required: true },
     prompt: { type: 'string', description: '完整任务指令：目标、范围、期望的结论形式', required: true },
-    subagent: { type: 'string', description: '子智能体名或 id（设置页配置的人设；缺省通用探索者）' }
+    subagent: { type: 'string', description: '子智能体名或 id（设置页配置的人设，可配置可写/专属模型；缺省通用探索者）' }
   },
   async execute(args, ctx): Promise<ToolResult> {
     if (!ctx.spawnSubagent) return { ok: false, error: '当前运行环境不支持子任务派发' };

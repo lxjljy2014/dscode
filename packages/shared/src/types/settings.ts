@@ -83,7 +83,7 @@ export interface Hook {
 
 /**
  * 子智能体：可切换的专用 agent 人设（选定后以其 systemPrompt 运行），
- * 也可作为 task 工具委派的子任务人设（model/allowedTools/maxTurns 仅对子任务生效）。
+ * 也可作为 task 工具委派的子任务人设（model/allowedTools/maxTurns/writable 仅对子任务生效）。
  */
 export interface Subagent {
   id: string;
@@ -92,10 +92,16 @@ export interface Subagent {
   systemPrompt: string;
   /** 子任务使用的模型（缺省跟随主会话） */
   model?: string;
-  /** 子任务允许的工具名（缺省只读工具集；task 工具本身始终不可用，防递归委派） */
+  /** 子任务允许的工具名（缺省按 writable 决定：只读集或按权限模式收敛的全集） */
   allowedTools?: string[];
   /** 子任务最大轮次（缺省 12） */
   maxTurns?: number;
+  /**
+   * 允许子任务修改文件/执行命令（缺省 false 只读）：
+   * true 时工具面按父运行权限模式收敛（full-access=全部、auto-edit=+文件编辑、
+   * confirm=仍只读——子任务无确认 UI，需审批的操作不暴露）；改动计入父会话 diff。
+   */
+  writable?: boolean;
 }
 
 /** MCP 服务器配置（stdio 传输） */
