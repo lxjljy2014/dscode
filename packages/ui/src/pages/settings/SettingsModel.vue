@@ -488,7 +488,7 @@ async function saveNewProvider() {
         <!-- 自定义表单 -->
         <section class="mt-6">
           <h3 class="text-xs font-medium text-faint">{{ t('settingsPage.model.customPreset') }}</h3>
-          <div class="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div class="mt-2 flex flex-col gap-3">
             <VTextField
               v-model="newName"
               density="compact"
@@ -513,7 +513,6 @@ async function saveNewProvider() {
               hide-details
               :label="t('settingsPage.model.apiKey')"
               :placeholder="t('onboarding.apiKeyPlaceholder')"
-              class="md:col-span-2"
             />
           </div>
 
