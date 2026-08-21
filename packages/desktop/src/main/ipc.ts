@@ -40,7 +40,7 @@ import {
   upsertSession,
   verifyProvider
 } from '@dscode/core';
-import { resolveConfirm, startAgent, stopAgent } from './agent/agent';
+import { resolveConfirm, startAgent, stopAgent, invalidateMcpToolsCache } from './agent/agent';
 import { authorizeAttachmentPaths, isAuthorizedAttachmentPath, readAttachment } from './attachment';
 import { compactSession } from './compact';
 import { loadAppSettings, saveAppSettings } from './settings';
@@ -94,6 +94,8 @@ export function registerIpcHandlers(): void {
       if (typeof record['workingDirectory'] === 'string' && record['workingDirectory'] !== homeDir) {
         touchProject(dbFile, record['workingDirectory'] as string);
       }
+      // MCP 服务器列表变化：失效动态工具缓存（下次 agent 启动重建）
+      if (record['mcpServers'] !== undefined) invalidateMcpToolsCache();
       return next;
     })
   );

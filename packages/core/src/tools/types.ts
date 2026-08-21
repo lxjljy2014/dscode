@@ -1,4 +1,4 @@
-import type { AgentToolName } from '@dscode/shared';
+import type { AnyToolName } from '@dscode/shared';
 
 /**
  * 工具执行结果（统一判别联合，借鉴官方 harness 的 ToolExecutionResult 语义）。
@@ -42,8 +42,8 @@ export interface ToolContext {
  * `Record<AgentToolName, Tool>` 类型在编译期保证（漏注册/多注册都会报错）。
  */
 export interface Tool {
-  /** 工具名（与 shared AgentToolName 对齐） */
-  name: AgentToolName;
+  /** 工具名（内置工具与 shared AgentToolName 对齐；动态注入工具（MCP）用 mcp__<server>__<tool>） */
+  name: AnyToolName;
   /** 权限分类 */
   permission: ToolPermission;
   /** 发给模型的工具描述 */

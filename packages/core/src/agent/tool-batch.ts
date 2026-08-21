@@ -1,7 +1,7 @@
-import type { AgentToolEvent, AgentToolName, ConfirmDecision, PermissionMode, Skill } from '@dscode/shared';
+import type { AgentToolEvent, ConfirmDecision, PermissionMode, Skill } from '@dscode/shared';
 import { gateTool, needsConfirm } from '../gate/gate';
 import { approvalSignature, executeTool, toolConcurrencyOf, toolPermission } from '../tools';
-import type { ToolResult } from '../tools';
+import type { Tool, ToolResult } from '../tools';
 import type { AgentEventSink } from './types';
 
 /** 同轮内并行工具调用的最大并发数（借鉴官方 harness agent-loop 的 maxParallelToolCalls 滚动池） */
@@ -25,6 +25,8 @@ export interface ToolBatchRuntime {
   toolBudget?: { remaining: number };
   /** 本次运行可用的技能列表（透传给 skill 工具） */
   skills: Skill[];
+  /** 动态注入工具（MCP）查表：内置注册表未命中时回退到此 */
+  extraTools?: Map<string, Tool>;
 }
 
 /** 一轮工具调度的结果：continueLoop=false 表示中止/用户拒绝（调用方应退出 runLoop）；concluded 表示某工具标记本轮结束 */
@@ -46,7 +48,7 @@ export interface ToolBatchOutcome {
 export async function executeToolBatch(
   sessionId: string,
   permissionMode: PermissionMode,
-  toolCalls: { id: string; name: AgentToolName; arguments: string }[],
+  toolCalls: { id: string; name: string; arguments: string }[],
   messages: unknown[],
   cwd: string,
   signal: AbortSignal,
@@ -55,7 +57,7 @@ export async function executeToolBatch(
 ): Promise<ToolBatchOutcome> {
   // ---- 门控阶段（串行）：统一 gateTool 决策（放行/拒绝/确认），拒绝停止整个任务 ----
   interface Planned {
-    call: { id: string; name: AgentToolName; arguments: string };
+    call: { id: string; name: string; arguments: string };
     toolEventId: string;
     event: AgentToolEvent;
   }
@@ -142,7 +144,11 @@ export async function executeToolBatch(
     await Promise.all(slice.map(async (p, idx) => {
       const absIdx = cursor + idx;
       const toolStart = Date.now();
-      const result = await executeTool(p.call.name, p.call.arguments, cwd, { signal, skills: rt.skills });
+      const result = await executeTool(p.call.name, p.call.arguments, cwd, {
+        signal,
+        skills: rt.skills,
+        extraTools: rt.extraTools
+      });
       results[absIdx] = { result, toolMs: Date.now() - toolStart };
     }));
     // 模型顺序提交：done/error 事件 + diff + 上下文，顺序与 planned 一致

@@ -4,12 +4,12 @@
  * 工具自身可声明 finalizeContent（最后内容变换）。DSCode 无插件容器，用「注册表 + 钩子数组」实现同等扩展点。
  */
 
-import type { AgentToolName } from '@dscode/shared';
+import type { AnyToolName } from '@dscode/shared';
 import type { ToolResult } from './types';
 
 /** 一次工具执行的上下文（管线各段共享） */
 export interface ToolExecution {
-  name: AgentToolName;
+  name: AnyToolName;
   /** 已解析的参数对象（执行前统一校验通过） */
   args: Record<string, unknown>;
   /** 工作目录 */

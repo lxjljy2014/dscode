@@ -1,7 +1,9 @@
 import { app, BrowserWindow } from 'electron';
 import {
+  buildMcpTools,
   createSqliteLlmCache,
   disposeAgents,
+  disposeMcpConnections,
   getSessionStats,
   recordUsage,
   resolveConfirm,
@@ -11,8 +13,8 @@ import {
   SYSTEM_PROMPT,
   SYSTEM_PROMPT_EN
 } from '@dscode/core';
-import type { AppSettings, Hook } from '@dscode/shared';
-import type { AgentEventSink, AgentStartResult, LlmCache } from '@dscode/core';
+import type { AppSettings, Hook, McpServer } from '@dscode/shared';
+import type { AgentEventSink, AgentStartResult, LlmCache, Tool } from '@dscode/core';
 import { loadAppSettings } from '../settings';
 import { getConfigDir, getDbFile, getSessionsDir } from '../data-dir';
 import { isChatMessagePayload } from '../validators';
@@ -26,6 +28,34 @@ import { fireHooks } from '../hooks';
 
 /** 运行发起窗口归属（事件只推给发起窗口；窗口关闭时回收其运行，避免孤儿运行烧 token） */
 const winBySession = new Map<string, BrowserWindow>();
+
+/**
+ * MCP 动态工具表缓存：构建需 spawn 全部 MCP 服务器进程（几十到几百 ms），
+ * 不放进每次 agent:start 的关键路径重跑；并发构建去重，空结果不缓存（下次启动重试），
+ * 设置页 mcpServers 变化时经 invalidateMcpToolsCache 失效。
+ */
+let mcpToolsCache: Tool[] | null = null;
+let mcpToolsPromise: Promise<Tool[]> | null = null;
+
+function ensureMcpTools(servers: readonly McpServer[]): Promise<Tool[]> {
+  if (mcpToolsCache) return Promise.resolve(mcpToolsCache);
+  if (!mcpToolsPromise) {
+    mcpToolsPromise = buildMcpTools(servers)
+      .then(tools => {
+        if (tools.length > 0) mcpToolsCache = tools;
+        return tools;
+      })
+      .finally(() => {
+        mcpToolsPromise = null;
+      });
+  }
+  return mcpToolsPromise;
+}
+
+/** 设置页 MCP 服务器列表变化时失效缓存（下次 agent 启动重建） */
+export function invalidateMcpToolsCache(): void {
+  mcpToolsCache = null;
+}
 
 /** LLM 回复缓存（~/.dscode/db/cache.db，懒初始化；命中时重放响应省 token） */
 let llmCache: LlmCache | null = null;
@@ -115,6 +145,8 @@ export async function startAgent(
       browsingEnabled: settings.browsingEnabled,
       skills: settings.skills,
       llmCache: getLlmCache(),
+      // MCP 动态工具（与内置工具并行暴露；无服务器配置时跳过构建）
+      ...(settings.mcpServers.length > 0 ? { mcpTools: await ensureMcpTools(settings.mcpServers) } : {}),
       // 渲染端「推理强度」选择器：显式值时覆盖 provider 默认；undefined（auto）跟随 provider
       ...(reasoningEffort !== undefined ? { reasoningEffort: reasoningEffort as 'off' | 'high' | 'max' } : {})
     }
@@ -160,4 +192,4 @@ export function stopWindowAgents(win: BrowserWindow): void {
   }
 }
 
-export { disposeAgents, resolveConfirm };
+export { disposeAgents, disposeMcpConnections, resolveConfirm };

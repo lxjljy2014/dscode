@@ -9,6 +9,7 @@ export * from './cache/llm-cache';
 export * from './agent/types';
 export * from './gate/gate';
 export * from './mcp/client';
+export * from './mcp/agent-tools';
 export * from './git/git';
 export * from './persist/config';
 export * from './persist/projects';

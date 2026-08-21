@@ -1,4 +1,4 @@
-import type { AgentErrorEvent, AgentToolEvent, AgentToolName, ContextProjection, DiffFile, SessionStats } from '@dscode/shared';
+import type { AgentErrorEvent, AgentToolEvent, AnyToolName, ContextProjection, DiffFile, SessionStats } from '@dscode/shared';
 import type { ChatUsage } from '../adapters/types';
 
 /**
@@ -11,7 +11,7 @@ export interface AgentEventSink {
   /** 工具事件（状态流转，同一 toolEventId 多次推送） */
   tool(sessionId: string, event: AgentToolEvent): void;
   /** 写/执行确认请求 */
-  confirm(sessionId: string, toolEventId: string, name: AgentToolName, args: string): void;
+  confirm(sessionId: string, toolEventId: string, name: AnyToolName, args: string): void;
   /** 运行结束时的 token 用量（聚合整次运行的所有轮次） */
   usage(sessionId: string, usage: ChatUsage): void;
   /** 本轮运行结束 */

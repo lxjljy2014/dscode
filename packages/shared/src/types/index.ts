@@ -103,6 +103,12 @@ export interface AgentContextEvent extends ContextProjection {
 /** agent 可调用的工具名 */
 export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file' | 'browse' | 'run_code' | 'skill';
 
+/**
+ * 任意工具名：内置 AgentToolName + 动态注入的工具名（MCP 工具 mcp__<server>__<tool>）。
+ * 事件/确认请求等协议层用该类型；内置注册表仍以 AgentToolName 编译期保证完整。
+ */
+export type AnyToolName = AgentToolName | (string & {});
+
 /** 工具结果的结构化内容块（借鉴官方 harness 的 ContentBlock 语义，供 UI 按类型渲染；content 字符串仍是模型可见文本） */
 export type ToolContentBlock =
   | { type: 'text'; text: string }
@@ -115,7 +121,7 @@ export interface AgentToolEvent {
   id: string;
   /** 模型 tool call id（历史重建时对齐运行时上下文，保持前缀缓存稳定；旧数据缺省） */
   toolCallId?: string;
-  name: AgentToolName;
+  name: AnyToolName;
   /** 参数 JSON 字符串（原样展示） */
   args: string;
   status: 'running' | 'done' | 'error' | 'confirming' | 'denied';
@@ -171,7 +177,7 @@ export interface AgentErrorEvent {
 export interface AgentConfirmRequest {
   sessionId: string;
   toolEventId: string;
-  name: AgentToolName;
+  name: AnyToolName;
   args: string;
 }
 

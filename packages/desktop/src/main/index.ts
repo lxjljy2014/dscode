@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { registerIpcHandlers, runDeferredInit } from './ipc';
-import { disposeAgents, stopWindowAgents } from './agent/agent';
+import { disposeAgents, stopWindowAgents, disposeMcpConnections } from './agent/agent';
 import { migrateLegacyData } from './data-dir';
 import { disposeTerminals, killWindowTerminals } from './shell/terminal';
 import { createTray, destroyTray } from './tray';
@@ -212,4 +212,5 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   disposeTerminals();
   disposeAgents();
+  disposeMcpConnections();
 });

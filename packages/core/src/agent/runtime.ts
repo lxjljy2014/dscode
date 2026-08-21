@@ -13,6 +13,7 @@ import type { ChatUsage } from '../adapters/types';
 import type { LlmCache } from '../cache/llm-cache';
 import { isConfirmDecision } from '../gate/gate';
 import { toolSchemas } from '../tools';
+import type { Tool } from '../tools';
 import { DiffSnapshotStore } from '../workspace/diff';
 import { estimateMessageTokens, estimateSystemTokens, estimateTokens, estimateToolsTokens } from './token-estimate';
 import { executeToolBatch } from './tool-batch';
@@ -103,6 +104,11 @@ export interface AgentStartInput {
     skills?: Skill[];
     /** LLM 回复缓存（省成本；命中时重放缓存响应，不调 API） */
     llmCache?: LlmCache;
+    /**
+     * 动态注入的 MCP 工具（宿主经 buildMcpTools 构建后传入）：
+     * 与内置工具并行暴露给模型，执行经 MCP 连接池；权限默认 write（走确认门控）。
+     */
+    mcpTools?: Tool[];
     /**
      * DeepSeek 推理模式覆盖（缺省读第一个 provider 的配置）：
      * true=thinking enabled，false=disabled，undefined=跟随 provider/供应商默认
@@ -231,7 +237,8 @@ export class AgentRuntime {
       config.browsingEnabled !== false,
       config.skills ?? [],
       sink,
-      config.llmCache
+      config.llmCache,
+      config.mcpTools
     ).finally(() => {
       if (this.runs.get(sessionId) === run) this.runs.delete(sessionId);
       // 快照保留（下一次运行启动时覆盖）：DiffPanel 的「恢复到运行前」依赖它；
@@ -267,11 +274,14 @@ export class AgentRuntime {
     browsingEnabled: boolean,
     skills: Skill[],
     sink: AgentEventSink,
-    llmCache?: LlmCache
+    llmCache?: LlmCache,
+    mcpTools?: Tool[]
   ): Promise<void> {
     const run = this.runs.get(sessionId);
     if (!run) return;
     const signal = run.controller.signal;
+    // 动态工具查表（executeTool 内置注册表未命中时回退到此）
+    const extraTools = new Map<string, Tool>((mcpTools ?? []).map(t => [t.name, t]));
 
     try {
       let totalPrompt = 0;
@@ -280,8 +290,9 @@ export class AgentRuntime {
       let totalCachedPrompt = 0;
       // 本运行的工具结果上下文预算（跨轮累计，executeToolBatch 在插入时按预算截断）
       const toolBudget = { remaining: MAX_TOOL_CONTEXT_CHARS };
-      // 工具 schema 跨轮不变（browsingEnabled/skills 固定），提升到循环外供上下文投影复用
-      const tools = toolSchemas(browsingEnabled, false, skills.length > 0);
+      // 工具 schema 跨轮不变（browsingEnabled/skills 固定），提升到循环外供上下文投影复用；
+      // MCP 动态工具一并注入（与内置工具并行暴露）
+      const tools = toolSchemas(browsingEnabled, false, skills.length > 0, mcpTools);
       // ---- 上下文占用投影（借鉴官方 harness token-meter 的 anchored projection）----
       // 锚定供应商最近一次 usage 的 promptTokens，叠加「表面」启发式增量，让占用随流式正文/工具结果
       // 实时更新，而不是等本轮 usage 到达后才统计。表面 = 系统提示词 + 工具 schema + 对话消息 + 流式累计。
@@ -492,6 +503,7 @@ export class AgentRuntime {
             recomputeDiff: (sid, wd, changedPaths) => this.snapshots.recomputeDiff(sid, wd, changedPaths).then(files => { sink.diff(sid, files); }),
             toolBudget,
             skills,
+            extraTools,
           }
         );
         // 工具结果已入上下文：表面增长，推送实时投影

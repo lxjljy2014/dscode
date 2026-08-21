@@ -55,25 +55,29 @@ export const TOOL_STATUSES: readonly AgentToolEvent['status'][] = ['running', 'd
  * 返回给模型的工具 schema 数组（OpenAI function calling 格式）；includeBrowse=false 时排除 browse。
  * codeMode=true 时只暴露 run_code（Code Mode 折叠：模型只能调 run_code，程序内经 SDK 调其它工具），
  * includeSkill=false 时排除 skill（无可用技能时避免暴露必败工具），
+ * extra 追加动态注入的工具（MCP 等，与内置注册表并行暴露），
  * 借鉴官方 harness 的 tools.mode='code' 设计。
  */
-export function toolSchemas(includeBrowse = true, codeMode = false, includeSkill = true): unknown[] {
-  let tools = Object.values(TOOLS).filter(t => (t.name === 'browse' ? includeBrowse : true) && (t.name === 'skill' ? includeSkill : true));
+export function toolSchemas(includeBrowse = true, codeMode = false, includeSkill = true, extra?: readonly Tool[]): unknown[] {
+  let tools: Tool[] = Object.values(TOOLS).filter(
+    t => (t.name === 'browse' ? includeBrowse : true) && (t.name === 'skill' ? includeSkill : true)
+  );
   if (codeMode) tools = tools.filter(t => t.name === 'run_code');
+  if (extra && extra.length > 0) tools = tools.concat(extra);
   return tools.map(t => ({
     type: 'function',
     function: { name: t.name, description: t.description, parameters: t.parameters }
   }));
 }
 
-/** 工具权限分类（未知名默认按只读处理，与门控决策保持一致） */
-export function toolPermission(name: AgentToolName): ToolPermission {
-  return TOOLS[name]?.permission ?? 'read';
+/** 工具权限分类（未知名默认按只读处理，与门控决策保持一致；含 MCP 等动态工具） */
+export function toolPermission(name: string): ToolPermission {
+  return TOOLS[name as AgentToolName]?.permission ?? 'read';
 }
 
 /** 工具并发分类（未知名默认独占） */
-export function toolConcurrencyOf(name: AgentToolName): 'parallel' | 'exclusive' {
-  const tool = TOOLS[name];
+export function toolConcurrencyOf(name: string): 'parallel' | 'exclusive' {
+  const tool = TOOLS[name as AgentToolName];
   return tool ? toolConcurrency(tool) : 'exclusive';
 }
 
@@ -81,7 +85,7 @@ export function toolConcurrencyOf(name: AgentToolName): 'parallel' | 'exclusive'
  * 审批签名：写/编辑按路径、执行按命令、浏览按 URL（其余按首个字符串参数），
  * 会话记忆与持久规则均以该签名为匹配键（格式 ${tool}:${主参数}，是 UI 与运行时之间的契约）。
  */
-export function approvalSignature(name: AgentToolName, argsJson: string): string {
+export function approvalSignature(name: string, argsJson: string): string {
   let primary = '';
   try {
     const parsed = JSON.parse(argsJson) as Record<string, unknown>;
@@ -97,14 +101,15 @@ export function approvalSignature(name: AgentToolName, argsJson: string): string
 /**
  * 统一执行入口：解析 JSON 参数 → schema 校验 → 执行管线（pre → guard → around(execute) → post → onResult）→ 异常兜底。
  * 参数校验失败与执行失败都返回结构化错误，供模型下次修正参数。
+ * extraTools：动态注入工具（MCP）的查表（内置注册表未命中时回退到此）。
  */
 export async function executeTool(
   name: string,
   argsJson: string,
   cwd: string,
-  opts: { signal?: AbortSignal; skills?: Skill[] } = {}
+  opts: { signal?: AbortSignal; skills?: Skill[]; extraTools?: Map<string, Tool> } = {}
 ): Promise<ToolResult> {
-  const tool = TOOLS[name as AgentToolName];
+  const tool = TOOLS[name as AgentToolName] ?? opts.extraTools?.get(name);
   if (!tool) return { ok: false, error: '未知工具: ' + name };
   let args: Record<string, unknown>;
   try {

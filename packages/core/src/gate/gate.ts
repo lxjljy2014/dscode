@@ -1,4 +1,4 @@
-import type { AgentToolName, ConfirmDecision, PermissionMode } from '@dscode/shared';
+import type { AnyToolName, ConfirmDecision, PermissionMode } from '@dscode/shared';
 import { toolPermission } from '../tools';
 
 /** 门控决策结果 */
@@ -11,12 +11,12 @@ export interface GateDecision {
 }
 
 /** 确认回调：由 agent 循环提供（发 agent:confirm 事件并等待渲染端响应） */
-export type ConfirmFn = (toolEventId: string, name: AgentToolName, argsJson: string) => Promise<ConfirmDecision>;
+export type ConfirmFn = (toolEventId: string, name: AnyToolName, argsJson: string) => Promise<ConfirmDecision>;
 
 const CONFIRM_TIMEOUT_MS = 120_000;
 
 /** 工具是否需要用户确认（只读与 full-access 全放行；plan 模式下写/执行无需确认直接被拒） */
-export function needsConfirm(name: AgentToolName, mode: PermissionMode): boolean {
+export function needsConfirm(name: string, mode: PermissionMode): boolean {
   const permission = toolPermission(name);
   if (permission === 'read' || mode === 'full-access') return false;
   if (mode === 'plan') return false;
@@ -37,7 +37,7 @@ export function isConfirmDecision(v: unknown): v is ConfirmDecision {
  * 等待 120s 超时自动拒绝，保证 agent 循环不会永久挂起。
  */
 export async function gateTool(
-  name: AgentToolName,
+  name: string,
   mode: PermissionMode,
   toolEventId: string,
   argsJson: string,
