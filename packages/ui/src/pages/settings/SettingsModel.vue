@@ -7,9 +7,10 @@ import { host } from '../../bridge/host';
 import { useSettingsStore } from '../../stores/settings';
 
 /**
- * 模型设置：左栏供应商导航（IDE 式：无外框、hairline 分隔、选中指示条），
- * 右栏编辑/添加。视觉签名是 monogram 徽标——厂商名首个拉丁词前两字符的
- * 等宽字方块（纯中文名取首字），左栏列表、右栏头部、预设网格三处复用。
+ * 模型设置：左栏供应商导航（VList nav）+ 右栏编辑/添加，全部交互走 Vuetify
+ * 组件（VListItem / VItemGroup + VCard），不再用裸 button 手搓样式。
+ * 视觉签名是 monogram 徽标——厂商名首个拉丁词前两字符的等宽字方块
+ * （纯中文名取首字），左栏列表、右栏头部、预设网格三处复用。
  * 本地可编辑副本 + 保存按钮一次性写回（与其它设置页一致）。
  */
 
@@ -186,11 +187,18 @@ const addFormValid = computed(
 );
 const addReady = computed(() => addFormValid.value && verifyState.value === 'ok');
 
-function pickPreset(preset: { name: string; baseUrl: string }) {
-  newName.value = preset.name;
-  newBaseUrl.value = preset.baseUrl;
-  resetVerify();
-}
+/** 预设选中态：按表单当前值反查（手动改动名称/地址即视为自定义，自动取消选中） */
+const pickedPresetId = computed<string | undefined>({
+  get: () =>
+    PROVIDER_PRESETS.find(p => p.name === newName.value.trim() && p.baseUrl === newBaseUrl.value.trim())?.id,
+  set: id => {
+    const preset = PROVIDER_PRESETS.find(p => p.id === id);
+    if (!preset) return;
+    newName.value = preset.name;
+    newBaseUrl.value = preset.baseUrl;
+    resetVerify();
+  }
+});
 
 async function saveNewProvider() {
   if (!addReady.value) return;
@@ -214,51 +222,46 @@ async function saveNewProvider() {
 
 <template>
   <div class="-mt-1 flex items-stretch gap-6">
-    <!-- 左栏：供应商导航（IDE 式，无外框） -->
-    <nav class="sticky top-0 w-60 shrink-0 self-start border-r border-line pr-4" aria-label="providers">
-      <!-- 列表项：monogram 徽标 + 名称/摘要；选中 = 主色指示条 + 微底色 -->
-      <button
-        v-for="p in providers"
-        :key="p.id"
-        type="button"
-        class="group relative flex w-full items-center gap-2.5 rounded-md border-none bg-transparent py-2 pl-3 pr-2 text-left transition-colors"
-        :class="p.id === selectedId ? 'bg-primary/10' : 'hover:bg-elevated'"
-        @click="select(p.id)"
-      >
-        <span
-          class="absolute inset-y-1 left-0 w-0.5 rounded-full transition-opacity"
-          :class="p.id === selectedId ? 'bg-primary opacity-100' : 'opacity-0'"
-        />
-        <span
-          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold tracking-tight"
-          :class="p.id === selectedId ? 'bg-primary/15 text-primary' : 'bg-elevated text-muted group-hover:text-fg'"
+    <!-- 左栏：供应商导航（VList nav，选中 = Vuetify 主色 pill） -->
+    <nav class="sticky top-0 w-60 shrink-0 self-start border-r border-line pr-2" aria-label="providers">
+      <VList class="p-0" nav density="compact">
+        <VListItem
+          v-for="p in providers"
+          :key="p.id"
+          :active="p.id === selectedId"
+          class="mb-0.5"
+          @click="select(p.id)"
         >
-          {{ monogram(p.name) }}
-        </span>
-        <span class="min-w-0 flex-1">
-          <span class="block truncate text-sm leading-5" :class="p.id === selectedId ? 'text-fg font-medium' : 'text-fg'">
-            {{ p.name }}
-          </span>
-          <span class="block truncate text-xs leading-4 text-muted">
+          <template #prepend>
+            <span
+              class="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold tracking-tight"
+              :class="p.id === selectedId ? 'bg-primary/15 text-primary' : 'bg-elevated text-muted'"
+            >
+              {{ monogram(p.name) }}
+            </span>
+          </template>
+          <VListItemTitle class="text-sm">{{ p.name }}</VListItemTitle>
+          <VListItemSubtitle class="text-xs">
             {{ p.apiKey ? t('settingsPage.model.modelsCount', { n: p.models.length }) : t('settingsPage.model.keyNotSet') }}
-          </span>
-        </span>
-        <span
-          class="h-1.5 w-1.5 shrink-0 rounded-full"
-          :class="p.apiKey ? 'bg-success' : 'bg-warning opacity-70'"
-          :title="p.apiKey ? '' : t('settingsPage.model.keyNotSet')"
-        />
-      </button>
+          </VListItemSubtitle>
+          <template #append>
+            <span
+              class="ml-1 h-1.5 w-1.5 shrink-0 rounded-full"
+              :class="p.apiKey ? 'bg-success' : 'bg-warning opacity-70'"
+              :title="p.apiKey ? '' : t('settingsPage.model.keyNotSet')"
+            />
+          </template>
+        </VListItem>
 
-      <button
-        type="button"
-        class="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed bg-transparent py-2 text-sm transition-colors"
-        :class="isAdding ? 'border-primary bg-primary/5 text-primary' : 'border-line text-muted hover:border-primary/60 hover:text-primary'"
-        @click="select(ADD_KEY)"
-      >
-        <span class="i-lucide:plus text-4" />
-        {{ t('settingsPage.model.addProvider') }}
-      </button>
+        <VDivider class="my-1.5" />
+
+        <VListItem :active="isAdding" class="text-muted" @click="select(ADD_KEY)">
+          <template #prepend>
+            <span class="i-lucide:plus mr-2 h-7 w-7 shrink-0 rounded-md bg-elevated p-1.5 text-4" />
+          </template>
+          <VListItemTitle class="text-sm">{{ t('settingsPage.model.addProvider') }}</VListItemTitle>
+        </VListItem>
+      </VList>
     </nav>
 
     <!-- 右栏 -->
@@ -436,32 +439,33 @@ async function saveNewProvider() {
           <div class="mt-0.5 text-xs leading-5 text-muted">{{ t('settingsPage.model.presetsSection') }}</div>
         </div>
 
-        <!-- 预设厂商：monogram 徽标 + 名称 + 等宽地址；选中 = 主色描边 -->
-        <div class="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
-          <button
-            v-for="preset in PROVIDER_PRESETS"
-            :key="preset.id"
-            type="button"
-            class="flex items-center gap-2.5 rounded-lg border p-2.5 text-left transition-colors"
-            :class="
-              newBaseUrl === preset.baseUrl
-                ? 'border-primary bg-primary/10'
-                : 'border-line hover:border-primary/50 hover:bg-elevated'
-            "
-            @click="pickPreset(preset)"
-          >
-            <span
-              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold"
-              :class="newBaseUrl === preset.baseUrl ? 'bg-primary/15 text-primary' : 'bg-elevated text-muted'"
+        <!-- 预设厂商：VCard 选择卡；选中 = 主色描边 + 微底色 + 勾选 -->
+        <VItemGroup v-model="pickedPresetId" class="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
+          <VItem v-for="preset in PROVIDER_PRESETS" :key="preset.id" v-slot="{ isSelected, toggle }" :value="preset.id">
+            <VCard
+              variant="outlined"
+              link
+              :color="isSelected ? 'primary' : undefined"
+              :class="isSelected ? 'bg-primary/5' : ''"
+              class="h-full transition-colors"
+              @click="toggle"
             >
-              {{ monogram(preset.name) }}
-            </span>
-            <span class="min-w-0">
-              <span class="block truncate text-sm leading-5 text-fg">{{ preset.name }}</span>
-              <span class="block truncate font-mono text-xs leading-4 text-muted">{{ preset.baseUrl }}</span>
-            </span>
-          </button>
-        </div>
+              <div class="flex items-center gap-2.5 p-2.5">
+                <span
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold"
+                  :class="isSelected ? 'bg-primary/15 text-primary' : 'bg-elevated text-muted'"
+                >
+                  {{ monogram(preset.name) }}
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm leading-5 text-fg">{{ preset.name }}</span>
+                  <span class="block truncate font-mono text-xs leading-4 text-muted">{{ preset.baseUrl }}</span>
+                </span>
+                <span v-if="isSelected" class="i-lucide:circle-check shrink-0 text-4.5 text-primary" />
+              </div>
+            </VCard>
+          </VItem>
+        </VItemGroup>
 
         <!-- 自定义表单 -->
         <section class="mt-5">
