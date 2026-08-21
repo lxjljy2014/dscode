@@ -88,7 +88,7 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             artifacts/mac/* artifacts/win/* \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "DSCode ${GITHUB_REF_NAME#v}" \
+            --title "${GITHUB_REF_NAME}" \
             --notes "DSCode ${GITHUB_REF_NAME#v} 发布（CI 自动构建，未签名）。" \
             --verify-tag
         env:
