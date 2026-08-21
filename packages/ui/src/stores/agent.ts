@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import type {
   AgentToolEvent,
   AssistantStep,
@@ -82,6 +82,27 @@ export const useAgentStore = defineStore('agent', () => {
 
   /** 各会话最近一次运行使用的模型（自动压缩按所属供应商的 contextWindow 判定阈值） */
   const sessionModels = new Map<string, string>();
+
+  /** 当前使用的模型（跨组件共享：ChatInput 选择、设置页供应商绿标）；空 = 尚未选择 */
+  const activeModel = ref('');
+
+  /** 全部供应商聚合的模型列表（去重；跨供应商列出，主进程按模型名反查供应商） */
+  const availableModels = computed(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const p of settingsStore.settings.providers) {
+      for (const m of p.models) {
+        if (!seen.has(m)) {
+          seen.add(m);
+          out.push(m);
+        }
+      }
+    }
+    return out;
+  });
+  watch(availableModels, list => {
+    if (list.length && !list.includes(activeModel.value)) activeModel.value = list[0];
+  }, { immediate: true });
 
   /** 收敛一次回复的运行统计：结束时间 + 用时 + 首token + token 速率所需数据 */
   function finalizeStats(reply: Message) {
@@ -543,6 +564,8 @@ const sessionStats = computed<SessionStats | null>(() => {
     compacting,
     diffFiles,
     sessionStats,
+    activeModel,
+    availableModels,
     sendMessage,
     stopGenerating,
     respondConfirm,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { Command, MessageAttachment, MessageContext, PermissionMode } from '@dscode/shared';
 import { useSessionStore } from '../../stores/session';
@@ -97,28 +97,9 @@ function removeContext(id: string): void {
   contexts.value = contexts.value.filter(c => c.id !== id);
 }
 
-// 模型列表聚合全部供应商（多供应商：跨供应商列出模型，选中后由主进程按模型名反查供应商）
-const model = ref('');
-const models = computed(() => {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const p of settingsStore.settings.providers) {
-    for (const m of p.models) {
-      if (!seen.has(m)) {
-        seen.add(m);
-        out.push(m);
-      }
-    }
-  }
-  return out;
-});
-watch(
-  () => models.value,
-  list => {
-    if (list.length && !list.includes(model.value)) model.value = list[0];
-  },
-  { immediate: true }
-);
+// 模型选择收拢到 agent store（activeModel/availableModels）：设置页据此给在用供应商标绿
+const model = toRef(agentStore, 'activeModel');
+const models = computed(() => agentStore.availableModels);
 
 // 自定义斜杠命令 + 插件贡献的命令（/name 展开为 prompt）
 const pluginsStore = usePluginsStore();

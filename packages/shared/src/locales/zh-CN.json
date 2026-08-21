@@ -356,6 +356,7 @@
       "modelsCount": "{n} 个模型",
       "keyNotSet": "未设置 Key",
       "keySet": "Key 已设置",
+      "inUse": "当前使用中",
       "sectionConnect": "连接",
       "sectionReasoning": "推理与输出",
       "emptyHint": "从左侧添加一个供应商开始",

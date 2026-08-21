@@ -5,6 +5,7 @@ import type { ProviderConfig } from '@dscode/shared';
 import { PROVIDER_PRESETS } from '@dscode/shared';
 import { host } from '../../bridge/host';
 import { useSettingsStore } from '../../stores/settings';
+import { useAgentStore } from '../../stores/agent';
 
 /**
  * 模型设置：左栏供应商导航（VList nav）+ 右栏编辑/添加，全部交互走 Vuetify
@@ -16,6 +17,7 @@ import { useSettingsStore } from '../../stores/settings';
 
 const { t } = useI18n();
 const settingsStore = useSettingsStore();
+const agentStore = useAgentStore();
 
 const providers = ref<ProviderConfig[]>([]);
 const showKey = ref<Record<string, boolean>>({});
@@ -56,6 +58,12 @@ watch(
 );
 const selected = computed(() => providers.value.find(p => p.id === selectedId.value) ?? null);
 const isAdding = computed(() => selectedId.value === ADD_KEY);
+/** 当前在用模型所属的供应商（左栏绿点：一眼看出正在用的是哪家） */
+const activeProviderId = computed(() => {
+  const m = agentStore.activeModel;
+  if (!m) return null;
+  return providers.value.find(p => p.models.includes(m))?.id ?? null;
+});
 
 function select(id: string) {
   // 离开添加视图时清掉验证状态
@@ -228,28 +236,41 @@ async function saveNewProvider() {
         <VListItem
           v-for="p in providers"
           :key="p.id"
-          :active="p.id === selectedId"
           class="mb-0.5"
           @click="select(p.id)"
         >
           <template #prepend>
-            <span class="mr-1 flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-3 font-semibold tracking-tight text-muted">
+            <span
+              class="mr-1 flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold tracking-tight"
+              :class="p.id === selectedId ? 'bg-primary/15 text-primary' : 'bg-elevated text-muted'"
+            >
               {{ monogram(p.name) }}
             </span>
           </template>
-          <VListItemTitle class="text-sm">{{ p.name }}</VListItemTitle>
+          <VListItemTitle class="text-sm" :class="p.id === selectedId ? 'font-semibold text-primary' : ''">
+            {{ p.name }}
+          </VListItemTitle>
           <VListItemSubtitle class="text-xs">
             {{ p.apiKey ? t('settingsPage.model.modelsCount', { n: p.models.length }) : t('settingsPage.model.keyNotSet') }}
           </VListItemSubtitle>
+          <template #append>
+            <span
+              v-if="p.id === activeProviderId"
+              class="ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-success"
+              :title="t('settingsPage.model.inUse')"
+            />
+          </template>
         </VListItem>
 
         <VDivider class="my-1.5" />
 
-        <VListItem :active="isAdding" class="text-muted" @click="select(ADD_KEY)">
+        <VListItem class="text-muted" @click="select(ADD_KEY)">
           <template #prepend>
-            <span class="i-lucide:plus mr-2 h-7 w-7 shrink-0 rounded-md bg-elevated p-1.5 text-4" />
+            <span class="i-lucide:plus mr-2 h-6.5 w-6.5 shrink-0 rounded-md bg-elevated p-1.5 text-4" />
           </template>
-          <VListItemTitle class="text-sm">{{ t('settingsPage.model.addProvider') }}</VListItemTitle>
+          <VListItemTitle class="text-sm" :class="isAdding ? 'font-semibold text-primary' : ''">
+            {{ t('settingsPage.model.addProvider') }}
+          </VListItemTitle>
         </VListItem>
       </VList>
     </nav>
@@ -287,33 +308,29 @@ async function saveNewProvider() {
           </VBtn>
         </div>
 
-        <!-- 连接：行式布局，左标签右控件，hairline 分隔 -->
+        <!-- 连接：关键字段独占一行，outlined 带标签 -->
         <section class="mt-7">
           <h3 class="text-xs font-medium text-faint">{{ t('settingsPage.model.sectionConnect') }}</h3>
-          <div class="divide-y divide-line">
-            <div class="grid grid-cols-[11rem_1fr] items-center gap-6 py-2.5">
-              <div class="text-sm">{{ t('settingsPage.model.providerBaseUrl') }}</div>
-              <VTextField
-                v-model="selected.baseUrl"
-                density="compact"
-                variant="underlined"
-                hide-details
-                :placeholder="t('settingsPage.model.providerBaseUrlPlaceholder')"
-              />
-            </div>
-            <div class="grid grid-cols-[11rem_1fr] items-center gap-6 py-2.5">
-              <div class="text-sm">{{ t('settingsPage.model.apiKey') }}</div>
-              <VTextField
-                v-model="selected.apiKey"
-                :type="showKey[selected.id] ? 'text' : 'password'"
-                density="compact"
-                variant="underlined"
-                hide-details
-                :placeholder="t('onboarding.apiKeyPlaceholder')"
-                :append-inner-icon="showKey[selected.id] ? 'i-lucide:eye-off' : 'i-lucide:eye'"
-                @click:append-inner="toggleKey(selected.id)"
-              />
-            </div>
+          <div class="mt-2 flex flex-col gap-3">
+            <VTextField
+              v-model="selected.baseUrl"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.providerBaseUrl')"
+              :placeholder="t('settingsPage.model.providerBaseUrlPlaceholder')"
+            />
+            <VTextField
+              v-model="selected.apiKey"
+              :type="showKey[selected.id] ? 'text' : 'password'"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.apiKey')"
+              :placeholder="t('onboarding.apiKeyPlaceholder')"
+              :append-inner-icon="showKey[selected.id] ? 'i-lucide:eye-off' : 'i-lucide:eye'"
+              @click:append-inner="toggleKey(selected.id)"
+            />
           </div>
         </section>
 
@@ -342,7 +359,8 @@ async function saveNewProvider() {
             <VTextField
               v-model="newModel[selected.id]"
               density="compact"
-              variant="underlined"
+              variant="outlined"
+              :label="t('settingsPage.model.modelLabel')"
               :placeholder="t('settingsPage.model.modelPlaceholder')"
               hide-details
               class="flex-1"
@@ -388,7 +406,7 @@ async function saveNewProvider() {
                   { title: t('settingsPage.model.thinkingDisabled'), value: 'disabled' }
                 ]"
                 density="compact"
-                variant="underlined"
+                variant="outlined"
                 hide-details
               />
             </div>
@@ -403,7 +421,7 @@ async function saveNewProvider() {
                   { title: t('settingsPage.model.effortMax'), value: 'max' }
                 ]"
                 density="compact"
-                variant="underlined"
+                variant="outlined"
                 hide-details
               />
             </div>
@@ -412,14 +430,14 @@ async function saveNewProvider() {
                 <div class="text-sm">{{ t('settingsPage.model.maxTokensLabel') }}</div>
                 <div class="mt-0.5 text-xs leading-4 text-muted">{{ t('settingsPage.model.maxTokensHint') }}</div>
               </div>
-              <VTextField v-model="maxTokensSel[selected.id]" type="number" density="compact" variant="underlined" hide-details />
+              <VTextField v-model="maxTokensSel[selected.id]" type="number" density="compact" variant="outlined" hide-details />
             </div>
             <div class="grid grid-cols-[11rem_1fr] items-center gap-6 py-2.5">
               <div>
                 <div class="text-sm">{{ t('settingsPage.model.contextWindowLabel') }}</div>
                 <div class="mt-0.5 text-xs leading-4 text-muted">{{ t('settingsPage.model.contextWindowHint') }}</div>
               </div>
-              <VTextField v-model="contextWinSel[selected.id]" type="number" density="compact" variant="underlined" hide-details />
+              <VTextField v-model="contextWinSel[selected.id]" type="number" density="compact" variant="outlined" hide-details />
             </div>
           </div>
         </section>
@@ -470,38 +488,33 @@ async function saveNewProvider() {
         <!-- 自定义表单 -->
         <section class="mt-6">
           <h3 class="text-xs font-medium text-faint">{{ t('settingsPage.model.customPreset') }}</h3>
-          <div class="mt-1 grid grid-cols-1 gap-x-8 gap-y-0 md:grid-cols-2">
-            <div class="grid grid-cols-[6rem_1fr] items-center gap-4 py-2.5">
-              <div class="text-sm">{{ t('settingsPage.model.providerName') }}</div>
-              <VTextField
-                v-model="newName"
-                density="compact"
-                variant="underlined"
-                hide-details
-                :placeholder="t('settingsPage.model.providerNamePlaceholder')"
-              />
-            </div>
-            <div class="grid grid-cols-[6rem_1fr] items-center gap-4 py-2.5">
-              <div class="text-sm">{{ t('settingsPage.model.providerBaseUrl') }}</div>
-              <VTextField
-                v-model="newBaseUrl"
-                density="compact"
-                variant="underlined"
-                hide-details
-                :placeholder="t('settingsPage.model.providerBaseUrlPlaceholder')"
-              />
-            </div>
-            <div class="grid grid-cols-[6rem_1fr] items-center gap-4 py-2.5 md:col-span-2">
-              <div class="text-sm">{{ t('settingsPage.model.apiKey') }}</div>
-              <VTextField
-                v-model="newApiKey"
-                type="password"
-                density="compact"
-                variant="underlined"
-                hide-details
-                :placeholder="t('onboarding.apiKeyPlaceholder')"
-              />
-            </div>
+          <div class="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <VTextField
+              v-model="newName"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.providerName')"
+              :placeholder="t('settingsPage.model.providerNamePlaceholder')"
+            />
+            <VTextField
+              v-model="newBaseUrl"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.providerBaseUrl')"
+              :placeholder="t('settingsPage.model.providerBaseUrlPlaceholder')"
+            />
+            <VTextField
+              v-model="newApiKey"
+              type="password"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.apiKey')"
+              :placeholder="t('onboarding.apiKeyPlaceholder')"
+              class="md:col-span-2"
+            />
           </div>
 
           <div class="mt-3 flex flex-wrap items-center gap-3">

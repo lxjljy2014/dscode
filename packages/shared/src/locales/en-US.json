@@ -356,6 +356,7 @@
       "modelsCount": "{n} models",
       "keyNotSet": "No key set",
       "keySet": "API key set",
+      "inUse": "In use",
       "sectionConnect": "Connection",
       "sectionReasoning": "Reasoning & output",
       "emptyHint": "Add a provider from the left to get started",
