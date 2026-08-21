@@ -144,6 +144,8 @@ export async function startAgent(
       systemPrompt: buildAgentSystemPrompt(settings, subagentId),
       browsingEnabled: settings.browsingEnabled,
       skills: settings.skills,
+      // 子智能体配置（task 工具按名/id 解析人设与受限工具集）
+      subagents: settings.subagents,
       llmCache: getLlmCache(),
       // MCP 动态工具（与内置工具并行暴露；无服务器配置时跳过构建）
       ...(settings.mcpServers.length > 0 ? { mcpTools: await ensureMcpTools(settings.mcpServers) } : {}),

@@ -101,7 +101,7 @@ export interface AgentContextEvent extends ContextProjection {
 }
 
 /** agent 可调用的工具名 */
-export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file' | 'browse' | 'run_code' | 'skill';
+export type AgentToolName = 'read_file' | 'list_dir' | 'search' | 'run_command' | 'write_file' | 'edit_file' | 'browse' | 'run_code' | 'skill' | 'task';
 
 /**
  * 任意工具名：内置 AgentToolName + 动态注入的工具名（MCP 工具 mcp__<server>__<tool>）。

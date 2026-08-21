@@ -27,6 +27,22 @@ export type ToolPermission = 'read' | 'write' | 'execute';
 /** 工具并发分类：决定同一轮内多个工具调用的调度方式（借鉴官方 harness 的 isConcurrencySafe） */
 export type ToolConcurrency = 'parallel' | 'exclusive';
 
+/** 子任务派发请求（task 工具 → 运行时注入的 spawnSubagent 实现） */
+export interface SubagentTaskRequest {
+  /** 任务简述（展示用） */
+  description: string;
+  /** 完整任务指令 */
+  prompt: string;
+  /** 子智能体 id 或名（设置页配置；缺省通用探索者人设） */
+  subagent?: string;
+}
+
+/** 子任务结果：成功为结论文本，失败为错误说明 */
+export interface SubagentTaskResult {
+  ok: boolean;
+  content: string;
+}
+
 /** 工具执行上下文（cwd 为工作目录，工具内所有相对路径的根；signal 为运行时 abort，超时/取消时中止） */
 export interface ToolContext {
   cwd: string;
@@ -34,6 +50,11 @@ export interface ToolContext {
   skills?: import('@dscode/shared').Skill[];
   /** 调用方取消信号：运行时停止/超时会中止，工具内的异步工作应响应它 */
   signal?: AbortSignal;
+  /**
+   * 派发子任务（task 工具用）：以独立上下文窗口跑只读工具循环，仅返回结论。
+   * 由运行时注入（子任务需要 provider/LLM 环境，工具本体保持纯薄壳）。
+   */
+  spawnSubagent?(req: SubagentTaskRequest, signal?: AbortSignal): Promise<SubagentTaskResult>;
 }
 
 /**

@@ -27,6 +27,13 @@ export interface ToolBatchRuntime {
   skills: Skill[];
   /** 动态注入工具（MCP）查表：内置注册表未命中时回退到此 */
   extraTools?: Map<string, Tool>;
+  /**
+   * 工具集白名单（子任务运行时注入）：模型调用了未暴露的工具 → 结构化错误结果
+   * （不中止运行，模型可自行纠正）；缺省不限制。task 始终不在子任务白名单内（防递归委派）。
+   */
+  allowedTools?: Set<string>;
+  /** 子任务派发实现（task 工具用，运行时注入） */
+  spawnSubagent?: import('../tools/types').ToolContext['spawnSubagent'];
 }
 
 /** 一轮工具调度的结果：continueLoop=false 表示中止/用户拒绝（调用方应退出 runLoop）；concluded 表示某工具标记本轮结束 */
@@ -65,6 +72,20 @@ export async function executeToolBatch(
   for (const call of toolCalls) {
     if (signal.aborted) return { continueLoop: false, concluded: false };
     const toolEventId = rt.nextToolId();
+    // 白名单外工具（子任务运行）：不门控不执行，直接按模型顺序回错误结果，模型可纠正后重试
+    if (rt.allowedTools && !rt.allowedTools.has(call.name)) {
+      sink.tool(sessionId, {
+        id: toolEventId,
+        toolCallId: call.id,
+        name: call.name,
+        args: call.arguments,
+        status: 'error',
+        error: '该工具在当前任务中不可用',
+        createdAt: Date.now()
+      });
+      messages.push({ role: 'tool', tool_call_id: call.id, content: '错误：该工具在当前任务中不可用' });
+      continue;
+    }
     const event: AgentToolEvent = {
       id: toolEventId,
       // 模型 tool call id：渲染端历史重建时靠它对齐运行时上下文，保持前缀缓存稳定
@@ -147,7 +168,8 @@ export async function executeToolBatch(
       const result = await executeTool(p.call.name, p.call.arguments, cwd, {
         signal,
         skills: rt.skills,
-        extraTools: rt.extraTools
+        extraTools: rt.extraTools,
+        spawnSubagent: rt.spawnSubagent
       });
       results[absIdx] = { result, toolMs: Date.now() - toolStart };
     }));

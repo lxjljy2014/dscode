@@ -162,7 +162,7 @@ function readLogLines(dir: string): string[] {
 }
 
 const TOOL_NAMES = new Set([
-  'read_file', 'list_dir', 'search', 'run_command', 'write_file', 'edit_file', 'browse', 'run_code', 'skill'
+  'read_file', 'list_dir', 'search', 'run_command', 'write_file', 'edit_file', 'browse', 'run_code', 'skill', 'task'
 ]);
 
 /** 读回时把 steps 归一化回有序步骤；非终态工具事件（崩溃时残留的 running/confirming）归一化为 error */

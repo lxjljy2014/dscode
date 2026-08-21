@@ -8,6 +8,7 @@ import { runCommandTool } from './run-command';
 import { searchTool } from './search';
 import { writeFileTool } from './write-file';
 import { skillTool } from './skill';
+import { taskTool } from './task';
 import { runCodeTool } from '../code-run/run-code';
 import { toolConcurrency, validateArgs } from './types';
 import type { Tool, ToolContext, ToolPermission, ToolResult } from './types';
@@ -42,7 +43,8 @@ export const TOOLS: Record<AgentToolName, Tool> = {
   edit_file: editFileTool,
   browse: browseTool,
   run_code: runCodeTool,
-  skill: skillTool
+  skill: skillTool,
+  task: taskTool
 };
 
 /** 工具名列表（与 AgentToolName 对齐，编译期由 Record<AgentToolName, Tool> 保证完整）；供跨进程校验单一事实源 */
@@ -107,7 +109,12 @@ export async function executeTool(
   name: string,
   argsJson: string,
   cwd: string,
-  opts: { signal?: AbortSignal; skills?: Skill[]; extraTools?: Map<string, Tool> } = {}
+  opts: {
+    signal?: AbortSignal;
+    skills?: Skill[];
+    extraTools?: Map<string, Tool>;
+    spawnSubagent?: ToolContext['spawnSubagent'];
+  } = {}
 ): Promise<ToolResult> {
   const tool = TOOLS[name as AgentToolName] ?? opts.extraTools?.get(name);
   if (!tool) return { ok: false, error: '未知工具: ' + name };
@@ -122,7 +129,7 @@ export async function executeTool(
   const violations = validateArgs(tool.parameters, args);
   if (violations.length > 0) return { ok: false, error: '参数错误: ' + violations.join('; ') };
   // 超时：工具声明 timeoutMs 时以 AbortSignal.timeout 与调用方 signal 合成；未声明则透传调用方 signal
-  const ctx: ToolContext = { cwd, signal: opts.signal, skills: opts.skills };
+  const ctx: ToolContext = { cwd, signal: opts.signal, skills: opts.skills, ...(opts.spawnSubagent ? { spawnSubagent: opts.spawnSubagent } : {}) };
   if (tool.timeoutMs !== undefined) {
     const timeoutSignal = AbortSignal.timeout(tool.timeoutMs);
     ctx.signal = opts.signal ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal;

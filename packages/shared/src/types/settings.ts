@@ -81,12 +81,21 @@ export interface Hook {
   command: string;
 }
 
-/** 子智能体：可切换的专用 agent 人设（选定后以其 systemPrompt 运行） */
+/**
+ * 子智能体：可切换的专用 agent 人设（选定后以其 systemPrompt 运行），
+ * 也可作为 task 工具委派的子任务人设（model/allowedTools/maxTurns 仅对子任务生效）。
+ */
 export interface Subagent {
   id: string;
   name: string;
   description: string;
   systemPrompt: string;
+  /** 子任务使用的模型（缺省跟随主会话） */
+  model?: string;
+  /** 子任务允许的工具名（缺省只读工具集；task 工具本身始终不可用，防递归委派） */
+  allowedTools?: string[];
+  /** 子任务最大轮次（缺省 12） */
+  maxTurns?: number;
 }
 
 /** MCP 服务器配置（stdio 传输） */

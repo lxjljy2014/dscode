@@ -109,7 +109,7 @@ function isHook(v: unknown): v is Hook {
   );
 }
 
-/** 子智能体收窄 */
+/** 子智能体收窄（可选字段 model/allowedTools/maxTurns 类型非法时丢弃，保持已存值可用） */
 function isSubagent(v: unknown): v is Subagent {
   if (typeof v !== 'object' || v === null) return false;
   const s = v as Record<string, unknown>;

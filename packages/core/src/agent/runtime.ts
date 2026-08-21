@@ -6,14 +6,16 @@ import type {
   PermissionMode,
   ProviderConfig,
   SessionStats,
-  Skill
+  Skill,
+  Subagent
 } from '@dscode/shared';
 import { ApiError, resolveAdapter, streamChatWithRetry } from '../adapters';
 import type { ChatUsage } from '../adapters/types';
 import type { LlmCache } from '../cache/llm-cache';
 import { isConfirmDecision } from '../gate/gate';
-import { toolSchemas } from '../tools';
-import type { Tool } from '../tools';
+import { TOOLS, toolSchemas } from '../tools';
+import type { Tool, ToolContext } from '../tools';
+import type { SubagentTaskRequest, SubagentTaskResult } from '../tools/types';
 import { DiffSnapshotStore } from '../workspace/diff';
 import { estimateMessageTokens, estimateSystemTokens, estimateTokens, estimateToolsTokens } from './token-estimate';
 import { executeToolBatch } from './tool-batch';
@@ -36,6 +38,48 @@ const ROUND_TIMEOUT_MS = 5 * 60_000;
  * （Map 插入序即 LRU 序，start 时刷新新鲜度），防主进程长生命周期下两个 Map 只增不减。
  */
 const MAX_SESSION_CACHE_ENTRIES = 64;
+
+/** 子任务（task 工具派发）相关约束 */
+/** 单次父运行内子任务次数上限（防无界派生烧 token） */
+const MAX_SUBTASKS_PER_RUN = 5;
+/** 子任务默认轮数上限 */
+const DEFAULT_SUBAGENT_MAX_TURNS = 12;
+/** 子任务结论返回主上下文的字符上限 */
+const SUBAGENT_RESULT_MAX_CHARS = 8 * 1024;
+/** 子任务默认工具集（只读；不含 task 防递归委派） */
+const SUBAGENT_DEFAULT_TOOLS: readonly string[] = ['read_file', 'list_dir', 'search', 'browse'];
+
+/** 子任务默认人设（task 工具未指定 subagent 时使用） */
+const SUBAGENT_DEFAULT_PROMPT = `你是被主任务派发的子任务执行者，在用户的工作目录中完成给定的只读调查任务。规则：
+- 只使用只读工具（读文件/列目录/搜索/浏览），不要尝试修改任何文件
+- 聚焦完成给定任务，不扩大范围
+- 完成后输出简明结论（要点式，附关键文件路径与证据）——这是主任务唯一能看到的内容`;
+
+/** 运行时已解析的供应商请求参数（主运行与子任务共用） */
+interface ResolvedProvider {
+  baseUrl: string;
+  apiKey: string;
+  adapter?: string;
+  thinking?: boolean;
+  reasoningEffort?: 'off' | 'high' | 'max';
+  maxTokens?: number;
+}
+
+/** runLoop 可选项：主运行全量暴露工具；子任务注入白名单与更小轮数上限 */
+interface RunLoopOptions {
+  browsingEnabled: boolean;
+  skills: Skill[];
+  sink: AgentEventSink;
+  llmCache?: LlmCache;
+  /** MCP 动态工具（主运行注入；子任务缺省不注入） */
+  mcpTools?: Tool[];
+  /** 工具白名单（子任务）：schema 与执行双重过滤，task 始终排除；缺省全量 */
+  allowedTools?: Set<string>;
+  /** 轮数上限（缺省 MAX_TOOL_ROUNDS；子任务更小） */
+  maxRounds?: number;
+  /** 子任务派发实现（主运行注入，task 工具用） */
+  spawnSubagent?: ToolContext['spawnSubagent'];
+}
 
 /** 系统提示词：默认值，可经 AgentStartInput.config.systemPrompt 覆盖 */
 export const SYSTEM_PROMPT = `你是 DSCode 内置的编程助手，在用户的工作目录中工作。可以调用工具读取文件、列出目录、搜索代码、执行命令、写入或编辑文件。规则：
@@ -102,6 +146,8 @@ export interface AgentStartInput {
     browsingEnabled?: boolean;
     /** 可用技能列表（系统提示词注入目录，skill 工具按名加载正文；缺省空列表不暴露 skill 工具） */
     skills?: Skill[];
+    /** 子智能体配置（task 工具按名/id 解析人设与工具集；缺省空列表走通用探索者） */
+    subagents?: Subagent[];
     /** LLM 回复缓存（省成本；命中时重放缓存响应，不调 API） */
     llmCache?: LlmCache;
     /**
@@ -219,26 +265,52 @@ export class AgentRuntime {
       ...rawMessages
     ];
 
+    // 子任务派发计数（单次父运行内；task 工具经 spawnSubagent 闭包使用）
+    let subtaskCount = 0;
+    // 本次运行的供应商请求参数（主循环与子任务共用）
+    const resolved: ResolvedProvider = {
+      baseUrl: provider.baseUrl,
+      apiKey: provider.apiKey,
+      adapter: provider.adapter,
+      thinking: config.thinking ?? provider.thinking,
+      reasoningEffort: config.reasoningEffort ?? provider.reasoningEffort,
+      maxTokens: config.maxTokens ?? provider.maxTokens
+    };
+    // 子任务派发环境：捕获父运行配置，供 task 工具 spawn 独立上下文的只读子运行
+    const subagentEnv = {
+      workingDirectory: config.workingDirectory,
+      providers: config.providers,
+      browsingEnabled: config.browsingEnabled !== false,
+      llmCache: config.llmCache,
+      subagents: config.subagents ?? []
+    };
+
     run.done = this.runLoop(
       sessionId,
       config.workingDirectory,
       config.permissionMode,
       config.permissionModeSource,
-      {
-        baseUrl: provider.baseUrl,
-        apiKey: provider.apiKey,
-        adapter: provider.adapter,
-        thinking: config.thinking ?? provider.thinking,
-        reasoningEffort: config.reasoningEffort ?? provider.reasoningEffort,
-        maxTokens: config.maxTokens ?? provider.maxTokens
-      },
+      resolved,
       resolvedModel,
       context,
-      config.browsingEnabled !== false,
-      config.skills ?? [],
-      sink,
-      config.llmCache,
-      config.mcpTools
+      {
+        browsingEnabled: config.browsingEnabled !== false,
+        skills: config.skills ?? [],
+        sink,
+        llmCache: config.llmCache,
+        mcpTools: config.mcpTools,
+        // task 工具的派发实现：继承父运行环境，父取消信号联动子运行
+        spawnSubagent: (req, toolSignal) =>
+          this.runSubagentTask(
+            sessionId,
+            subagentEnv,
+            resolved,
+            resolvedModel,
+            () => subtaskCount++,
+            req,
+            toolSignal ?? run.controller.signal
+          )
+      }
     ).finally(() => {
       if (this.runs.get(sessionId) === run) this.runs.delete(sessionId);
       // 快照保留（下一次运行启动时覆盖）：DiffPanel 的「恢复到运行前」依赖它；
@@ -256,32 +328,133 @@ export class AgentRuntime {
 
   // ---- agent 循环 ----
 
+  /**
+   * 执行一次子任务（task 工具派发）：以独立 sessionId 与独立上下文窗口运行只读工具循环，
+   * 静默 sink 收集全部正文流，结束后仅把结论文本返回给父运行的 task 工具结果。
+   * 安全约束：工具白名单（缺省只读集，task 始终排除防递归）、轮数上限、单父运行次数上限、
+   * 父/task 取消信号联动子运行；子任务不触发确认（只读工具全模式放行，异常确认直接拒绝）。
+   */
+  private async runSubagentTask(
+    parentSessionId: string,
+    env: {
+      workingDirectory: string;
+      providers: ProviderConfig[];
+      browsingEnabled: boolean;
+      llmCache?: LlmCache;
+      subagents: Subagent[];
+    },
+    parentProvider: ResolvedProvider,
+    parentModel: string,
+    nextSubtaskCount: () => number,
+    req: SubagentTaskRequest,
+    signal: AbortSignal
+  ): Promise<SubagentTaskResult> {
+    // 次数上限（闭包计数父运行生命周期内累计；调用即自增，返回本次序号）
+    const used = nextSubtaskCount();
+    if (used >= MAX_SUBTASKS_PER_RUN) {
+      return { ok: false, content: `子任务次数已达上限（${MAX_SUBTASKS_PER_RUN} 次），请直接在主任务中完成` };
+    }
+
+    // 子智能体解析：id 或 name 匹配；未匹配（或未指定）走默认探索者人设
+    const conf = req.subagent ? env.subagents.find(s => s.id === req.subagent || s.name === req.subagent) : undefined;
+    const systemPrompt = conf?.systemPrompt ?? SUBAGENT_DEFAULT_PROMPT;
+
+    // 模型：子智能体配置的 model 反查供应商（找不到回退父运行的）
+    let provider = parentProvider;
+    let model = parentModel;
+    if (conf?.model) {
+      const found = env.providers.find(p => p.models.includes(conf.model!));
+      if (found) {
+        provider = {
+          baseUrl: found.baseUrl,
+          apiKey: found.apiKey,
+          adapter: found.adapter,
+          thinking: found.thinking,
+          reasoningEffort: found.reasoningEffort,
+          maxTokens: found.maxTokens
+        };
+        model = conf.model;
+      }
+    }
+
+    // 工具白名单：配置集（缺省只读集）∩ 真实存在的内置工具，排除 task（防递归）
+    const configured = conf?.allowedTools && conf.allowedTools.length > 0 ? conf.allowedTools : SUBAGENT_DEFAULT_TOOLS;
+    const allowedTools = new Set(configured.filter(n => n !== 'task' && n in TOOLS));
+    if (allowedTools.size === 0) allowedTools.add('read_file'); // 兜底：白名单清空时至少可读
+
+    // 子运行注册（获得 runs Map 的 abort 语义）与父取消联动
+    const subSessionId = `${parentSessionId}#sub-${used}`;
+    const subController = new AbortController();
+    const subRun: RunState = { controller: subController, replacing: false, done: Promise.resolve() };
+    this.runs.set(subSessionId, subRun);
+    const onParentAbort = (): void => subController.abort();
+    signal.addEventListener('abort', onParentAbort, { once: true });
+
+    // 静默 sink：只收集正文流与终态，不向渲染端上抛（子任务过程不进聊天流）
+    let collected = '';
+    let failure = '';
+    const subSink: AgentEventSink = {
+      delta: (_sid, kind, content) => {
+        if (kind === 'content') collected += content;
+      },
+      tool: () => {},
+      confirm: (_sid, toolEventId) => {
+        // 只读工具不应触发确认；防御性拒绝（外部确认也无 UI 入口）
+        this.resolveConfirm(toolEventId, { kind: 'deny' });
+      },
+      usage: () => {},
+      done: () => {},
+      error: (_sid, code, detail) => {
+        failure = detail ? `${code}: ${detail}` : code;
+      },
+      sessionStats: () => {},
+      context: () => {},
+      diff: () => {}
+    };
+
+    try {
+      await this.runLoop(subSessionId, env.workingDirectory, 'confirm', undefined, provider, model, [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: req.prompt }
+      ], {
+        browsingEnabled: env.browsingEnabled,
+        skills: [],
+        sink: subSink,
+        llmCache: env.llmCache,
+        allowedTools,
+        maxRounds: conf?.maxTurns ?? DEFAULT_SUBAGENT_MAX_TURNS
+      });
+    } catch (e) {
+      failure = e instanceof Error ? e.message : String(e);
+    } finally {
+      signal.removeEventListener('abort', onParentAbort);
+    }
+
+    if (signal.aborted || subController.signal.aborted) return { ok: false, content: '子任务已中止' };
+    if (failure) return { ok: false, content: `子任务失败：${failure}` };
+    const conclusion = collected.trim().slice(0, SUBAGENT_RESULT_MAX_CHARS);
+    return { ok: true, content: conclusion.length > 0 ? conclusion : '（子任务未返回结论）' };
+  }
+
   private async runLoop(
     sessionId: string,
     cwd: string,
     permissionMode: PermissionMode,
     permissionModeSource: (() => PermissionMode | Promise<PermissionMode>) | undefined,
-    provider: {
-      baseUrl: string;
-      apiKey: string;
-      adapter?: string;
-      thinking?: boolean;
-      reasoningEffort?: 'off' | 'high' | 'max';
-      maxTokens?: number;
-    },
+    provider: ResolvedProvider,
     model: string,
     messages: unknown[],
-    browsingEnabled: boolean,
-    skills: Skill[],
-    sink: AgentEventSink,
-    llmCache?: LlmCache,
-    mcpTools?: Tool[]
+    opts: RunLoopOptions
   ): Promise<void> {
     const run = this.runs.get(sessionId);
     if (!run) return;
     const signal = run.controller.signal;
+    // 局部别名：函数体内沿用既有标识符（skills/sink/llmCache）
+    const { skills, sink, llmCache } = opts;
     // 动态工具查表（executeTool 内置注册表未命中时回退到此）
-    const extraTools = new Map<string, Tool>((mcpTools ?? []).map(t => [t.name, t]));
+    const extraTools = new Map<string, Tool>((opts.mcpTools ?? []).map(t => [t.name, t]));
+    // 轮数上限（子任务更小）
+    const maxRounds = opts.maxRounds ?? MAX_TOOL_ROUNDS;
 
     try {
       let totalPrompt = 0;
@@ -291,8 +464,12 @@ export class AgentRuntime {
       // 本运行的工具结果上下文预算（跨轮累计，executeToolBatch 在插入时按预算截断）
       const toolBudget = { remaining: MAX_TOOL_CONTEXT_CHARS };
       // 工具 schema 跨轮不变（browsingEnabled/skills 固定），提升到循环外供上下文投影复用；
-      // MCP 动态工具一并注入（与内置工具并行暴露）
-      const tools = toolSchemas(browsingEnabled, false, skills.length > 0, mcpTools);
+      // MCP 动态工具一并注入（与内置工具并行暴露）；子任务按白名单收敛工具面
+      let tools = toolSchemas(opts.browsingEnabled, false, opts.skills.length > 0, opts.mcpTools);
+      if (opts.allowedTools) {
+        const allowed = opts.allowedTools;
+        tools = tools.filter(t => allowed.has((t as { function: { name: string } }).function.name));
+      }
       // ---- 上下文占用投影（借鉴官方 harness token-meter 的 anchored projection）----
       // 锚定供应商最近一次 usage 的 promptTokens，叠加「表面」启发式增量，让占用随流式正文/工具结果
       // 实时更新，而不是等本轮 usage 到达后才统计。表面 = 系统提示词 + 工具 schema + 对话消息 + 流式累计。
@@ -327,7 +504,7 @@ export class AgentRuntime {
         pushContext();
       };
       pushContext(); // 初始投影：锚定持久化占用（无历史时为纯启发式）
-      for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      for (let round = 0; round < maxRounds; round++) {
         const combined = AbortSignal.any([signal, AbortSignal.timeout(ROUND_TIMEOUT_MS)]);
         const roundStart = Date.now();
         // 首 token 耗时（首个非空正文增量；缓存命中轮保持 null 不计数）
@@ -504,6 +681,8 @@ export class AgentRuntime {
             toolBudget,
             skills,
             extraTools,
+            ...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
+            ...(opts.spawnSubagent ? { spawnSubagent: opts.spawnSubagent } : {}),
           }
         );
         // 工具结果已入上下文：表面增长，推送实时投影
@@ -518,7 +697,7 @@ export class AgentRuntime {
       }
       // 工具循环打满 MAX_TOOL_ROUNDS 仍未产生最终回答：按错误收尾，避免「无结论却显示完成」误导用户
       sink.usage(sessionId, { promptTokens: totalPrompt, completionTokens: totalCompletion, cachedPromptTokens: totalCachedPrompt });
-      sink.error(sessionId, 'max-rounds', `已达到最大工具轮次（${MAX_TOOL_ROUNDS} 轮），任务提前结束`);
+      sink.error(sessionId, 'max-rounds', `已达到最大工具轮次（${maxRounds} 轮），任务提前结束`);
     } catch (e) {
       if (signal.aborted) {
         // 被新运行替换时静默退出（渲染端已丢失状态，aborted 事件无接收方）
