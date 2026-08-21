@@ -164,6 +164,30 @@ export const DEEPSEEK_PRESET: ProviderConfig = {
   contextWindow: 1000000
 };
 
+/**
+ * 供应商预设（OpenAI 兼容接口）：仅预填名称与 baseUrl，模型列表靠「验证并拉取」
+ * 从 {baseUrl}/models 获取（预写模型名会随服务迭代过时）。
+ */
+export interface ProviderPreset {
+  /** 预设标识（展示用，不作为供应商 id） */
+  id: string;
+  name: string;
+  baseUrl: string;
+}
+
+/** 常见厂商与本地推理服务预设 */
+export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com' },
+  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
+  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
+  { id: 'siliconflow', name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1' },
+  { id: 'moonshot', name: 'Moonshot Kimi', baseUrl: 'https://api.moonshot.cn/v1' },
+  { id: 'zhipu', name: 'Zhipu GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+  { id: 'qwen', name: 'Qwen', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  { id: 'ollama', name: 'Ollama（本地）', baseUrl: 'http://localhost:11434/v1' },
+  { id: 'lmstudio', name: 'LM Studio（本地）', baseUrl: 'http://localhost:1234/v1' }
+];
+
 /** 内置技能：首次启动（无自定义）时预置；系统提示词只注入目录（名称+一句话说明），
  * 模型判断任务与某技能相关时先调用 skill 工具加载完整指令再执行（借鉴官方 harness 的
  * 目录注入 + 按需加载设计：避免把全部指令塞进提示词，省 token 且提升指令相关性）。 */
