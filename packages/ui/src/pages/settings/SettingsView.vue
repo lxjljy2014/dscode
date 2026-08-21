@@ -22,7 +22,7 @@ const title = computed(() => t(`settingsPage.section.${route.path.split('/').fil
   <VMain scrollable>
     <div class="h-full flex flex-col bg-base">
       <div class="min-h-0 flex-1 overflow-y-auto">
-        <div class="mx-auto max-w-180 px-8 pb-10 pt-6">
+        <div class="mx-auto max-w-220 px-10 pb-10 pt-6">
           <h1 class="mb-5 select-none text-2xl font-semibold">{{ title }}</h1>
           <RouterView />
         </div>

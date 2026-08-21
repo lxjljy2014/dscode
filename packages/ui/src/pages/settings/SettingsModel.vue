@@ -7,8 +7,10 @@ import { host } from '../../bridge/host';
 import { useSettingsStore } from '../../stores/settings';
 
 /**
- * 模型设置：左右栏布局——左侧供应商列表（含添加入口），右侧选中项的编辑表单。
- * 本地可编辑副本 + 保存按钮一次性写回（与其它设置页一致），避免每个字段实时落盘。
+ * 模型设置：左栏供应商导航（IDE 式：无外框、hairline 分隔、选中指示条），
+ * 右栏编辑/添加。视觉签名是 monogram 徽标——厂商名首个拉丁词前两字符的
+ * 等宽字方块（纯中文名取首字），左栏列表、右栏头部、预设网格三处复用。
+ * 本地可编辑副本 + 保存按钮一次性写回（与其它设置页一致）。
  */
 
 const { t } = useI18n();
@@ -62,6 +64,15 @@ function select(id: string) {
 
 function toggleKey(id: string) {
   showKey.value[id] = !showKey.value[id];
+}
+
+/** 厂商 monogram：取名称中首个拉丁词前两字符（纯中文名取首字），避免双汉字挤占方块 */
+function monogram(name: string): string {
+  const trimmed = name.trim();
+  const latin = trimmed.match(/[A-Za-z][A-Za-z0-9]*/);
+  if (latin) return latin[0].slice(0, 2).toUpperCase();
+  const cjk = trimmed.match(/[\u4e00-\u9fff]/);
+  return cjk ? cjk[0] : '?';
 }
 
 // ---- 保存 / 删除 ----
@@ -202,66 +213,93 @@ async function saveNewProvider() {
 </script>
 
 <template>
-  <div class="flex items-stretch gap-5">
-    <!-- 左栏：供应商列表 + 添加入口 -->
-    <div class="sticky top-0 w-56 shrink-0 self-start">
-      <div class="flex flex-col gap-0.5 rounded-lg border border-line bg-surface p-1.5">
-        <button
-          v-for="p in providers"
-          :key="p.id"
-          type="button"
-          class="flex flex-col gap-0.5 rounded-md px-3 py-2 text-left transition-colors"
-          :class="p.id === selectedId ? 'bg-primary/12 text-fg' : 'text-fg hover:bg-elevated'"
-          @click="select(p.id)"
+  <div class="-mt-1 flex items-stretch gap-6">
+    <!-- 左栏：供应商导航（IDE 式，无外框） -->
+    <nav class="sticky top-0 w-60 shrink-0 self-start border-r border-line pr-4" aria-label="providers">
+      <!-- 列表项：monogram 徽标 + 名称/摘要；选中 = 主色指示条 + 微底色 -->
+      <button
+        v-for="p in providers"
+        :key="p.id"
+        type="button"
+        class="group relative flex w-full items-center gap-2.5 rounded-md border-none bg-transparent py-2 pl-3 pr-2 text-left transition-colors"
+        :class="p.id === selectedId ? 'bg-primary/10' : 'hover:bg-elevated'"
+        @click="select(p.id)"
+      >
+        <span
+          class="absolute inset-y-1 left-0 w-0.5 rounded-full transition-opacity"
+          :class="p.id === selectedId ? 'bg-primary opacity-100' : 'opacity-0'"
+        />
+        <span
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold tracking-tight"
+          :class="p.id === selectedId ? 'bg-primary/15 text-primary' : 'bg-elevated text-muted group-hover:text-fg'"
         >
-          <span class="flex w-full items-center gap-1.5">
-            <span
-              class="h-1.5 w-1.5 shrink-0 rounded-full"
-              :class="p.apiKey ? 'bg-success' : 'bg-warning'"
-            />
-            <span class="truncate text-sm font-medium">{{ p.name }}</span>
+          {{ monogram(p.name) }}
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-sm leading-5" :class="p.id === selectedId ? 'text-fg font-medium' : 'text-fg'">
+            {{ p.name }}
           </span>
-          <span class="truncate text-xs text-muted">
+          <span class="block truncate text-xs leading-4 text-muted">
             {{ p.apiKey ? t('settingsPage.model.modelsCount', { n: p.models.length }) : t('settingsPage.model.keyNotSet') }}
           </span>
-        </button>
+        </span>
+        <span
+          class="h-1.5 w-1.5 shrink-0 rounded-full"
+          :class="p.apiKey ? 'bg-success' : 'bg-warning opacity-70'"
+          :title="p.apiKey ? '' : t('settingsPage.model.keyNotSet')"
+        />
+      </button>
 
-        <button
-          type="button"
-          class="mt-0.5 flex items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors"
-          :class="isAdding ? 'bg-primary/12 text-primary' : 'text-muted hover:bg-elevated hover:text-fg'"
-          @click="select(ADD_KEY)"
-        >
-          <span class="i-lucide:plus text-4" />
-          {{ t('settingsPage.model.addProvider') }}
-        </button>
-      </div>
-    </div>
+      <button
+        type="button"
+        class="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed bg-transparent py-2 text-sm transition-colors"
+        :class="isAdding ? 'border-primary bg-primary/5 text-primary' : 'border-line text-muted hover:border-primary/60 hover:text-primary'"
+        @click="select(ADD_KEY)"
+      >
+        <span class="i-lucide:plus text-4" />
+        {{ t('settingsPage.model.addProvider') }}
+      </button>
+    </nav>
 
-    <!-- 右栏：编辑 / 添加 -->
-    <div class="min-w-0 flex-1">
+    <!-- 右栏 -->
+    <div class="min-w-0 flex-1 py-1">
       <!-- 编辑视图 -->
       <template v-if="selected">
-        <VCard class="px-5 py-4">
-          <div class="flex items-center gap-2">
+        <!-- 头部：monogram + 名称编辑 + 操作 -->
+        <div class="flex items-center gap-3 border-b border-line pb-4">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/12 font-mono text-4.5 font-semibold text-primary">
+            {{ monogram(selected.name) }}
+          </span>
+          <div class="min-w-0 flex-1">
             <VTextField
               v-model="selected.name"
               density="compact"
               variant="outlined"
               hide-details
               :label="t('settingsPage.model.providerName')"
-              class="max-w-64"
+              :placeholder="t('settingsPage.model.providerNamePlaceholder')"
             />
-            <VSpacer />
-            <VBtn size="small" icon variant="text" :title="t('settingsPage.model.deleteProvider')" @click="deleteTarget = selected">
-              <span class="i-lucide:trash-2 text-4" />
-            </VBtn>
-            <VBtn size="small" color="primary" @click="save">
-              {{ t('settingsPage.save') }}
-            </VBtn>
+            <div class="mt-1.5 flex items-center gap-2 text-xs leading-5 text-muted">
+              <span class="flex items-center gap-1.5">
+                <span class="h-1.5 w-1.5 rounded-full" :class="selected.apiKey ? 'bg-success' : 'bg-warning'" />
+                {{ selected.apiKey ? t('settingsPage.model.keySet') : t('settingsPage.model.keyNotSet') }}
+              </span>
+              <span class="text-faint">·</span>
+              <span>{{ t('settingsPage.model.modelsCount', { n: selected.models.length }) }}</span>
+            </div>
           </div>
+          <VBtn size="small" icon variant="text" :title="t('settingsPage.model.deleteProvider')" @click="deleteTarget = selected">
+            <span class="i-lucide:trash-2 text-4" />
+          </VBtn>
+          <VBtn size="small" color="primary" @click="save">
+            {{ t('settingsPage.save') }}
+          </VBtn>
+        </div>
 
-          <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <!-- 连接 -->
+        <section class="mt-5">
+          <h3 class="text-xs font-semibold tracking-widest text-muted">{{ t('settingsPage.model.sectionConnect') }}</h3>
+          <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
             <VTextField
               v-model="selected.baseUrl"
               density="compact"
@@ -282,205 +320,218 @@ async function saveNewProvider() {
               @click:append-inner="toggleKey(selected.id)"
             />
           </div>
+        </section>
 
-          <!-- 模型列表 + 重新拉取 -->
-          <div class="mt-4 border-t border-line pt-4">
-            <div class="mb-2 flex items-center justify-between">
-              <span class="text-sm font-medium">{{ t('settingsPage.model.models') }}</span>
-              <div class="flex items-center gap-2">
-                <span v-if="verifying && fetchTargetId === selected.id" class="text-xs text-muted">
-                  {{ t('settingsPage.model.verifying') }}
-                </span>
-                <VBtn
-                  size="x-small"
-                  variant="text"
-                  :loading="verifying && fetchTargetId === selected.id"
-                  :disabled="!selected.baseUrl.trim() || !selected.apiKey.trim()"
-                  @click="verifyAndFetch(selected.baseUrl, selected.apiKey, selected.id)"
-                >
-                  <span class="i-lucide:refresh-cw mr-1 text-3.5" />
-                  {{ t('settingsPage.model.fetchModels') }}
-                </VBtn>
-              </div>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <VChip v-for="m in selected.models" :key="m" size="small" closable @click:close="removeModel(selected, m)">
-                {{ m }}
-              </VChip>
-            </div>
-            <div class="mt-2 flex items-center gap-2">
-              <VTextField
-                v-model="newModel[selected.id]"
-                density="compact"
-                variant="outlined"
-                :placeholder="t('settingsPage.model.modelPlaceholder')"
-                hide-details
-                class="flex-1"
-                @keydown.enter="addModel(selected)"
-              />
-              <VBtn size="small" variant="outlined" class="shrink-0" @click="addModel(selected)">
-                {{ t('settingsPage.model.addModel') }}
-              </VBtn>
-            </div>
-            <!-- 拉取结果反馈（编辑态：点应用后合并进 chips） -->
-            <div
-              v-if="fetchTargetId === selected.id && verifyState === 'ok' && fetchedModels.length > 0"
-              class="mt-2 flex flex-wrap items-center gap-2"
+        <!-- 模型 -->
+        <section class="mt-6">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-semibold tracking-widest text-muted">{{ t('settingsPage.model.models') }}</h3>
+            <VBtn
+              size="small"
+              variant="text"
+              color="primary"
+              :loading="verifying && fetchTargetId === selected.id"
+              :disabled="!selected.baseUrl.trim() || !selected.apiKey.trim()"
+              @click="verifyAndFetch(selected.baseUrl, selected.apiKey, selected.id)"
             >
-              <span class="text-xs text-success">
-                <span class="i-lucide:circle-check mr-1" />
-                {{ t('settingsPage.model.fetchModelsOk', { n: fetchedModels.length }) }}
-              </span>
-              <VBtn size="x-small" variant="tonal" @click="applyFetchedModels">
-                {{ t('settingsPage.model.verify') }}
-              </VBtn>
-            </div>
-            <div v-else-if="fetchTargetId === selected.id && verifyErrorKey" class="mt-2 text-xs text-error">
-              <span class="i-lucide:circle-x mr-1" />
-              {{ t(verifyErrorKey) }}
-            </div>
+              <span class="i-lucide:refresh-cw mr-1 text-3.5" />
+              {{ t('settingsPage.model.fetchModels') }}
+            </VBtn>
           </div>
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            <VChip v-for="m in selected.models" :key="m" size="small" variant="tonal" closable @click:close="removeModel(selected, m)">
+              {{ m }}
+            </VChip>
+          </div>
+          <div class="mt-2 flex items-center gap-2">
+            <VTextField
+              v-model="newModel[selected.id]"
+              density="compact"
+              variant="outlined"
+              :label="t('settingsPage.model.modelLabel')"
+              :placeholder="t('settingsPage.model.modelPlaceholder')"
+              hide-details
+              class="flex-1"
+              @keydown.enter="addModel(selected)"
+            />
+            <VBtn size="small" variant="outlined" class="shrink-0" @click="addModel(selected)">
+              {{ t('settingsPage.model.addModel') }}
+            </VBtn>
+          </div>
+          <!-- 拉取结果反馈（编辑态：点应用后合并进 chips） -->
+          <div
+            v-if="fetchTargetId === selected.id && verifyState === 'ok' && fetchedModels.length > 0"
+            class="mt-2 flex flex-wrap items-center gap-2"
+          >
+            <span class="text-xs text-success">
+              <span class="i-lucide:circle-check mr-1" />
+              {{ t('settingsPage.model.fetchModelsOk', { n: fetchedModels.length }) }}
+            </span>
+            <VBtn size="x-small" variant="tonal" @click="applyFetchedModels">
+              {{ t('settingsPage.model.verify') }}
+            </VBtn>
+          </div>
+          <div v-else-if="fetchTargetId === selected.id && verifyErrorKey" class="mt-2 text-xs text-error">
+            <span class="i-lucide:circle-x mr-1" />
+            {{ t(verifyErrorKey) }}
+          </div>
+        </section>
 
-          <!-- 推理/输出设置 -->
-          <div class="mt-4 border-t border-line pt-4">
-            <div class="mb-2 text-sm font-medium">{{ t('settingsPage.model.thinkingLabel') }}</div>
-            <div class="text-xs leading-5 text-muted">{{ t('settingsPage.model.thinkingHint') }}</div>
-            <div class="mt-2 flex flex-wrap items-center gap-3">
-              <VSelect
-                v-model="thinkingSel[selected.id]"
-                :items="[
-                  { title: t('settingsPage.model.thinkingAuto'), value: 'auto' },
-                  { title: t('settingsPage.model.thinkingEnabled'), value: 'enabled' },
-                  { title: t('settingsPage.model.thinkingDisabled'), value: 'disabled' }
-                ]"
-                density="compact"
-                variant="outlined"
-                hide-details
-                class="min-w-36 max-w-44"
-              />
-              <VSelect
-                v-model="effortSel[selected.id]"
-                :items="[
-                  { title: t('settingsPage.model.effortAuto'), value: 'auto' },
-                  { title: t('settingsPage.model.effortOff'), value: 'off' },
-                  { title: t('settingsPage.model.effortHigh'), value: 'high' },
-                  { title: t('settingsPage.model.effortMax'), value: 'max' }
-                ]"
-                density="compact"
-                variant="outlined"
-                hide-details
-                class="min-w-36 max-w-44"
-              />
-              <VTextField
-                v-model="maxTokensSel[selected.id]"
-                type="number"
-                density="compact"
-                variant="outlined"
-                hide-details
-                :label="t('settingsPage.model.maxTokensLabel')"
-                :hint="t('settingsPage.model.maxTokensHint')"
-                persistent-hint
-                class="max-w-56"
-              />
-              <VTextField
-                v-model="contextWinSel[selected.id]"
-                type="number"
-                density="compact"
-                variant="outlined"
-                hide-details
-                :label="t('settingsPage.model.contextWindowLabel')"
-                :hint="t('settingsPage.model.contextWindowHint')"
-                persistent-hint
-                class="max-w-56"
-              />
-            </div>
+        <!-- 推理与输出 -->
+        <section class="mt-6">
+          <h3 class="text-xs font-semibold tracking-widest text-muted">{{ t('settingsPage.model.sectionReasoning') }}</h3>
+          <div class="mt-1 text-xs leading-5 text-faint">{{ t('settingsPage.model.thinkingHint') }}</div>
+          <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <VSelect
+              v-model="thinkingSel[selected.id]"
+              :items="[
+                { title: t('settingsPage.model.thinkingAuto'), value: 'auto' },
+                { title: t('settingsPage.model.thinkingEnabled'), value: 'enabled' },
+                { title: t('settingsPage.model.thinkingDisabled'), value: 'disabled' }
+              ]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.thinkingLabel')"
+            />
+            <VSelect
+              v-model="effortSel[selected.id]"
+              :items="[
+                { title: t('settingsPage.model.effortAuto'), value: 'auto' },
+                { title: t('settingsPage.model.effortOff'), value: 'off' },
+                { title: t('settingsPage.model.effortHigh'), value: 'high' },
+                { title: t('settingsPage.model.effortMax'), value: 'max' }
+              ]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.effortLabel')"
+            />
+            <VTextField
+              v-model="maxTokensSel[selected.id]"
+              type="number"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.maxTokensLabel')"
+              :hint="t('settingsPage.model.maxTokensHint')"
+            />
+            <VTextField
+              v-model="contextWinSel[selected.id]"
+              type="number"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.contextWindowLabel')"
+              :hint="t('settingsPage.model.contextWindowHint')"
+            />
           </div>
-        </VCard>
+        </section>
       </template>
 
       <!-- 添加视图：预设 + 表单 -->
-      <VCard v-else-if="isAdding" class="px-5 py-4">
-        <div class="text-sm font-medium">{{ t('settingsPage.model.addProvider') }}</div>
-        <div class="mt-1 text-xs leading-5 text-muted">{{ t('settingsPage.model.presetsSection') }}</div>
+      <template v-else-if="isAdding">
+        <div class="border-b border-line pb-4">
+          <div class="text-sm font-medium">{{ t('settingsPage.model.addProvider') }}</div>
+          <div class="mt-0.5 text-xs leading-5 text-muted">{{ t('settingsPage.model.presetsSection') }}</div>
+        </div>
 
-        <!-- 预设厂商网格：点选填入名称与地址 -->
-        <div class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
+        <!-- 预设厂商：monogram 徽标 + 名称 + 等宽地址；选中 = 主色描边 -->
+        <div class="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
           <button
             v-for="preset in PROVIDER_PRESETS"
             :key="preset.id"
             type="button"
-            class="flex flex-col gap-0.5 rounded-md border border-line px-3 py-2 text-left transition-colors hover:border-primary hover:bg-primary/8"
-            :class="newBaseUrl === preset.baseUrl ? 'border-primary bg-primary/12' : ''"
+            class="flex items-center gap-2.5 rounded-lg border p-2.5 text-left transition-colors"
+            :class="
+              newBaseUrl === preset.baseUrl
+                ? 'border-primary bg-primary/10'
+                : 'border-line hover:border-primary/50 hover:bg-elevated'
+            "
             @click="pickPreset(preset)"
           >
-            <span class="truncate text-sm font-medium text-fg">{{ preset.name }}</span>
-            <span class="truncate text-xs text-muted">{{ preset.baseUrl }}</span>
+            <span
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold"
+              :class="newBaseUrl === preset.baseUrl ? 'bg-primary/15 text-primary' : 'bg-elevated text-muted'"
+            >
+              {{ monogram(preset.name) }}
+            </span>
+            <span class="min-w-0">
+              <span class="block truncate text-sm leading-5 text-fg">{{ preset.name }}</span>
+              <span class="block truncate font-mono text-xs leading-4 text-muted">{{ preset.baseUrl }}</span>
+            </span>
           </button>
         </div>
 
-        <div class="mt-4 grid grid-cols-1 gap-3 border-t border-line pt-4 md:grid-cols-2">
-          <VTextField
-            v-model="newName"
-            density="compact"
-            variant="outlined"
-            hide-details
-            :label="t('settingsPage.model.providerName')"
-            :placeholder="t('settingsPage.model.providerNamePlaceholder')"
-          />
-          <VTextField
-            v-model="newBaseUrl"
-            density="compact"
-            variant="outlined"
-            hide-details
-            :label="t('settingsPage.model.providerBaseUrl')"
-            :placeholder="t('settingsPage.model.providerBaseUrlPlaceholder')"
-          />
-          <VTextField
-            v-model="newApiKey"
-            type="password"
-            density="compact"
-            variant="outlined"
-            hide-details
-            :label="t('settingsPage.model.apiKey')"
-            :placeholder="t('onboarding.apiKeyPlaceholder')"
-            class="md:col-span-2"
-          />
-        </div>
+        <!-- 自定义表单 -->
+        <section class="mt-5">
+          <h3 class="text-xs font-semibold tracking-widest text-muted">{{ t('settingsPage.model.customPreset') }}</h3>
+          <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <VTextField
+              v-model="newName"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.providerName')"
+              :placeholder="t('settingsPage.model.providerNamePlaceholder')"
+            />
+            <VTextField
+              v-model="newBaseUrl"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.providerBaseUrl')"
+              :placeholder="t('settingsPage.model.providerBaseUrlPlaceholder')"
+            />
+            <VTextField
+              v-model="newApiKey"
+              type="password"
+              density="compact"
+              variant="outlined"
+              hide-details
+              :label="t('settingsPage.model.apiKey')"
+              :placeholder="t('onboarding.apiKeyPlaceholder')"
+              class="md:col-span-2"
+            />
+          </div>
 
-        <div class="mt-3 flex flex-wrap items-center gap-3">
-          <VBtn size="small" variant="outlined" :loading="verifying" :disabled="!addFormValid" @click="verifyAndFetch(newBaseUrl, newApiKey, null)">
-            <span class="i-lucide:plug-zap mr-1 text-3.5" />
-            {{ t('settingsPage.model.verify') }}
-          </VBtn>
-          <VBtn size="small" color="primary" :disabled="!addReady" @click="saveNewProvider">
-            {{ t('settingsPage.model.saveProvider') }}
-          </VBtn>
-          <span v-if="verifyState === 'ok'" class="text-xs text-success">
-            <span class="i-lucide:circle-check mr-1" />
-            {{
-              fetchedModels.length > 0
-                ? t('settingsPage.model.verifyOkWithModels', { n: fetchedModels.length })
-                : t('settingsPage.model.verifyOk')
-            }}
-          </span>
-          <span v-else-if="verifyErrorKey" class="text-xs text-error">
-            <span class="i-lucide:circle-x mr-1" />
-            {{ t(verifyErrorKey) }}
-          </span>
-          <span v-else-if="!addFormValid" class="text-xs text-faint">
-            {{ t('settingsPage.model.verifyFirst') }}
-          </span>
-        </div>
-        <div v-if="verifyState === 'ok'" class="mt-2 text-xs text-muted">
-          {{ t('settingsPage.model.providerModelsHint') }}
-        </div>
-      </VCard>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <VBtn size="small" variant="outlined" :loading="verifying" :disabled="!addFormValid" @click="verifyAndFetch(newBaseUrl, newApiKey, null)">
+              <span class="i-lucide:plug-zap mr-1 text-3.5" />
+              {{ t('settingsPage.model.verify') }}
+            </VBtn>
+            <VBtn size="small" color="primary" :disabled="!addReady" @click="saveNewProvider">
+              {{ t('settingsPage.model.saveProvider') }}
+            </VBtn>
+            <span v-if="verifyState === 'ok'" class="text-xs text-success">
+              <span class="i-lucide:circle-check mr-1" />
+              {{
+                fetchedModels.length > 0
+                  ? t('settingsPage.model.verifyOkWithModels', { n: fetchedModels.length })
+                  : t('settingsPage.model.verifyOk')
+              }}
+            </span>
+            <span v-else-if="verifyErrorKey" class="text-xs text-error">
+              <span class="i-lucide:circle-x mr-1" />
+              {{ t(verifyErrorKey) }}
+            </span>
+            <span v-else-if="!addFormValid" class="text-xs text-faint">
+              {{ t('settingsPage.model.verifyFirst') }}
+            </span>
+          </div>
+          <div v-if="verifyState === 'ok'" class="mt-2 text-xs text-muted">
+            {{ t('settingsPage.model.providerModelsHint') }}
+          </div>
+        </section>
+      </template>
 
       <!-- 无供应商且未点添加 -->
       <div v-else class="flex flex-col items-center justify-center gap-2 py-16 text-faint select-none">
         <span class="i-lucide:server text-8" />
         <div class="text-sm">{{ t('settingsPage.model.empty') }}</div>
+        <div class="text-xs">{{ t('settingsPage.model.emptyHint') }}</div>
       </div>
+    </div>
 
     <!-- 删除供应商确认 -->
     <VDialog :model-value="deleteTarget !== null" max-width="420" @update:model-value="v => { if (!v) deleteTarget = null }">
@@ -502,6 +553,5 @@ async function saveNewProvider() {
         </VCardActions>
       </VCard>
     </VDialog>
-    </div>
   </div>
 </template>
