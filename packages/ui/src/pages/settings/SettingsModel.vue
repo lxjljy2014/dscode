@@ -185,7 +185,7 @@ async function confirmDeleteProvider() {
           />
           <VTextField
             v-model="newApiKey"
-            :type="'password'"
+            type="password"
             density="compact"
             variant="outlined"
             hide-details
