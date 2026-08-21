@@ -325,8 +325,11 @@ export const DEFAULT_COMMANDS: Command[] = [
 
 /**
  * API key 校验结果（校验请求由主进程发起：渲染端 CSP default-src 'self' 不允许直连外部 API）。
+ * ok=true 时可携带从 {baseUrl}/models 拉取的模型名列表（响应非 OpenAI 格式时缺省，用户仍可手动添加模型）。
  * unauthorized = key 无效；network = 网络/服务异常；invalid-args = 参数不合法。
  */
-export type ProviderVerifyResult = { ok: true } | { ok: false; reason: 'unauthorized' | 'network' | 'invalid-args' };
+export type ProviderVerifyResult =
+  | { ok: true; models?: string[] }
+  | { ok: false; reason: 'unauthorized' | 'network' | 'invalid-args' };
 
 export type SettingsPatch = Partial<AppSettings>;

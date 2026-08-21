@@ -16,8 +16,10 @@ const showKey = ref(false);
 const apiKey = ref(settingsStore.settings.providers.find(p => p.id === 'deepseek')?.apiKey ?? '');
 
 async function save() {
+  // 只更新 DeepSeek 预置项：其余供应商（设置页「模型」添加的自定义项）原样保留
+  const others = settingsStore.settings.providers.filter(p => p.id !== 'deepseek');
   await settingsStore.save({
-    providers: [{ ...DEEPSEEK_PRESET, models: [...DEEPSEEK_PRESET.models], apiKey: apiKey.value.trim() }]
+    providers: [...others, { ...DEEPSEEK_PRESET, models: [...DEEPSEEK_PRESET.models], apiKey: apiKey.value.trim() }]
   });
 }
 </script>
