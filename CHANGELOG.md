@@ -1,5 +1,48 @@
 # 更新日志
 
+## 0.2.0（2026-08-21）
+
+本版重点：MCP 工具接入、子智能体委派、自定义模型供应商，以及启动与工具能力的全面增强。
+
+### 🎉 新功能
+
+- **MCP 工具闭环**：配置的 MCP 服务器（stdio）工具以 `mcp__<server>__<tool>` 命名合入 agent 工具表，模型可直接调用（长连接池 + 30 分钟空闲回收，外部工具默认走写确认门控）；JSON Schema 自动映射为工具参数，复杂嵌套降级透传。
+- **子智能体委派（task 工具）**：主 agent 可派发独立上下文的子任务（单父运行上限 5 个），结论摘要回传；默认只读白名单（read_file / list_dir / search / browse），改动计入父会话 diff。
+- **子智能体可写（writable）**：借鉴官方 harness 的「继承 + 冻结」权限模型——writable 开启时工具面按父权限模式收敛（confirm 模式下仍只读，可见性即执行性），可写子任务的文件改动由父会话全量 diff 捡漏。
+- **自定义模型供应商**：设置页可添加任意 OpenAI 兼容接口（第三方中转 / OpenRouter / 本地 Ollama、LM Studio），预置 9 家厂商一键填入；「验证并拉取模型」连通即拉取模型列表（http 仅放行本机回环地址，SSRF 防护不变）。
+- **模型设置页重做**：左右栏布局（VList 导航 + 编辑/添加视图），厂商官方 logo（simple-icons / lobehub 图源，随包内置），当前在用供应商标绿；当前使用的模型提升为全局共享状态。
+- **read_file 行分页**：`offset` / `limit` 参数 + `totalLines` / `hasMore` 元信息，大文件按页读取（默认 500 行）。
+- **search 增强**：正则模式、文件过滤（`include`，支持 `*.ts` / `ts,tsx`）、每文件命中上限；跳过目录扩充（build / target / venv / __pycache__ 等十余项）。
+- **diff 面板升级**：统一 / 并排视图切换、diff 行语法高亮（按扩展名映射语言）、提交时文件勾选（默认全选，只提交勾选路径）。
+- **文件树右键操作**：新建文件 / 新建文件夹 / 重命名 / 删除（移入系统回收站，非永久删除），操作后自动刷新。
+
+### ⚡ 性能与稳定性
+
+- 启动提速：splash 最短展示 3000ms → 600ms；旧会话迁移与回填移出首窗关键路径。
+- 单实例锁：重复启动聚焦已有主窗口，不再多开。
+- 会话缓存 LRU 淘汰：runtime 审批/统计 Map 与 persist 目录缓存设上限（64 会话），归档会话即时清理。
+- UI 文件内容缓存上限 32 文件（保留当前选中）。
+
+### 🐛 修复
+
+- **release CI 构建失败**：electron-builder 在 CI 环境默认尝试自动发布而 workflow 无 token，显式 `--publish never`（本工作流由 publish job 汇总发布）；publish 改用 Actions 内置 token。
+- SettingsProviders 保存自定义供应商时覆盖已有列表的问题。
+
+### 🛠 工程
+
+- 单测扩展至 **319 个**（core 263 + desktop 32 + ui 24），新增 ui 纯逻辑测试基建（diff / markdown / settings store / workspace store）。
+- 模型页交互组件全面 Vuetify 化（VListItem / VItemGroup + VCard），裸 button 手搓样式退场。
+
+### ⚠️ 已知问题
+
+- 安装包**未签名**：macOS Gatekeeper / Windows SmartScreen 会提示「未知开发者」，需手动放行（mac 自动更新依赖签名，暂不可用）。
+- 回滚快照与 diff 面板均为应用生命周期内瞬态（重启后不可回滚）。
+
+### 📦 安装
+
+- **Windows**（x64）：`DSCode-0.2.0-win-x64-setup.exe`
+- **macOS**（Intel / Apple Silicon）：`DSCode-0.2.0-mac-x64.dmg` / `DSCode-0.2.0-mac-arm64.dmg`
+
 ## 0.1.3（2026-08-20）
 
 本版重点：agent 改动的安全网（回滚 / 定向提交）与上下文自动压缩，另修复 /compact 一批可用性问题。
