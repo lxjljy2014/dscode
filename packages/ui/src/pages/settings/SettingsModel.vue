@@ -6,12 +6,12 @@ import { PROVIDER_PRESETS } from '@dscode/shared';
 import { host } from '../../bridge/host';
 import { useSettingsStore } from '../../stores/settings';
 import { useAgentStore } from '../../stores/agent';
+import { PROVIDER_LOGOS } from '../../utils/provider-logos';
 
 /**
  * 模型设置：左栏供应商导航（VList nav）+ 右栏编辑/添加，全部交互走 Vuetify
- * 组件（VListItem / VItemGroup + VCard），不再用裸 button 手搓样式。
- * 视觉签名是 monogram 徽标——厂商名首个拉丁词前两字符的等宽字方块
- * （纯中文名取首字），左栏列表、右栏头部、预设网格三处复用。
+ * 组件（VListItem / VItemGroup + VCard）。厂商标识优先用官方 logo（provider-logos，
+ * 未知供应商回退 monogram 首字母方块）：左栏列表、右栏头部、预设网格三处复用。
  * 本地可编辑副本 + 保存按钮一次性写回（与其它设置页一致）。
  */
 
@@ -75,13 +75,21 @@ function toggleKey(id: string) {
   showKey.value[id] = !showKey.value[id];
 }
 
-/** 厂商 monogram：取名称中首个拉丁词前两字符（纯中文名取首字），避免双汉字挤占方块 */
+/** 厂商 monogram：取名称中首个拉丁词前两字符（纯中文名取首字），未知厂商的 logo 兜底 */
 function monogram(name: string): string {
   const trimmed = name.trim();
   const latin = trimmed.match(/[A-Za-z][A-Za-z0-9]*/);
   if (latin) return latin[0].slice(0, 2).toUpperCase();
   const cjk = trimmed.match(/[\u4e00-\u9fff]/);
   return cjk ? cjk[0] : '?';
+}
+
+/** 供应商 logo path 集：按 id 命中；预设创建的供应商 id 是 uuid，按 baseUrl 反查预设 */
+function logoOf(p: { id: string; baseUrl: string }): string[] | null {
+  const byId = PROVIDER_LOGOS[p.id];
+  if (byId) return byId;
+  const preset = PROVIDER_PRESETS.find(x => x.baseUrl === p.baseUrl.trim());
+  return preset ? PROVIDER_LOGOS[preset.id] ?? null : null;
 }
 
 // ---- 保存 / 删除 ----
@@ -240,9 +248,18 @@ async function saveNewProvider() {
           @click="select(p.id)"
         >
           <template #prepend>
+            <svg
+              v-if="logoOf(p)"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              class="mr-2 h-5 w-5 shrink-0"
+              :class="p.id === selectedId ? 'text-fg' : 'text-muted'"
+            >
+              <path v-for="(d, i) in logoOf(p)" :key="i" :d="d" />
+            </svg>
             <span
-              class="mr-1 flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold tracking-tight"
-              :class="p.id === selectedId ? 'bg-primary/15 text-primary' : 'bg-elevated text-muted'"
+              v-else
+              class="mr-1 flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-3 font-semibold tracking-tight text-muted"
             >
               {{ monogram(p.name) }}
             </span>
@@ -281,8 +298,11 @@ async function saveNewProvider() {
       <template v-if="selected">
         <!-- 头部：身份（大字名称可编辑）+ 保存锚点 -->
         <div class="flex items-start gap-4">
-          <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-elevated font-mono text-5 font-semibold text-muted">
-            {{ monogram(selected.name) }}
+          <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-elevated">
+            <svg v-if="logoOf(selected)" viewBox="0 0 24 24" fill="currentColor" class="h-6.5 w-6.5 text-fg">
+              <path v-for="(d, i) in logoOf(selected)" :key="i" :d="d" />
+            </svg>
+            <span v-else class="font-mono text-5 font-semibold text-muted">{{ monogram(selected.name) }}</span>
           </span>
           <div class="group min-w-0 flex-1">
             <div class="flex items-center gap-1.5">
@@ -469,9 +489,18 @@ async function saveNewProvider() {
               @click="toggle"
             >
               <div class="flex items-center gap-2.5 p-3">
+                <svg
+                  v-if="PROVIDER_LOGOS[preset.id]"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  class="h-5 w-5 shrink-0"
+                  :class="isSelected ? 'text-primary' : 'text-muted'"
+                >
+                  <path v-for="(d, i) in PROVIDER_LOGOS[preset.id]" :key="i" :d="d" />
+                </svg>
                 <span
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold"
-                  :class="isSelected ? 'bg-primary/15 text-primary' : 'text-muted'"
+                  v-else
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-3 font-semibold text-muted"
                 >
                   {{ monogram(preset.name) }}
                 </span>
